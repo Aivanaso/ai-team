@@ -1,0 +1,47 @@
+# Artifact Dependency Graph
+#
+# Defines the DAG (Directed Acyclic Graph) of SDD phases.
+# The orchestrator uses this to determine which phases can run
+# and what artifacts must exist before starting a phase.
+
+artifacts:
+  - id: proposal
+    description: "Problem statement, scope, and high-level approach"
+    path: "proposal.md"
+    agent: sdd-propose
+    requires: []
+
+  - id: specs
+    description: "Delta specs with requirements and Given/When/Then scenarios"
+    path: "specs/{domain}/spec.md"
+    agent: sdd-spec
+    requires: [proposal]
+
+  - id: design
+    description: "Technical design: components, interfaces, data flow"
+    path: "design.md"
+    agent: sdd-design
+    requires: [proposal]
+
+  - id: tasks
+    description: "Implementation task breakdown with file-level changes"
+    path: "tasks.md"
+    agent: sdd-tasks
+    requires: [specs, design]
+
+# Post-artifact phases (operate on code, not documents)
+
+apply:
+  description: "Implement the tasks — write actual code"
+  agent: sdd-apply
+  requires: [tasks]
+
+verify:
+  description: "Run tests, lint, type-check — validate the implementation"
+  agent: sdd-verify
+  requires: [tasks]
+
+archive:
+  description: "Merge delta specs, move change to archive"
+  agent: orchestrator
+  requires: [verify]
