@@ -31,7 +31,9 @@ ai-team/
 │   │   └── spec-convention.md
 │   ├── orchestrator/         # Delegate-only coordinator
 │   │   └── AGENT.md
-│   └── sdd-scout/            # Project inspector + codebase explorer
+│   ├── sdd-scout/            # Project inspector + codebase explorer
+│   │   └── AGENT.md
+│   └── sdd-propose/          # PRD → RFC proposal generator
 │       └── AGENT.md
 ├── config/
 │   ├── schema.yaml           # Artifact dependency graph (DAG)
@@ -91,11 +93,11 @@ ai-team is tool-agnostic. Adapters translate the orchestrator's delegation proto
 
 ## Current Status
 
-**Phase 1** — Orchestrator + Scout agents. Validating the delegation model.
+**Phase 2** — Core SDD loop in progress.
 
 ### Roadmap
 
-- Phase 2: sdd-propose + sdd-spec + sdd-apply (core SDD loop)
+- Phase 2: sdd-propose (done) + sdd-spec + sdd-apply (core SDD loop)
 - Phase 3: sdd-design + sdd-tasks + sdd-verify + sdd-archive (full lifecycle)
 - Phase 4: code-review + refactor specialists
 - Phase 5: Additional tool adapters

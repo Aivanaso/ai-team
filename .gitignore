@@ -12,3 +12,6 @@ Thumbs.db
 
 # Claude Code
 .claude/
+
+# Self-generated ai-team artifacts (this is a framework, not a target project)
+.ai-team/
