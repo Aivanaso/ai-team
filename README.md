@@ -33,7 +33,11 @@ ai-team/
 │   │   └── AGENT.md
 │   ├── sdd-scout/            # Project inspector + codebase explorer
 │   │   └── AGENT.md
-│   └── sdd-propose/          # PRD → RFC proposal generator
+│   ├── sdd-propose/          # PRD → RFC proposal generator
+│   │   └── AGENT.md
+│   ├── sdd-spec/             # Proposal → domain specs (delta + greenfield)
+│   │   └── AGENT.md
+│   └── sdd-design/           # Specs → technical design (grounded in codebase)
 │       └── AGENT.md
 ├── config/
 │   ├── schema.yaml           # Artifact dependency graph (DAG)
@@ -63,7 +67,13 @@ ai-team/
 /ai-team explore "authentication flow"
 ```
 
-### 3. Start a change (Phase 2+)
+### 3. Generate a baseline spec for existing code
+
+```
+/ai-team baseline shops
+```
+
+### 4. Start a new feature
 
 ```
 /ai-team new user-authentication
@@ -93,12 +103,24 @@ ai-team is tool-agnostic. Adapters translate the orchestrator's delegation proto
 
 ## Current Status
 
-**Phase 2** — Core SDD loop in progress.
+**Phase 2** — Core SDD agents in progress.
+
+| Agent | Status | Description |
+|-------|--------|-------------|
+| orchestrator | Done | Delegate-only coordinator with escalation logic |
+| sdd-scout | Done | Bootstrap, explore, and baseline modes |
+| sdd-propose | Done | PRD → proposal with ACs (blocks on vague input) |
+| sdd-spec | Done | Proposal → delta/greenfield domain specs |
+| sdd-design | Done | Specs → technical design grounded in codebase |
+| sdd-tasks | Next | Design → file-level task breakdown |
+| sdd-apply | Planned | Tasks → code generation |
+| sdd-verify | Planned | Spec compliance verification |
+| sdd-archive | Planned | Change archival and base spec promotion |
 
 ### Roadmap
 
-- Phase 2: sdd-propose (done) + sdd-spec + sdd-apply (core SDD loop)
-- Phase 3: sdd-design + sdd-tasks + sdd-verify + sdd-archive (full lifecycle)
+- Phase 2: Core SDD loop — propose, spec, design, tasks (in progress)
+- Phase 3: Apply + verify + archive (full lifecycle)
 - Phase 4: code-review + refactor specialists
 - Phase 5: Additional tool adapters
 - Phase 6: setup.sh installer script
