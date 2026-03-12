@@ -67,20 +67,58 @@ Cross-reference the user's request against existing requirements:
 - Does this add new behavior? Note where it fits.
 - Does this conflict with documented decisions? Flag it as a risk.
 
-### Step 4 — Analyze the Codebase
+### Step 4 — Analyze the Codebase (Two-Phase Exploration)
 
-Read code to ground the proposal in reality. Specifically:
+Ground the proposal in reality using a two-phase approach. This prevents blind spots in both legacy spaghetti and well-structured DDD/hexagonal projects.
+
+#### Phase A — Structural Scan (cost-free)
+
+Map the codebase topology **without reading file contents**. This phase does NOT count toward the file read budget.
+
+1. **Glob for structure** — Scan directory trees to understand the project layout
+2. **Grep for connections** — Search for imports, class names, decorators, and route definitions related to the change
+3. **Build a dependency sketch** — Which files reference which? Where are the entry points, and what do they call?
+
+This gives you a bird's-eye view — like opening the folder tree on your first day.
+
+**Use `config.yaml` architecture hints:**
+
+| `architecture.style` | Scan strategy |
+|----------------------|---------------|
+| `ddd` | Glob aggregate roots in affected `bounded_contexts`, then trace via application handlers |
+| `hexagonal` | Start from `infrastructure/` adapters (controllers, CLI), trace inward to `application/` and `domain/` |
+| `layered` / `mvc` | Glob `controllers/` for entry points, then `services/`, then `entities/` |
+| `modular` | Glob affected feature folders entirely |
+| `unknown` | Full grep scan — cast a wide net, then cluster results by directory |
+
+#### Phase B — Selective Read (budgeted)
+
+Now read file contents, but only the files that matter:
 
 1. **Find entry points** — Routes, controllers, pages, CLI commands related to the change
 2. **Trace the flow** — From entry point through services, repositories, external calls
 3. **Identify constraints** — Database schema, API contracts, shared types, validation rules
 4. **Spot conflicts** — Code that would resist the proposed change (tight coupling, hardcoded assumptions, missing abstractions)
 
-Bounds:
+**Read budget based on architecture complexity:**
 
-- Read a **maximum of 20 source files**
-- Prioritize: entry points > services > models > utilities
-- Stop when you have enough context to write a grounded proposal
+| Scenario | Max file reads |
+|----------|---------------|
+| Single domain, known architecture (`ddd`, `hexagonal`, `layered`, `mvc`) | 20 |
+| Multiple domains or cross-context changes | 30 |
+| `unknown` architecture or legacy codebase | 40 |
+
+**Read priority (what to read vs skip):**
+
+| Priority | Read | Skip (infer from Phase A) |
+|----------|------|---------------------------|
+| 1 | Aggregate roots, domain models | Value objects with obvious names |
+| 2 | Application handlers, services | DTOs, serializers (boilerplate) |
+| 3 | Entry points (controllers, routes) | Repository implementations (infra detail) |
+| 4 | Shared types, API contracts | Test files (unless verifying behavior) |
+| 5 | Cross-context adapters, ACLs | Config files, module declarations |
+
+Stop when you have enough context to write a grounded proposal — you don't need to exhaust the budget.
 
 ### Step 5 — Write proposal.md
 
@@ -294,6 +332,6 @@ risks:
 3. **Proposal is strategic, not technical** — No file names, no class designs, no schemas in the Approach. That is for spec and design phases
 4. **Ground in reality** — Every claim in the proposal must be traceable to either the user request or code analysis. No hallucinated features
 5. **Surface conflicts, don't resolve them** — If the request conflicts with existing code or specs, document it. The user decides
-6. **Bounded exploration** — Max 20 source files. You are writing a proposal, not doing a full audit
+6. **Bounded exploration** — Two-phase: free structural scan (glob/grep) + budgeted reads (20-40 depending on complexity). You are writing a proposal, not doing a full audit
 7. **Honest uncertainty** — If you can't determine something, say so in Open Questions
 8. **Result envelope always** — Every response MUST end with a result envelope

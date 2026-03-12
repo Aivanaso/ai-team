@@ -52,6 +52,25 @@ Scan the project root for these markers (in order):
 | `package-lock.json` | npm |
 | `composer.lock` | composer |
 
+#### Project Type Detection
+
+Determine whether the project is an `app`, `library`, or `monorepo`.
+
+##### Monorepo detection (check in order)
+
+1. **Explicit monorepo tooling** — `turbo.json`, `pnpm-workspace.yaml`, `lerna.json`, `nx.json` → `monorepo`
+2. **Workspace config** — `package.json` contains a `workspaces` field → `monorepo`
+3. **Multiple package manifests** — Two or more `package.json` (or `composer.json`, `go.mod`, `Cargo.toml`) found in **direct child directories** of the project root (e.g., `backend/package.json` + `frontend/package.json`) → `monorepo`
+
+##### App vs Library detection (when not monorepo)
+
+| Signal | Type |
+|--------|------|
+| Has entry points: `main.ts`, `index.html`, routes, controllers, `bin/` scripts | `app` |
+| `package.json` has `main`/`exports`/`types` fields and no server/routes | `library` |
+| `composer.json` type is `"library"` | `library` |
+| Ambiguous | default to `app` |
+
 #### Skill Discovery
 
 Scan the project for `SKILL.md` files:
@@ -64,6 +83,100 @@ For each found skill:
 1. Read its content
 2. Extract: name, description, trigger conditions
 3. Add to skill registry
+
+#### Architecture Detection
+
+After detecting the stack, analyze the **directory structure and code patterns** to infer the project's architectural style. This is what a senior developer does on day one: open the folder tree and figure out how the project is organized.
+
+##### Detection Heuristics
+
+Scan directory names and file naming patterns to classify the architecture:
+
+| Signal | Infers |
+|--------|--------|
+| Directories named `domain/`, `application/`, `infrastructure/` nested inside feature folders | `ddd` |
+| Top-level `domain/`, `application/`, `infrastructure/`, `presentation/` | `hexagonal` |
+| Flat `controllers/`, `services/`, `models/`, `views/` | `mvc` |
+| Flat `controllers/`, `services/`, `entities/`, `repositories/` (e.g., NestJS default) | `layered` |
+| Feature folders with mixed concerns (controller + service + entity in same folder) | `modular` |
+| No clear pattern or deeply nested spaghetti | `unknown` |
+
+##### Pattern Detection
+
+Look for these file naming conventions:
+
+| File pattern | Detects |
+|--------------|---------|
+| `*Command.{ts,php}` + `*Handler.{ts,php}` or `*CommandHandler.{ts,php}` | `cqrs` |
+| `*Query.{ts,php}` + `*QueryHandler.{ts,php}` | `cqrs` (read side) |
+| `*Event.{ts,php}` + `*Listener.{ts,php}` or `*Subscriber.{ts,php}` | `event-driven` |
+| `*Repository.{ts,php}` (interface) + `*Repository.{ts,php}` (implementation in different layer) | `repository-pattern` |
+| `*Saga.{ts,php}` or `*Projection.{ts,php}` | `event-sourcing` |
+| `*Mediator*` or use of `@nestjs/cqrs` | `mediator` |
+| `*Voter.php` or `*Guard.ts` with role/permission logic | `role-based-access` |
+| `*Factory.{ts,php}` creating aggregates or entities | `factory-pattern` |
+
+##### Bounded Context / Module Discovery
+
+Identify the top-level domain boundaries:
+
+1. **Glob feature directories** — Look for directories under `src/` (or equivalent) that represent business domains (not technical layers)
+2. **Cross-reference with framework modules** — In NestJS: `*.module.ts`; in Symfony: bundles or `config/packages/`
+3. **List them** as `bounded_contexts` (DDD) or simply as module boundaries
+
+##### Output
+
+The architecture block is part of `config.yaml`. Example for a DDD project:
+
+```yaml
+architecture:
+  style: "ddd"
+  layers:
+    - name: "domain"
+      path: "src/*/domain/"
+    - name: "application"
+      path: "src/*/application/"
+    - name: "infrastructure"
+      path: "src/*/infrastructure/"
+  bounded_contexts:
+    - name: "orders"
+      path: "src/orders/"
+    - name: "customers"
+      path: "src/customers/"
+    - name: "inventory"
+      path: "src/inventory/"
+  patterns:
+    - "cqrs"
+    - "repository-pattern"
+    - "event-driven"
+```
+
+Example for a typical MVC/layered project:
+
+```yaml
+architecture:
+  style: "layered"
+  layers:
+    - name: "controllers"
+      path: "src/controllers/"
+    - name: "services"
+      path: "src/services/"
+    - name: "entities"
+      path: "src/entities/"
+  bounded_contexts: []
+  patterns:
+    - "repository-pattern"
+```
+
+Example when the structure is unclear:
+
+```yaml
+architecture:
+  style: "unknown"
+  layers: []
+  bounded_contexts: []
+  patterns: []
+```
 
 #### Output: `config.yaml`
 
@@ -101,6 +214,17 @@ structure:
   tests: "src/**/*.test.ts"
   components: "src/components/"
   # Detected from actual directory structure
+
+architecture:
+  style: "{detected style}"
+  layers:
+    - name: "{layer}"
+      path: "{path}"
+  bounded_contexts:
+    - name: "{context}"
+      path: "{path}"
+  patterns:
+    - "{pattern}"
 ```
 
 #### Output: `skill-registry.md`

@@ -40,6 +40,18 @@ structure:
   # pages: "src/app/"
   # styles: "src/styles/"
 
+architecture:
+  style: "{style}"               # ddd | hexagonal | layered | mvc | modular | unknown
+  layers: []                     # Detected logical layers with their paths
+    # - name: "{layer}"          # e.g., domain, application, infrastructure, presentation
+    #   path: "{glob-pattern}"   # e.g., src/*/domain/
+  bounded_contexts: []           # DDD bounded contexts or module boundaries
+    # - name: "{context}"        # e.g., orders, customers, auth
+    #   path: "{path}"           # e.g., src/orders/
+  patterns: []                   # Architectural patterns detected
+    # Examples: cqrs, event-sourcing, repository-pattern, mediator,
+    #           event-driven, service-layer, active-record
+
 # Custom rules for AI agents (optional)
 rules:
   # Examples:
