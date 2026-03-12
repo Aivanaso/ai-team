@@ -61,9 +61,9 @@ Start a new change through the SDD workflow.
 
 1. Create `.ai-team/changes/{change-name}/` directory
 2. Initialize `state.yaml` with all phases set to `pending`
-3. Delegate to **sdd-propose** agent (Phase 2 — not yet available)
+3. Delegate to **sdd-propose** agent
 4. Present proposal to user for approval (GATE)
-5. On approval, proceed to spec/design phases
+5. On approval, delegate to **sdd-spec** agent for delta spec generation
 
 ### `/ai-team continue [change-name]`
 
