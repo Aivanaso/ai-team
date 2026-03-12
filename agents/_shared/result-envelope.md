@@ -31,7 +31,8 @@ risks:
 |-------|---------|-------------------|
 | `ok` | Task completed successfully | Proceed to next phase |
 | `warning` | Completed but with concerns | Show risks to user, proceed with caution |
-| `blocked` | Cannot proceed — missing dependency or input | Ask user for resolution |
+| `needs_input` | Cannot proceed — user input is too vague or incomplete | Show questions to user, re-run agent with clarified input |
+| `blocked` | Cannot proceed — missing dependency or technical blocker | Ask user for resolution |
 | `failed` | Unrecoverable error | Report to user, suggest retry or alternative |
 
 ### `executive_summary` (REQUIRED)
@@ -52,6 +53,13 @@ risks:
 - Suggested next phases or actions
 - The orchestrator uses this as a hint, not a command
 - Must reference valid phase names from `config/schema.yaml`
+
+### `questions` (OPTIONAL)
+
+- List of specific questions the agent needs answered before it can proceed
+- Used with `status: needs_input` — the orchestrator surfaces these to the user
+- Each question should be concrete and actionable, not generic
+- Omit entirely if there are no questions
 
 ### `risks` (OPTIONAL)
 

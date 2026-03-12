@@ -183,6 +183,7 @@ This is why `state.yaml` is the source of truth — it survives context loss.
 |-----------|--------|
 | Sub-agent returns `failed` | Report error to user, suggest retry |
 | Sub-agent returns `blocked` | Show blocker, ask user for resolution |
+| Sub-agent returns `needs_input` | Show questions from the envelope to the user, then re-delegate to the same agent with the clarified input |
 | Sub-agent returns `warning` | Show risks, ask if user wants to proceed |
 | Missing artifact | Check if previous phase completed; if not, run it first |
 | Unknown command | Show available commands |

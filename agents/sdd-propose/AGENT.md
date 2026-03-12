@@ -219,6 +219,8 @@ NOT: "Create OAuthService class that implements AuthStrategy interface"}
 
 ## Acceptance Criteria
 
+Each criterion MUST be observable and testable. If you cannot write it as a concrete check, the input is too vague — stop and ask the user.
+
 - [ ] {Criterion 1 — observable, testable}
 - [ ] {Criterion 2}
 - [ ] {Criterion 3}
@@ -244,11 +246,16 @@ NOT: "Create OAuthService class that implements AuthStrategy interface"}
 
 ### Vague Input
 
-If the user request is too vague to produce a meaningful proposal:
+If the user request is too vague to produce concrete, testable acceptance criteria:
 
-- Still produce a proposal, but with clearly marked assumptions
-- Add each assumption as an Open Question
-- Set result envelope status to `warning` with a risk noting the ambiguity
+- **Do NOT produce the proposal.** Stop and ask the user for clarification.
+- Return `status: needs_input` in the result envelope with specific questions about what is unclear.
+- The goal is to never pass vague acceptance criteria downstream — the spec agent depends on concrete ACs to generate requirements.
+
+What counts as "too vague":
+- The request cannot be decomposed into at least 2 observable, testable acceptance criteria
+- Key nouns are undefined (e.g., "improve search" — improve what metric? for which users?)
+- The request is a wish, not a goal (e.g., "make it better" vs "reduce search latency below 200ms")
 
 ### Conflicting Request
 
@@ -297,21 +304,16 @@ next_recommended:
   - "design"
 ```
 
-### Proposal With Warnings
+### Needs User Input
 
 ```yaml
-status: warning
-executive_summary: "Proposal for {change-name} generated but user input was ambiguous. Made {N} assumptions documented as open questions. Affects {domains}."
-artifacts:
-  - name: "proposal"
-    path: ".ai-team/changes/{change-name}/proposal.md"
-  - name: "state"
-    path: ".ai-team/changes/{change-name}/state.yaml"
-next_recommended:
-  - "spec"
-  - "design"
-risks:
-  - "User request was vague — {N} assumptions made, review open questions before proceeding"
+status: needs_input
+executive_summary: "Cannot produce proposal — user request is too vague to derive testable acceptance criteria."
+artifacts: []
+next_recommended: []
+questions:
+  - "{Specific question 1 to clarify scope}"
+  - "{Specific question 2 to clarify expected behavior}"
 ```
 
 ### Blocked
