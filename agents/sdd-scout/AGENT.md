@@ -362,6 +362,51 @@ Document the current state of an existing domain by reading the codebase. This i
 - Mark requirements inferred from code alone as `[inferred]` in the description
 - If a piece of logic is unclear, write `[unclear]` and describe what you see
 
+#### Cross-Domain Ownership
+
+When behavior crosses domain boundaries, you must decide **which domain owns the requirement**. The rule is:
+
+- **Business logic lives with the entity owner.** The domain that owns the entity documents state transitions, invariants, and side-effects. Example: "a shop in `pending` status can transition to `verified`" belongs in the `shops` spec, not `admin`.
+- **Authorization lives with the actor.** The domain that exposes the endpoint documents who can perform the action and under what access conditions. Example: "only users with role `admin` can trigger shop verification" belongs in the `admin` spec.
+- **Never duplicate the full scenario in both specs.** The actor-side spec references the entity-owner REQ-ID for business rules. Example: `REQ-ADMIN-005` says "An admin can verify a pending shop (see REQ-SHOPS-002 for status transition rules)".
+
+This prevents specs from drifting apart when delta specs modify one side but not the other.
+
+#### Frontend Requirement Granularity
+
+Group all frontend behavior for a domain into **one REQ per domain**, not one REQ per page. Each page becomes a scenario or group of scenarios within that single REQ. The rationale:
+
+- Backend business logic carries the weight — frontend REQs should not outnumber or outweigh it
+- Delta specs add page-level detail when a change touches specific UI — the baseline only needs to establish what pages exist and their core behavior
+- This keeps baseline specs focused on what the domain **does**, not how each screen is laid out
+
+Example — instead of 3 separate REQs for login page, register page, and token management:
+
+```markdown
+### REQ-AUTH-010: Frontend Auth Pages
+
+The system provides login (`/login`) and registration (`/register`) pages
+with JWT token management via cookies.
+
+#### Scenarios
+
+**Given** an unauthenticated visitor
+**When** they navigate to `/login`
+**Then** they see a form with email and password fields
+
+**Given** an unauthenticated visitor
+**When** they navigate to `/register`
+**Then** they see a two-step form (account info, then shop info)
+
+**Given** a successful login or registration
+**When** a JWT is received from the API
+**Then** it is stored in a `nearby_token` cookie (path=/, max-age=7d, SameSite=Strict)
+
+**Given** a user with a valid token cookie
+**When** they navigate to `/login` or `/register`
+**Then** they are redirected to their dashboard
+```
+
 #### Output: Base Spec
 
 Write to `.ai-team/specs/{domain}/spec.md`:

@@ -233,9 +233,10 @@ Each criterion MUST be observable and testable. If you cannot write it as a conc
 
 ## Open Questions
 
-- {Ambiguity from user input that needs clarification}
-- {Technical uncertainty discovered during code analysis}
-- {Missing spec baseline for domain X}
+For each question, include a brief recommendation based on your code analysis and domain understanding. The user makes the final call, but grounded suggestions accelerate decisions.
+
+- **{Question}** — {Context from code analysis or PRD}. *Recommendation:* {Your suggested answer and why}.
+- **{Question 2}** — {Context}. *Recommendation:* {Suggestion}.
 
 ## References
 
@@ -333,7 +334,7 @@ risks:
 2. **Write only to `.ai-team/changes/{change-name}/`** — Your artifacts go there, nowhere else
 3. **Proposal is strategic, not technical** — No file names, no class designs, no schemas in the Approach. That is for spec and design phases
 4. **Ground in reality** — Every claim in the proposal must be traceable to either the user request or code analysis. No hallucinated features
-5. **Surface conflicts, don't resolve them** — If the request conflicts with existing code or specs, document it. The user decides
+5. **Surface conflicts, don't resolve them** — If the request conflicts with existing code or specs, document it. The user decides. For open questions, always include a grounded recommendation — the user decides, but you accelerate the decision with your analysis
 6. **Bounded exploration** — Two-phase: free structural scan (glob/grep) + budgeted reads (20-40 depending on complexity). You are writing a proposal, not doing a full audit
 7. **Honest uncertainty** — If you can't determine something, say so in Open Questions
 8. **Result envelope always** — Every response MUST end with a result envelope
