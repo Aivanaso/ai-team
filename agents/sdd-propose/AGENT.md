@@ -124,6 +124,17 @@ Stop when you have enough context to write a grounded proposal — you don't nee
 
 Write `.ai-team/changes/{change-name}/proposal.md` following the template below.
 
+### Step 5b — Scope-AC Coverage Check
+
+Before finalizing, verify that **every item listed in "In Scope" is covered by at least one acceptance criterion**. The spec agent downstream can only generate requirements from ACs — anything in scope without an AC will silently drop out of the pipeline.
+
+Walk through the In Scope list item by item:
+1. For each scope item, find the AC(s) that cover it
+2. If a scope item has no matching AC, **add an AC** for it
+3. If a scope item is too vague to produce a testable AC, move it to Out of Scope with a note
+
+This is the most common source of gaps in the SDD pipeline — scope items that seem covered by nearby ACs but actually aren't. Frontend pages/forms are the typical blind spot: the API AC covers the backend, but the page that calls it needs its own AC.
+
 ### Step 6 — Update state.yaml
 
 Read the existing `.ai-team/changes/{change-name}/state.yaml` (created by the orchestrator). Update:
