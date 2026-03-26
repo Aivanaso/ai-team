@@ -39,7 +39,9 @@ ai-team/
 │   │   └── AGENT.md
 │   ├── sdd-design/           # Specs → technical design (grounded in codebase)
 │   │   └── AGENT.md
-│   └── sdd-tasks/            # Design → ordered implementation task plan
+│   ├── sdd-tasks/            # Design → ordered implementation task plan
+│   │   └── AGENT.md
+│   └── sdd-apply/            # Tasks → actual code implementation
 │       └── AGENT.md
 ├── config/
 │   ├── schema.yaml           # Artifact dependency graph (DAG)
@@ -115,14 +117,14 @@ ai-team is tool-agnostic. Adapters translate the orchestrator's delegation proto
 | sdd-spec | Done | Proposal → delta/greenfield domain specs |
 | sdd-design | Done | Specs → technical design grounded in codebase |
 | sdd-tasks | Done | Design → ordered implementation task plan |
-| sdd-apply | Planned | Tasks → code generation |
+| sdd-apply | Done | Tasks → code implementation |
 | sdd-verify | Planned | Spec compliance verification |
 | sdd-archive | Planned | Change archival and base spec promotion |
 
 ### Roadmap
 
 - Phase 2: Core SDD loop — propose, spec, design, tasks (done)
-- Phase 3: Apply + verify + archive (full lifecycle)
+- Phase 3: Apply (done) + verify + archive (full lifecycle)
 - Phase 4: code-review + refactor specialists
 - Phase 5: Additional tool adapters
 - Phase 6: setup.sh installer script
