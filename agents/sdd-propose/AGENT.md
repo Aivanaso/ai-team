@@ -96,9 +96,10 @@ This gives you a bird's-eye view — like opening the folder tree on your first 
 Now read file contents, but only the files that matter:
 
 1. **Find entry points** — Routes, controllers, pages, CLI commands related to the change
-2. **Trace the flow** — From entry point through services, repositories, external calls
-3. **Identify constraints** — Database schema, API contracts, shared types, validation rules
-4. **Spot conflicts** — Code that would resist the proposed change (tight coupling, hardcoded assumptions, missing abstractions)
+2. **Trace the code flow** — From entry point through services, repositories, external calls
+3. **Trace user journeys** — For features with frontend scope: map each user path from entry to goal, including every existing flow the user must pass through (login, register, onboarding, checkout). Read those flows — they are in your analysis scope even if you are not changing them
+4. **Identify constraints** — Database schema, API contracts, shared types, validation rules
+5. **Spot conflicts** — Code that would resist the proposed change (tight coupling, hardcoded assumptions, missing abstractions). This includes existing flows with hardcoded assumptions incompatible with the new context (e.g., a registration flow that forces shop creation when the new feature needs registration without it)
 
 **Read budget based on architecture complexity:**
 
@@ -119,6 +120,23 @@ Now read file contents, but only the files that matter:
 | 5 | Cross-context adapters, ACLs | Config files, module declarations |
 
 Stop when you have enough context to write a grounded proposal — you don't need to exhaust the budget.
+
+### Step 4b — User Journey Compatibility Check
+
+When the feature has frontend scope items (pages, forms, redirects), verify that each user journey works end-to-end through existing flows. This catches conflicts in domains you might otherwise mark as "no changes".
+
+For each distinct user path:
+
+1. **Walk the journey** — Start from the entry point (e.g., a button on a page) and follow every step until the user reaches the goal. Include authentication gates, redirects, and multi-step forms.
+
+2. **Check prerequisite flows** — For every existing flow the user passes through:
+   - Does it support the redirect chain? (Does login actually read `?redirect=` and forward it through to register?)
+   - Does it force steps that don't apply in the new context? (e.g., registration requiring shop creation when the user wants to claim an existing shop)
+   - Does it redirect somewhere incompatible after completion?
+
+3. **Update affected domains** — If an existing flow is incompatible, **that domain needs changes**. Do not leave it as "no structural changes" — add it to the Affected Domains table with the required modifications and add ACs for the fix.
+
+**The pattern to catch:** a domain marked "no changes" because the new feature doesn't touch its data model or API — but the new feature's user journey passes through that domain's frontend, which has hardcoded assumptions.
 
 ### Step 5 — Write proposal.md
 
@@ -291,6 +309,17 @@ If no `.ai-team/specs/` directory exists or it is empty:
 - Proceed normally — the proposal does not depend on existing specs
 - Note affected domains as "no baseline spec" in the Affected Domains table
 - The orchestrator will trigger baseline generation before the spec phase
+
+### Journey Through Incompatible Flow
+
+If a new feature's user journey passes through an existing flow (login, register, onboarding) that has assumptions incompatible with the new context:
+
+- **Do NOT mark that domain as "no changes"** — it needs changes
+- Add the domain to Affected Domains with the specific modifications needed
+- Add acceptance criteria that cover the flow adaptation (e.g., "registration supports account creation without shop creation when redirected from claim flow")
+- Add the redirect chain as a testable AC (e.g., "after login/register, user is redirected back to the claim page, not to dashboard")
+
+Real example: a "claim shop" feature assumed the registration flow could be reused as-is. But registration forced shop creation in step 2, and neither login nor register read the `?redirect=` parameter. The claim flow was broken for every new user.
 
 ### Duplicate Change
 
