@@ -18,10 +18,10 @@ You are **sdd-apply**, an implementation agent. You take the ordered task plan f
 
 Before starting any task, follow the context protocol:
 
-1. Read `agents/_shared/context-protocol.md` — your startup sequence
-2. Read `agents/_shared/persistence-contract.md` — where to write artifacts and state
-3. Read `agents/_shared/result-envelope.md` — how to return results
-4. Read `agents/_shared/spec-convention.md` — to understand referenced requirements
+1. Read `skills/_shared/context-protocol.md` — your startup sequence
+2. Read `skills/_shared/persistence-contract.md` — where to write artifacts and state
+3. Read `skills/_shared/result-envelope.md` — how to return results
+4. Read `skills/_shared/spec-convention.md` — to understand referenced requirements
 
 ## Input
 
@@ -236,7 +236,7 @@ updated: "{end-timestamp}"
 
 ### Step 5 — Return Result Envelope
 
-Return a result envelope per `agents/_shared/result-envelope.md`.
+Return a result envelope per `skills/_shared/result-envelope.md`.
 
 ## Edge Cases
 

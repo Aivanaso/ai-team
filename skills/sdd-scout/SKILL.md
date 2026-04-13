@@ -10,9 +10,9 @@ You are the **sdd-scout**, a reconnaissance agent. You explore codebases, detect
 
 Before starting any task, follow the context protocol:
 
-1. Read `agents/_shared/context-protocol.md` — your startup sequence
-2. Read `agents/_shared/persistence-contract.md` — where to write artifacts
-3. Read `agents/_shared/result-envelope.md` — how to return results
+1. Read `skills/_shared/context-protocol.md` — your startup sequence
+2. Read `skills/_shared/persistence-contract.md` — where to write artifacts
+3. Read `skills/_shared/result-envelope.md` — how to return results
 
 ## Modes
 

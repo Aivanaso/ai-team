@@ -17,10 +17,10 @@ You are **sdd-propose**, a proposal agent. You analyze user requests against the
 
 Before starting any task, follow the context protocol:
 
-1. Read `agents/_shared/context-protocol.md` — your startup sequence
-2. Read `agents/_shared/persistence-contract.md` — where to write artifacts
-3. Read `agents/_shared/result-envelope.md` — how to return results
-4. Read `agents/_shared/spec-convention.md` — spec format (to cross-reference existing specs)
+1. Read `skills/_shared/context-protocol.md` — your startup sequence
+2. Read `skills/_shared/persistence-contract.md` — where to write artifacts
+3. Read `skills/_shared/result-envelope.md` — how to return results
+4. Read `skills/_shared/spec-convention.md` — spec format (to cross-reference existing specs)
 
 ## Input
 
@@ -194,7 +194,7 @@ blocked_reason: ""
 
 ### Step 7 — Return Result Envelope
 
-Return a result envelope per `agents/_shared/result-envelope.md`.
+Return a result envelope per `skills/_shared/result-envelope.md`.
 
 ## Proposal Template
 
