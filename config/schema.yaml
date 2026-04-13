@@ -3,30 +3,44 @@
 # Defines the DAG (Directed Acyclic Graph) of SDD phases.
 # The orchestrator uses this to determine which phases can run
 # and what artifacts must exist before starting a phase.
+#
+# Model Routing
+#
+# Each phase specifies a model tier that defines the capability level needed.
+# Adapters resolve tiers to concrete models for the target AI provider.
+#
+# Tiers:
+#   reasoning — Complex analysis, architectural decisions, high-stakes judgment
+#   balanced  — Structured execution, spec writing, code generation
+#   fast      — Simple operations, copying, formatting
 
 artifacts:
   - id: proposal
     description: "Problem statement, scope, and high-level approach"
     path: "proposal.md"
     agent: sdd-propose
+    model: reasoning
     requires: []
 
   - id: specs
     description: "Delta specs with requirements and Given/When/Then scenarios"
     path: "specs/{domain}/spec.md"
     agent: sdd-spec
+    model: balanced
     requires: [proposal]
 
   - id: design
     description: "Technical design: components, interfaces, data flow"
     path: "design.md"
     agent: sdd-design
+    model: reasoning
     requires: [proposal]
 
   - id: tasks
     description: "Implementation task breakdown with file-level changes"
     path: "tasks.md"
     agent: sdd-tasks
+    model: balanced
     requires: [specs, design]
 
 # Post-artifact phases (operate on code, not documents)
@@ -34,14 +48,25 @@ artifacts:
 apply:
   description: "Implement the tasks — write actual code"
   agent: sdd-apply
+  model: balanced
   requires: [tasks]
 
 verify:
   description: "Run tests, lint, type-check — validate the implementation"
   agent: sdd-verify
+  model: balanced
   requires: [tasks]
 
 archive:
   description: "Merge delta specs, move change to archive"
   agent: orchestrator
+  model: fast
   requires: [verify]
+
+# Utility agents (not part of the DAG, invoked directly by orchestrator)
+
+utility_agents:
+  - id: scout
+    description: "Bootstrap, explore, and baseline — codebase discovery"
+    agent: sdd-scout
+    model: balanced

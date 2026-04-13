@@ -52,6 +52,17 @@ architecture:
     # Examples: cqrs, event-sourcing, repository-pattern, mediator,
     #           event-driven, service-layer, active-record
 
+# Model routing overrides (optional)
+#
+# Override default model tiers per phase for cost control or experimentation.
+# Values: reasoning, balanced, fast
+# Defaults are defined in config/schema.yaml.
+#
+# model_overrides:
+#   propose: balanced     # Cheaper proposals (less architectural depth)
+#   design: balanced      # Cheaper designs
+#   archive: balanced     # More thorough archiving
+
 # Custom rules for AI agents (optional)
 rules:
   # Examples:

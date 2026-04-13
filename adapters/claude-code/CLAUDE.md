@@ -29,18 +29,35 @@ When the user invokes any `/ai-team` command:
 - `/ai-team status [name]` — Show change progress
 ```
 
+## Model Routing
+
+The orchestrator specifies a model **tier** per phase. The adapter resolves tiers to Claude models:
+
+| Tier | Claude Model | Agent Tool `model` |
+|------|-------------|--------------------|
+| `reasoning` | Opus | `"opus"` |
+| `balanced` | Sonnet | `"sonnet"` |
+| `fast` | Haiku | `"haiku"` |
+
+Always include the `model` parameter when calling the Agent tool. The orchestrator resolves the tier (checking project overrides first, then schema.yaml defaults) and the adapter maps it here.
+
 ## Delegation via Agent Tool
 
 The orchestrator delegates to sub-agents using Claude Code's **Agent tool**. Each delegation:
 
-1. Launches a new agent with `subagent_type: "general-purpose"`
-2. Passes the sub-agent's `AGENT.md` content as part of the prompt
-3. Includes explicit file paths for context (per context-protocol.md)
-4. Receives a result envelope back
+1. Resolves the model tier for the phase (see Model Routing above)
+2. Launches a new agent with `subagent_type: "general-purpose"` and the resolved `model`
+3. Passes the sub-agent's `AGENT.md` content as part of the prompt
+4. Includes explicit file paths for context (per context-protocol.md)
+5. Receives a result envelope back
 
 ### Example Delegation Prompt
 
 ```
+Agent({
+  description: "sdd-scout: bootstrap project",
+  model: "sonnet",  // tier "balanced" → sonnet
+  prompt: `
 You are the sdd-scout agent. Follow the instructions in your AGENT.md exactly.
 
 ## Your AGENT.md
@@ -60,6 +77,30 @@ Bootstrap mode: detect the project stack and generate .ai-team/config.yaml and .
 
 ## Expected Output
 Return a result envelope as defined in agents/_shared/result-envelope.md.
+`
+})
+```
+
+### Model Examples by Phase
+
+```
+// propose — architectural analysis
+Agent({ model: "opus", description: "sdd-propose: analyze PRD", prompt: "..." })
+
+// spec — structured writing from clear input
+Agent({ model: "sonnet", description: "sdd-spec: generate delta specs", prompt: "..." })
+
+// design — interface decisions, data flow
+Agent({ model: "opus", description: "sdd-design: technical design", prompt: "..." })
+
+// tasks — breaking down from clear design
+Agent({ model: "sonnet", description: "sdd-tasks: task breakdown", prompt: "..." })
+
+// apply — code generation
+Agent({ model: "sonnet", description: "sdd-apply: implement tasks", prompt: "..." })
+
+// archive — copy and close
+Agent({ model: "haiku", description: "sdd-archive: merge and archive", prompt: "..." })
 ```
 
 ## State Recovery

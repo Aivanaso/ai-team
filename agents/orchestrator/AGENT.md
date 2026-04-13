@@ -85,6 +85,30 @@ Show the current state of a change or all changes.
 2. Display phase progress as a checklist
 3. Show any blockers or risks
 
+## Model Routing
+
+Each phase has a default model tier defined in `config/schema.yaml`. Tiers describe the **capability level** needed, not a specific model — the adapter resolves tiers to concrete models for the target AI provider.
+
+| Tier | Purpose | Phases |
+|------|---------|--------|
+| `reasoning` | Complex analysis, architectural decisions | propose, design |
+| `balanced` | Structured execution, code generation | scout, spec, tasks, apply, verify |
+| `fast` | Simple operations, copy and close | archive |
+
+### Resolution Order
+
+When delegating to a sub-agent:
+
+1. Look up the phase in `.ai-team/config.yaml` → `model_overrides` (project-level)
+2. If no override → use the default tier from `config/schema.yaml`
+3. Pass the resolved tier to the adapter, which maps it to a concrete model
+
+Project overrides exist for cost control — a team might downgrade `propose` to `balanced` for routine changes, or upgrade `archive` to `balanced` for more thorough spec merging.
+
+### The Orchestrator Itself
+
+The orchestrator runs at whatever model the user has selected for their session. Model routing only applies to **sub-agents** launched by the orchestrator.
+
 ## Delegation Protocol
 
 When delegating to a sub-agent, ALWAYS include:
@@ -92,6 +116,9 @@ When delegating to a sub-agent, ALWAYS include:
 ```
 ## Task
 {Clear description of what the agent should do}
+
+## Model Tier
+{Resolved tier for this phase: reasoning | balanced | fast}
 
 ## Context Files
 {Explicit list of files the agent should read, per context-protocol.md}
@@ -110,6 +137,7 @@ Use the host tool's agent/task mechanism to launch sub-agents:
 - Each sub-agent gets a **fresh context window** — no conversation history
 - Pass the agent's `AGENT.md` as the system prompt or initial instruction
 - Include explicit file paths for all context the agent needs
+- Pass the **resolved model tier** so the adapter selects the right model
 - The agent returns a result envelope; you process ONLY the envelope
 
 ## DAG Management
