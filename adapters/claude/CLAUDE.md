@@ -75,12 +75,23 @@ proposal --> specs ---> tasks --> apply --> verify --> archive
           -> design -/
 ```
 
-Defined in `config/schema.yaml`. Before starting any phase:
+| Phase | Skill | Requires | Produces |
+|-------|-------|----------|----------|
+| propose | sdd-propose | -- | `proposal.md` |
+| spec | sdd-spec | proposal | `specs/{domain}/spec.md` |
+| design | sdd-design | proposal | `design.md` |
+| tasks | sdd-tasks | specs, design | `tasks.md` |
+| apply | sdd-apply | tasks | code changes |
+| verify | sdd-verify | tasks | verification report |
+| archive | orchestrator | verify | merged specs |
 
-1. Read the `requires` field for that phase's artifact
-2. Verify all required artifacts exist (check file paths)
-3. If any are missing, check if the previous phase completed; if not, run it first
-4. If all present, delegate to the phase's agent
+Utility: **sdd-scout** (bootstrap, explore, baseline) -- invoked directly, not part of the DAG.
+
+Before starting any phase:
+
+1. Check the Requires column -- verify all required artifacts exist
+2. If any are missing, run the previous phase first
+3. If all present, delegate to the phase's skill
 
 ### Automatic Baseline Detection
 
@@ -116,21 +127,25 @@ This is why `state.yaml` is the source of truth -- it survives context loss.
 
 ## Model Routing
 
-Each SDD phase has a default model tier defined in `config/schema.yaml`. Model routing only applies to **delegated sub-agents**. Inline work runs at whatever model the user has selected for the session.
+Model routing only applies to **delegated sub-agents**. Inline work runs at whatever model the user has selected for the session.
 
-### Tiers
+Read this table at session start, cache it, and pass the model in every `Agent()` call. If a phase is missing, use `sonnet`. If the assigned model is unavailable, fall back to `sonnet`.
 
-| Tier | Claude Model | Purpose |
-|------|-------------|---------|
-| `reasoning` | opus | Architectural decisions (propose, design) |
-| `balanced` | sonnet | Structured execution (scout, spec, tasks, apply, verify) |
-| `fast` | haiku | Simple operations (archive) |
+| Phase | Model | Reason |
+|-------|-------|--------|
+| sdd-scout | sonnet | Codebase exploration, structured output |
+| sdd-propose | opus | Architectural analysis, scope decisions |
+| sdd-spec | sonnet | Structured writing from clear input |
+| sdd-design | opus | Interface decisions, data flow architecture |
+| sdd-tasks | sonnet | Mechanical breakdown from clear design |
+| sdd-apply | sonnet | Code generation from specs |
+| sdd-verify | sonnet | Validation against spec |
+| sdd-archive | haiku | Copy and close |
+| default | sonnet | Non-SDD general delegation |
 
-### Resolution
+### Project Override
 
-1. Check `.ai-team/config.yaml` for `model_overrides` (project-level override)
-2. If no override, use the default from `config/schema.yaml`
-3. Pass the resolved model in every `Agent()` call
+Check `.ai-team/config.yaml` for `model_overrides` -- project-level overrides take priority over the defaults above.
 
 ## Sub-Agent Delegation
 
