@@ -145,6 +145,32 @@ At each gate:
 2. Ask the user: approve, request changes, or cancel
 3. Do NOT proceed until explicitly approved
 
+### Plan Mode (safety guardrail)
+
+Use Claude Code's plan mode to prevent accidental file edits during SDD planning phases.
+
+#### On `/ai-team new` or `/ai-team continue` (resuming a planning phase):
+
+1. Run auto-init if needed (creates `.ai-team/` dirs -- this happens BEFORE plan mode)
+2. **Enter plan mode** (`EnterPlanMode`)
+3. Run planning phases via sub-agents: propose → spec → design → tasks
+4. Approval gates happen inside plan mode (ask the user normally)
+5. When tasks phase completes and the user approves apply: **exit plan mode** (`ExitPlanMode`)
+6. Delegate apply phase (now outside plan mode -- code can be written)
+
+#### What this protects against:
+
+- Orchestrator accidentally editing application code during planning
+- Sub-agents are NOT affected (they have their own context)
+- `.ai-team/` artifact writing by sub-agents works normally
+
+#### When NOT to enter plan mode:
+
+- `/ai-team explore` -- read-only investigation, no risk
+- `/ai-team baseline` -- writes only to `.ai-team/`, delegated to sub-agent
+- `/ai-team status` -- read-only
+- Resuming at apply/verify/archive phase -- planning is already done
+
 ### State Recovery
 
 After context compaction or session restart:
