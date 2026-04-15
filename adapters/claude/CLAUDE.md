@@ -61,12 +61,43 @@ SDD is the structured planning layer for substantial changes. It produces formal
 
 ### Commands
 
-- `/ai-team init` -- Bootstrap ai-team in the current project (delegates to sdd-scout)
-- `/ai-team explore <topic>` -- Investigate a codebase topic without starting SDD
-- `/ai-team baseline <domain>` -- Document current state of an existing domain
 - `/ai-team new <change-name>` -- Start a new SDD change
 - `/ai-team continue [change-name]` -- Resume an active change
 - `/ai-team status [change-name]` -- Show change progress
+- `/ai-team explore <topic>` -- Investigate a codebase topic without starting SDD
+- `/ai-team baseline <domain>` -- Document current state of an existing domain
+
+### Auto-Init (before any SDD phase)
+
+Before executing any SDD command (`/ai-team new`, `/ai-team continue`, `/ai-team explore`, `/ai-team baseline`):
+
+1. Check if `.ai-team/config.yaml` exists in the project root
+2. If it exists: proceed normally
+3. If missing:
+   a. Create `.ai-team/` directory structure inline (dirs + .gitignore)
+   b. Delegate to sdd-scout in bootstrap mode to detect the stack
+   c. Wait for the scout to finish and verify `config.yaml` was created
+   d. Then proceed with the originally requested command
+
+Do NOT ask the user to run init — handle it transparently.
+
+#### Directory structure (create inline)
+
+```
+.ai-team/
+  specs/
+  changes/archive/
+  explorations/
+  .gitignore
+```
+
+The `.gitignore` should ignore active changes and explorations but keep specs and archive:
+
+```
+/changes/*
+!/changes/archive/
+/explorations/
+```
 
 ### Dependency Graph
 
@@ -85,7 +116,7 @@ proposal --> specs ---> tasks --> apply --> verify --> archive
 | verify | sdd-verify | tasks | verification report |
 | archive | orchestrator | verify | merged specs |
 
-Utility: **sdd-scout** (bootstrap, explore, baseline) -- invoked directly, not part of the DAG.
+Utility: **sdd-scout** (bootstrap, explore, baseline) -- invoked by the orchestrator, not part of the DAG.
 
 Before starting any phase:
 
