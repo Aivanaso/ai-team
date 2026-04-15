@@ -31,8 +31,7 @@ The orchestrator provides:
 2. **Approved proposal** — `.ai-team/changes/{change-name}/proposal.md`.
 3. **Delta specs** — `.ai-team/changes/{change-name}/specs/{domain}/spec.md` (may not exist yet if design runs in parallel with spec — handle gracefully).
 4. **Project config** — `.ai-team/config.yaml` (stack, architecture, conventions, patterns).
-5. **Skill registry** — `.ai-team/skill-registry.md` (available coding skills).
-6. **Base specs** — `.ai-team/specs/{domain}/spec.md` for affected domains (if they exist).
+5. **Base specs** — `.ai-team/specs/{domain}/spec.md` for affected domains (if they exist).
 
 ## Process
 

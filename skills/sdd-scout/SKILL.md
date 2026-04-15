@@ -303,7 +303,7 @@ Document the current state of an existing domain by reading the codebase. This i
 #### When This Runs
 
 - **Explicitly**: User runs `/ai-team baseline shops`
-- **Automatically**: During SDD workflow, when the orchestrator detects that `specs/{domain}/spec.md` doesn't exist before generating a delta spec. The orchestrator delegates baseline generation BEFORE the spec phase begins.
+- **Automatically**: During SDD workflow, when the orchestrator detects that `.ai-team/specs/{domain}/spec.md` doesn't exist before generating a delta spec. The orchestrator delegates baseline generation BEFORE the spec phase begins.
 
 #### Process
 

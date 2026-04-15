@@ -86,12 +86,10 @@ risks:
 
 ```yaml
 status: ok
-executive_summary: "Bootstrapped project config. Detected Next.js 14 + TypeScript + Tailwind + pnpm monorepo. Found 3 existing SKILL.md files (react, typescript, testing). Generated config.yaml and skill-registry.md."
+executive_summary: "Bootstrapped project config. Detected Next.js 14 + TypeScript + Tailwind + pnpm monorepo. Generated config.yaml."
 artifacts:
   - name: "config"
     path: ".ai-team/config.yaml"
-  - name: "skill-registry"
-    path: ".ai-team/skill-registry.md"
 next_recommended: []
 model_used: "sonnet"
 ```

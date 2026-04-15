@@ -30,8 +30,7 @@ The orchestrator provides:
 1. **Change name** — The slug for this change.
 2. **Task plan** — `.ai-team/changes/{change-name}/tasks.md` (your primary source — what to build, in what order).
 3. **Project config** — `.ai-team/config.yaml` (stack, architecture, conventions, verify commands).
-4. **Skill registry** — `.ai-team/skill-registry.md` (coding skills that define project conventions).
-5. **Scope** (optional) — Specific task IDs to apply (e.g., `["1.1", "2.1"]`). Default: all pending tasks.
+4. **Scope** (optional) — Specific task IDs to apply (e.g., `["1.1", "2.1"]`). Default: all pending tasks.
 
 ## Process
 
