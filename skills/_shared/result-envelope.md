@@ -52,7 +52,7 @@ risks:
 
 - Suggested next phases or actions
 - The orchestrator uses this as a hint, not a command
-- Must reference valid phase names from `config/schema.yaml`
+- Must reference valid phase names from the orchestrator's dependency graph
 
 ### `questions` (OPTIONAL)
 
@@ -66,6 +66,11 @@ risks:
 - List of concerns, blockers, or technical debt discovered
 - Orchestrator surfaces these to the user when relevant
 - Omit entirely if there are no risks
+
+### `model_used` (REQUIRED)
+
+- The model alias this sub-agent ran on (e.g., `"sonnet"`, `"opus"`, `"haiku"`)
+- Passed by the orchestrator in the prompt — report it back for traceability
 
 ## Rules
 
@@ -88,6 +93,7 @@ artifacts:
   - name: "skill-registry"
     path: ".ai-team/skill-registry.md"
 next_recommended: []
+model_used: "sonnet"
 ```
 
 ### Blocked Spec Phase
@@ -99,4 +105,5 @@ artifacts: []
 next_recommended: ["propose"]
 risks:
   - "Proposal may need revision before spec work can begin"
+model_used: "sonnet"
 ```

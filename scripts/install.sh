@@ -7,22 +7,23 @@
 #
 # What it does:
 #   1. Copies SDD skills to ~/.claude/skills/
-#   2. Writes the orchestrator to ~/.claude/ai-team-orchestrator.md
-#   3. Adds an @reference in ~/.claude/CLAUDE.md (symlink-safe)
+#   2. Injects orchestrator content inline into ~/.claude/CLAUDE.md
+#      between <!-- ai-team:orchestrator --> markers
 #
 # Re-run to update after pulling new changes from the repo.
+# User content outside the markers is never touched.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CLAUDE_DIR="${HOME}/.claude"
-ORCHESTRATOR_FILE="ai-team-orchestrator.md"
-AT_REFERENCE="@${ORCHESTRATOR_FILE}"
 
-# Legacy markers (migration from old injection approach)
-MARKER_START="<!-- ai-team:orchestrator -->"
-MARKER_END="<!-- /ai-team:orchestrator -->"
+MARKER_OPEN="<!-- ai-team:orchestrator -->"
+MARKER_CLOSE="<!-- /ai-team:orchestrator -->"
+
+# Legacy @reference to clean up
+LEGACY_REFERENCE="@ai-team-orchestrator.md"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -49,67 +50,96 @@ done
 skill_count=$(find "$CLAUDE_DIR/skills/sdd-"* -maxdepth 0 -type d 2>/dev/null | wc -l)
 info "  -> ~/.claude/skills/ ($skill_count phases + _shared)"
 
-# --- 2. Write orchestrator file ---
+# --- 2. Prepare orchestrator content ---
 
-info "Writing ${ORCHESTRATOR_FILE}..."
-sed \
+info "Preparing orchestrator content..."
+
+# Read source orchestrator and rewrite skill paths for installed location
+ORCHESTRATOR_CONTENT=$(sed \
   -e 's|skills/_shared/|~/.claude/skills/_shared/|g' \
   -e 's|skills/sdd-|~/.claude/skills/sdd-|g' \
-  "$REPO_ROOT/adapters/claude/CLAUDE.md" > "$CLAUDE_DIR/$ORCHESTRATOR_FILE"
+  "$REPO_ROOT/adapters/claude/CLAUDE.md")
 
-info "  -> ~/.claude/${ORCHESTRATOR_FILE}"
-
-# --- 3. Migrate legacy marker injection (if present) ---
+# --- 3. Resolve CLAUDE.md (handle symlinks) ---
 
 CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
 
-if [[ -f "$CLAUDE_MD" ]] && grep -qF "$MARKER_START" "$CLAUDE_MD"; then
-  warn "Found legacy orchestrator markers — removing inline block..."
-
-  # Resolve symlink target so we write to the actual file, not replace the link
-  WRITE_TARGET="$CLAUDE_MD"
-  if [[ -L "$CLAUDE_MD" ]]; then
-    WRITE_TARGET="$(readlink -f "$CLAUDE_MD")"
-    warn "  CLAUDE.md is a symlink -> ${WRITE_TARGET}"
-  fi
-
-  awk -v start="$MARKER_START" -v end="$MARKER_END" '
-    index($0, start) { skip=1; next }
-    index($0, end)   { skip=0; next }
-    !skip
-  ' "$CLAUDE_MD" > "$CLAUDE_DIR/CLAUDE.md.tmp"
-  cp "$CLAUDE_DIR/CLAUDE.md.tmp" "$WRITE_TARGET"
-  rm "$CLAUDE_DIR/CLAUDE.md.tmp"
-
-  info "  Legacy markers removed"
+# If CLAUDE.md is a symlink, resolve to the real file so we write to the
+# actual target (not replace the symlink with a regular file).
+WRITE_TARGET="$CLAUDE_MD"
+if [[ -L "$CLAUDE_MD" ]]; then
+  WRITE_TARGET="$(readlink -f "$CLAUDE_MD")"
+  warn "CLAUDE.md is a symlink -> ${WRITE_TARGET}"
 fi
 
-# --- 4. Ensure @reference in CLAUDE.md ---
+# Create CLAUDE.md if it doesn't exist
+if [[ ! -f "$WRITE_TARGET" ]]; then
+  touch "$WRITE_TARGET"
+  info "Created ${WRITE_TARGET}"
+fi
 
-if [[ ! -f "$CLAUDE_MD" ]]; then
-  echo "$AT_REFERENCE" > "$CLAUDE_MD"
-  info "Created CLAUDE.md with ${AT_REFERENCE}"
-elif ! grep -qF "$AT_REFERENCE" "$CLAUDE_MD"; then
-  if [[ -L "$CLAUDE_MD" ]]; then
-    target="$(readlink -f "$CLAUDE_MD")"
-    warn "CLAUDE.md is a symlink -> ${target}"
-    warn "  Adding @reference to the symlink target"
-  fi
+EXISTING=$(cat "$WRITE_TARGET")
 
-  printf '\n%s\n' "$AT_REFERENCE" >> "$CLAUDE_MD"
-  info "Added ${AT_REFERENCE} to CLAUDE.md"
+# --- 4. Clean up legacy @reference (if present) ---
+
+if grep -qF "$LEGACY_REFERENCE" <<< "$EXISTING"; then
+  warn "Removing legacy ${LEGACY_REFERENCE}..."
+  EXISTING=$(grep -vF "$LEGACY_REFERENCE" <<< "$EXISTING")
+fi
+
+# Also remove the old standalone orchestrator file if it exists
+if [[ -f "$CLAUDE_DIR/ai-team-orchestrator.md" ]]; then
+  rm "$CLAUDE_DIR/ai-team-orchestrator.md"
+  warn "Removed legacy ~/.claude/ai-team-orchestrator.md"
+fi
+
+# --- 5. Inject between markers ---
+
+# Build the new section
+SECTION="${MARKER_OPEN}
+${ORCHESTRATOR_CONTENT}
+${MARKER_CLOSE}"
+
+if grep -qF "$MARKER_OPEN" <<< "$EXISTING"; then
+  # Markers exist — replace content between them
+  info "Updating existing orchestrator section..."
+
+  # Use awk to replace everything between markers (inclusive)
+  UPDATED=$(awk -v open="$MARKER_OPEN" -v close="$MARKER_CLOSE" -v section="$SECTION" '
+    BEGIN { printing=1 }
+    index($0, open) { printing=0; print section; next }
+    index($0, close) { printing=1; next }
+    printing
+  ' <<< "$EXISTING")
 else
-  info "${AT_REFERENCE} already in CLAUDE.md — skipping"
+  # No markers — append section at the end
+  info "Injecting orchestrator section..."
+
+  if [[ -n "$EXISTING" ]]; then
+    UPDATED="${EXISTING}
+
+${SECTION}"
+  else
+    UPDATED="$SECTION"
+  fi
 fi
+
+# --- 6. Write back ---
+
+# Write atomically: temp file + move
+TMPFILE=$(mktemp "${WRITE_TARGET}.XXXXXX")
+echo "$UPDATED" > "$TMPFILE"
+mv "$TMPFILE" "$WRITE_TARGET"
+
+info "  -> ${WRITE_TARGET}"
 
 # --- Done ---
 
 echo ""
 info "Installation complete!"
 echo ""
-echo "  Skills:        ~/.claude/skills/sdd-*/"
-echo "  Protocols:     ~/.claude/skills/_shared/"
-echo "  Orchestrator:  ~/.claude/${ORCHESTRATOR_FILE}"
-echo "  Reference:     ${AT_REFERENCE} in CLAUDE.md"
+echo "  Skills:       ~/.claude/skills/sdd-*/"
+echo "  Protocols:    ~/.claude/skills/_shared/"
+echo "  Orchestrator: inline in CLAUDE.md (between markers)"
 echo ""
 echo "  Re-run this script to update after pulling new changes."

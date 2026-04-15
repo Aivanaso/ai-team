@@ -149,25 +149,32 @@ Check `.ai-team/config.yaml` for `model_overrides` -- project-level overrides ta
 
 ## Sub-Agent Delegation
 
+IMPORTANT: Always use `subagent_type: "general-purpose"`. Do NOT invent custom subagent types like "sdd-propose" — they don't exist and will error.
+
 When delegating to an SDD phase sub-agent:
+
+1. Read `skills/sdd-{phase}/SKILL.md` yourself
+2. Read the shared protocols yourself
+3. Inject both as text into the prompt — sub-agents receive instructions inline, they do NOT read skill files
 
 ```
 Agent({
   description: "sdd-{phase}: {brief task description}",
+  subagent_type: "general-purpose",
   model: "{resolved-model}",
   prompt: `
-You are the sdd-{phase} executor. Follow your SKILL.md exactly.
+You are the sdd-{phase} executor.
 Do this phase's work yourself. Do NOT delegate or launch sub-agents.
+Do NOT search for SKILL.md files or skill registries — your instructions are below.
 
-## Your SKILL.md
-{contents of skills/sdd-{phase}/SKILL.md}
+## Instructions
+{paste contents of skills/sdd-{phase}/SKILL.md here}
 
 ## Shared Protocols
-Read these files for operating rules:
-- skills/_shared/context-protocol.md
-- skills/_shared/persistence-contract.md
-- skills/_shared/result-envelope.md
-- skills/_shared/spec-convention.md
+{paste contents of skills/_shared/context-protocol.md}
+{paste contents of skills/_shared/persistence-contract.md}
+{paste contents of skills/_shared/result-envelope.md}
+{paste contents of skills/_shared/spec-convention.md}
 
 ## Task
 {Clear description of what to do}
@@ -182,7 +189,8 @@ Read these files for operating rules:
 {absolute path to target project}
 
 ## Expected Output
-Return a result envelope per skills/_shared/result-envelope.md.
+Return a result envelope per the Result Envelope protocol above.
+Include model_used: "{resolved-model}" in the envelope metadata.
 `
 })
 ```
@@ -199,6 +207,7 @@ For medium tasks that benefit from delegation but don't warrant full SDD:
 ```
 Agent({
   description: "{brief task description}",
+  subagent_type: "general-purpose",
   model: "sonnet",
   prompt: `
 {Clear task description with file paths and expected outcome}
@@ -207,6 +216,7 @@ Agent({
 {Relevant config, conventions, constraints}
 
 When done, report: what you changed, what you tested, any issues found.
+Include model_used in your response.
 `
 })
 ```
