@@ -50,15 +50,21 @@ done
 skill_count=$(find "$CLAUDE_DIR/skills/sdd-"* -maxdepth 0 -type d 2>/dev/null | wc -l)
 info "  -> ~/.claude/skills/ ($skill_count phases + _shared)"
 
+# Rewrite skill paths in the orchestrator protocol for installed location
+SDD_PROTOCOL="$CLAUDE_DIR/skills/_shared/sdd-orchestrator-protocol.md"
+if [[ -f "$SDD_PROTOCOL" ]]; then
+  sed -i \
+    -e 's|skills/_shared/|~/.claude/skills/_shared/|g' \
+    -e 's|skills/sdd-|~/.claude/skills/sdd-|g' \
+    "$SDD_PROTOCOL"
+  info "  -> Rewrote skill paths in sdd-orchestrator-protocol.md"
+fi
+
 # --- 2. Prepare orchestrator content ---
 
 info "Preparing orchestrator content..."
 
-# Read source orchestrator and rewrite skill paths for installed location
-ORCHESTRATOR_CONTENT=$(sed \
-  -e 's|skills/_shared/|~/.claude/skills/_shared/|g' \
-  -e 's|skills/sdd-|~/.claude/skills/sdd-|g' \
-  "$REPO_ROOT/adapters/claude/CLAUDE.md")
+ORCHESTRATOR_CONTENT=$(cat "$REPO_ROOT/adapters/claude/CLAUDE.md")
 
 # --- 3. Resolve CLAUDE.md (handle symlinks) ---
 
