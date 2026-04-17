@@ -33,27 +33,76 @@ Anti-patterns -- these ALWAYS inflate context without need:
 - Running tests or builds inline -- delegate
 - Reading files as preparation for edits, then editing -- delegate the whole thing together
 
-## Size Classification
+## Mandatory Classification Gate
 
-Before acting on any task, evaluate its scope:
+**STOP before acting on ANY feature, change, or implementation request.**
 
-| Request | Size | Workflow |
-|---------|------|----------|
-| Question, typo, config, single-file fix | **Small** | Inline -- no sub-agent, no SDD |
-| Multi-file change, new component, 50-300 lines | **Medium** | Plan briefly, delegate heavy parts |
-| Multi-module, >300 lines, uncertain scope | **Large** | Suggest SDD: `/ai-team new {name}` |
-| User explicitly asks for SDD | **Large** | Full SDD regardless of actual size |
+Do not start coding. Do not enter plan mode. Classify FIRST.
+
+You MAY read a few files to classify (project structure, config, 1-2 key files to gauge scope). You must NOT read files to understand implementation details or prepare changes — that comes after the gate.
+
+### How to classify
+
+Evaluate these four signals:
+
+| Signal | Small | Medium | Large |
+|--------|-------|--------|-------|
+| Files touched | 1 | 2-5 | 6+ |
+| Crosses module/domain boundaries | No | Maybe | Yes |
+| Scope clarity | Fully clear | Mostly clear | Needs discovery |
+| Lines of new/changed code | <50 | 50-300 | >300 |
+
+**If ANY single signal points to Large, classify as Large.**
+
+When in doubt between Medium and Large, choose Large -- it's cheaper to downgrade from SDD than to redo scattered work.
+
+### Gate behavior by size
+
+**Small** (question, typo, config, single-file fix):
+- Act immediately. No gate output needed.
+
+**Medium** (multi-file change, new component, 50-300 lines):
+- STOP. Say this to the user:
+  > **Medium** -- [brief reason]. Plan: [2-3 bullets]. Proceed?
+- Wait for confirmation before any implementation.
+
+**Large** (multi-module, >300 lines, uncertain scope, new domain):
+- STOP. Say this to the user:
+  > **Large** -- [brief reason]. Recommend SDD (`/ai-team new {name}`). [1 sentence why].
+  > Options: SDD / treat as Medium / just do it.
+- Wait for the user to choose. Do NOT default to any option.
+
+**User explicitly asks for SDD**:
+- Full SDD regardless of actual size. Skip classification.
+
+### Gate does NOT apply to
+
+- Questions, explanations, debugging help, code review
+- Tasks where user already said "just do it" / "hazlo" / "no SDD"
+- Follow-up actions within an already-classified task
+
+### Plan mode as safety net
+
+For **Medium** and **Large** tasks, enter plan mode before presenting the classification. This technically prevents accidental file edits during classification and planning. Exit plan mode only when implementation is approved.
+
+- Small: no plan mode needed, act directly.
+- Medium: enter plan mode → present plan → exit after user approves → delegate implementation.
+- Large → SDD: enter plan mode → suggest SDD → stay in plan mode (SDD protocol manages it from here).
+- Large → no SDD: enter plan mode → present plan → exit after user approves → delegate as Medium.
+
+### After classification
 
 For **Medium** tasks:
-1. Read 1-3 key files inline to understand scope
-2. Make a brief plan (use Claude Code's plan mode or describe it)
-3. Delegate implementation to a sub-agent with clear instructions
+1. Get user confirmation on the plan
+2. Exit plan mode
+3. Delegate implementation to sub-agents per Delegation Philosophy
 4. Review the result
 
-For **Large** tasks:
-1. Suggest SDD: "This looks substantial. Want to use SDD? (`/ai-team new {name}`)"
-2. If user agrees, start the SDD workflow
-3. If user says no, treat as Medium -- plan and delegate without formal artifacts
+For **Large** tasks with SDD:
+1. Start the SDD workflow (see below)
+
+For **Large** tasks without SDD (user declined):
+1. Treat as Medium -- plan and delegate without formal artifacts
 
 ## SDD Workflow
 
