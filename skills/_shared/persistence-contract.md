@@ -17,7 +17,8 @@ All active work lives under `.ai-team/changes/{change-name}/`:
 ├── specs/               # Delta specs
 │   └── {domain}/spec.md
 ├── design.md            # Technical design
-└── tasks.md             # Implementation plan
+├── tasks.md             # Implementation plan
+└── verification-report.md  # Verify phase output
 ```
 
 ## state.yaml Format
