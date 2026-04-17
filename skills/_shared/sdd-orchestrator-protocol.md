@@ -58,7 +58,7 @@ proposal --> specs ---> tasks --> apply --> verify --> archive
 | tasks | sdd-tasks | specs, design | `tasks.md` |
 | apply | sdd-apply | tasks | code changes |
 | verify | sdd-verify | tasks | verification report |
-| archive | orchestrator | verify | merged specs |
+| archive | sdd-archive | verify | merged specs |
 
 Utility: **sdd-scout** (bootstrap, explore, baseline) -- invoked by the orchestrator, not part of the DAG.
 
