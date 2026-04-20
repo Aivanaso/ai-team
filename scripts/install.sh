@@ -111,10 +111,10 @@ if grep -qF "$MARKER_OPEN" <<< "$EXISTING"; then
   info "Updating existing orchestrator section..."
 
   # Use awk to replace everything between markers (inclusive)
-  UPDATED=$(awk -v open="$MARKER_OPEN" -v close="$MARKER_CLOSE" -v section="$SECTION" '
+  UPDATED=$(awk -v m_open="$MARKER_OPEN" -v m_close="$MARKER_CLOSE" -v section="$SECTION" '
     BEGIN { printing=1 }
-    index($0, open) { printing=0; print section; next }
-    index($0, close) { printing=1; next }
+    index($0, m_open) { printing=0; print section; next }
+    index($0, m_close) { printing=1; next }
     printing
   ' <<< "$EXISTING")
 else
