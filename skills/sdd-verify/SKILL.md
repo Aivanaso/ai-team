@@ -15,6 +15,7 @@ Static analysis alone is NOT enough. You must execute the code (compile, test) f
 3. **You verify against specs, not opinion** -- if the code implements what the spec says, it passes, even if you would have written it differently.
 4. **You report, you don't fix** -- findings go in the verification report. Fixes are the orchestrator's decision.
 5. **You write ONLY `verification-report.md`** -- your single artifact (plus `state.yaml` updates). No code, no spec changes, no design revisions.
+6. **Evidence > Assumption** -- See `_shared/evidence-protocol.md`. Read `.ai-team/changes/{change}/baseline.md` first (if present) to distinguish regressions from pre-existing failures. When validating a change that touches buses, serializers, middleware, or ORM lifecycle, smoke the real path (transports in-memory, real EM) -- do NOT trust tests that mock framework boundaries.
 
 ## Shared Protocols
 
@@ -24,6 +25,7 @@ Before starting, follow the context protocol:
 2. Read `skills/_shared/persistence-contract.md` -- where to write artifacts
 3. Read `skills/_shared/result-envelope.md` -- how to return results
 4. Read `skills/_shared/spec-convention.md` -- to understand spec requirements and scenarios
+5. Read `skills/_shared/evidence-protocol.md` -- use baseline.md, smoke real framework paths
 
 ## Input
 

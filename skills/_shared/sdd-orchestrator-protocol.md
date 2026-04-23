@@ -89,31 +89,83 @@ At each gate:
 2. Ask the user: approve, request changes, or cancel
 3. Do NOT proceed until explicitly approved
 
-## Plan Mode (safety guardrail)
+## Plan Mode (NOT used inside the SDD pipeline)
 
-Use Claude Code's plan mode to prevent accidental file edits during SDD planning phases.
+**Plan mode is NOT entered during the SDD pipeline.** The pipeline's own approval gates (proposal approval after propose, apply approval after tasks) are sufficient to prevent unintended changes.
 
-### On `/ai-team new` or `/ai-team continue` (resuming a planning phase):
+### Why plan mode is off for SDD
 
-1. Run auto-init if needed (creates `.ai-team/` dirs -- this happens BEFORE plan mode)
-2. **Enter plan mode** (`EnterPlanMode`)
-3. Run planning phases via sub-agents: propose → spec → design → tasks
-4. Approval gates happen inside plan mode (ask the user normally)
-5. When tasks phase completes and the user approves apply: **exit plan mode** (`ExitPlanMode`)
-6. Delegate apply phase (now outside plan mode -- code can be written)
+- **The pipeline gates already protect against unintended changes**: propose-approval before any spec/design work, apply-approval before any code is written. Adding plan mode on top is redundant.
+- **Harness bug**: in the real Claude Code harness, plan mode propagates to delegated sub-agents. A sub-agent launched while the orchestrator is in plan mode cannot write artifacts — it silently stages everything in its own plan file. This was observed in ECO-944 (propose 1st run wasted ~86k tokens on a blocked write).
+- **The adapter's classification gate still uses plan mode for Medium and Large-declines-SDD tasks** — it's only inside the SDD pipeline that plan mode is avoided.
 
-### What this protects against:
+### Orchestrator flow for SDD
 
-- Orchestrator accidentally editing application code during planning
-- Sub-agents are NOT affected (they have their own context)
-- `.ai-team/` artifact writing by sub-agents works normally
+1. Classification gate triggers Large → user chooses SDD (plan mode may be active at this point from the classification gate — see adapter CLAUDE.md)
+2. **Exit plan mode** (`ExitPlanMode`) as soon as the user confirms SDD
+3. Run auto-init if needed (creates `.ai-team/` dirs)
+4. Run health check (see next section)
+5. Delegate propose → approval gate → delegate spec + design in parallel → delegate tasks → approval gate → delegate apply → delegate verify → delegate archive
+6. No plan mode at any point in this flow
 
-### When NOT to enter plan mode:
+### When the orchestrator might still edit code during SDD
 
-- `/ai-team explore` -- read-only investigation, no risk
-- `/ai-team baseline` -- writes only to `.ai-team/`, delegated to sub-agent
-- `/ai-team status` -- read-only
-- Resuming at apply/verify/archive phase -- planning is already done
+In practice, almost never. The orchestrator coordinates — it delegates all writes to sub-agents. If the user explicitly asks for an inline edit during SDD (e.g., "just fix this typo real quick"), the orchestrator can do it without plan mode. The pipeline gates still protect the larger artifacts.
+
+## Health Check (before propose)
+
+Before delegating to `sdd-propose` on `/ai-team new`, establish a test-suite baseline so `sdd-verify` can later distinguish regressions from pre-existing failures.
+
+### When to run
+
+- `/ai-team new <change>` — always, after auto-init, before delegating propose
+- `/ai-team continue` — skip (baseline was captured on the original `new`)
+- `/ai-team explore`, `/ai-team baseline`, `/ai-team status` — skip (not a change run)
+
+### How to run
+
+1. Read `.ai-team/config.yaml` → look for `test_commands:` section (e.g., `unit:`, `integration:`)
+2. If `test_commands` exists, delegate to a sonnet sub-agent:
+   - Run each configured command
+   - Capture: exit code, pass/fail counts (parse the test runner output), last 20 lines of stderr
+   - Capture: `git rev-parse HEAD` for the commit reference
+   - Write `.ai-team/changes/{change-name}/baseline.md`
+3. If `test_commands` is missing: skip the health check, note it as a risk in the proposal delegation prompt, and proceed. Do NOT block on missing config — this is a best-effort safety net, not a hard requirement.
+
+### Baseline file format
+
+```markdown
+# Baseline — {change-name}
+
+**Date:** 2026-04-24T10:30:00Z
+**Git HEAD:** {commit-sha}
+**Branch:** {branch-name}
+
+## Test Runs
+
+### unit
+- **Command:** `{command}`
+- **Exit code:** 0
+- **Summary:** 3012 passed, 0 failed, 0 skipped
+- **Duration:** 12s
+
+### integration
+- **Command:** `{command}`
+- **Exit code:** 1
+- **Summary:** 200 passed, 23 failed (DoctrineSignatureRepository — pre-existing, column `metadata` missing)
+- **Duration:** 180s
+- **Failures (top 5):**
+  - `...::testFoo` — `column metadata does not exist`
+  - ...
+
+## Notes
+
+- 23 integration failures pre-exist on this branch (unrelated to this change). Verify phase should treat these as baseline noise.
+```
+
+### How verify uses the baseline
+
+`sdd-verify` MUST read `.ai-team/changes/{change}/baseline.md` (if present) before reporting test failures. Any failure that exists in the baseline is NOT a regression — it's pre-existing and out of scope for this change. Verify reports only deltas.
 
 ## State Recovery
 
@@ -176,6 +228,7 @@ Do NOT search for SKILL.md files or skill registries — your instructions are b
 {paste contents of skills/_shared/persistence-contract.md}
 {paste contents of skills/_shared/result-envelope.md}
 {paste contents of skills/_shared/spec-convention.md}
+{paste contents of skills/_shared/evidence-protocol.md}
 
 ## Task
 {Clear description of what to do}

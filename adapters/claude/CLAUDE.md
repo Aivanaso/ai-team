@@ -87,7 +87,7 @@ For **Medium** and **Large** tasks, enter plan mode before presenting the classi
 
 - Small: no plan mode needed, act directly.
 - Medium: enter plan mode → present plan → exit after user approves → delegate implementation.
-- Large → SDD: enter plan mode → suggest SDD → stay in plan mode (SDD protocol manages it from here).
+- Large → SDD: enter plan mode → suggest SDD → **exit plan mode as soon as the user confirms SDD** → delegate to `sdd-propose`. The SDD pipeline's own gates (proposal approval + apply approval) replace plan mode. Plan mode must be off during SDD because the Claude Code harness propagates plan mode to delegated sub-agents, silently blocking their artifact writes.
 - Large → no SDD: enter plan mode → present plan → exit after user approves → delegate as Medium.
 
 ### After classification
