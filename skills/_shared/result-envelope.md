@@ -72,6 +72,16 @@ risks:
 - The model alias this sub-agent ran on (e.g., `"sonnet"`, `"opus"`, `"haiku"`)
 - Passed by the orchestrator in the prompt — report it back for traceability
 
+### `change_type` (OPTIONAL — propose phase only)
+
+- Classifies the change for orchestrator routing decisions
+- Values: `infra` | `feature` | `mixed`
+  - `infra` — refactor, plumbing, deps, tooling, observability, performance, internal migrations. NO new business requirements, no user-observable behavior changes
+  - `feature` — adds or modifies user-observable behavior, business rules, or UX
+  - `mixed` — both at once, OR uncertain (default to `mixed` when in doubt)
+- The orchestrator uses `infra` to offer skipping the spec phase at the proposal approval gate. `feature` and `mixed` always run spec
+- Only the `sdd-propose` envelope sets this; other phases omit it
+
 ## Rules
 
 1. **Always return an envelope** — even on failure

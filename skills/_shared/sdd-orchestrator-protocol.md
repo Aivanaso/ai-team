@@ -45,20 +45,28 @@ The `.gitignore` should ignore active changes and explorations but keep specs an
 
 ## Dependency Graph
 
+Standard path (`change_type: feature` or `mixed`):
+
 ```
 proposal --> specs ---> tasks --> apply --> verify --> archive
           -> design -/
 ```
 
-| Phase | Skill | Requires | Produces |
-|-------|-------|----------|----------|
-| propose | sdd-propose | -- | `proposal.md` |
-| spec | sdd-spec | proposal | `specs/{domain}/spec.md` |
-| design | sdd-design | proposal | `design.md` |
-| tasks | sdd-tasks | specs, design | `tasks.md` |
-| apply | sdd-apply | tasks | code changes |
-| verify | sdd-verify | tasks | verification report |
-| archive | sdd-archive | verify | merged specs |
+Infra-only short path (`change_type: infra`, user approved skip-spec at proposal gate):
+
+```
+proposal --> design --> tasks --> apply --> verify --> archive
+```
+
+| Phase | Skill | Requires (standard) | Requires (infra short path) | Produces |
+|-------|-------|---------------------|------------------------------|----------|
+| propose | sdd-propose | -- | -- | `proposal.md` |
+| spec | sdd-spec | proposal | (skipped) | `specs/{domain}/spec.md` |
+| design | sdd-design | proposal | proposal | `design.md` |
+| tasks | sdd-tasks | specs, design | design | `tasks.md` |
+| apply | sdd-apply | tasks | tasks | code changes |
+| verify | sdd-verify | tasks | tasks | verification report |
+| archive | sdd-archive | verify | verify | merged specs (no-op if no specs) |
 
 Utility: **sdd-scout** (bootstrap, explore, baseline) -- invoked by the orchestrator, not part of the DAG.
 
@@ -88,6 +96,27 @@ At each gate:
 1. Present a concise summary of the completed phase
 2. Ask the user: approve, request changes, or cancel
 3. Do NOT proceed until explicitly approved
+
+### Proposal approval — infra-only short path
+
+When `sdd-propose` returns `change_type: "infra"` in its envelope (and the proposal.md `Change Type` section confirms it), present the user a third option in the approval gate:
+
+> Proposal classified as **infra-only** (no new business requirements). You can skip the spec phase and go straight to design + tasks. Spec adds ~30-50k tokens of overhead and provides little value when there are no business rules to document.
+>
+> Options:
+> - **Approve + skip spec** (faster, recommended for pure infra)
+> - **Approve + run spec** (default, conservative)
+> - **Request changes** / **Cancel**
+
+**Default if user is ambiguous**: run spec. Only skip when the user explicitly says "skip spec" / "salta spec" / "infra path" / picks the option by name.
+
+When the user picks skip-spec:
+- Mark `phases.spec.status: "skipped"` in `state.yaml` with `skip_reason: "infra-only change, user approved"`
+- Skip baseline detection for spec (specs/{domain}/spec.md is not required)
+- Delegate `sdd-design` only; tasks phase reads design without spec
+- Verify and archive proceed normally; verify's traceability matrix maps ACs from proposal directly to tests (no requirement IDs)
+
+When `change_type` is `feature` or `mixed`, do NOT offer the skip option — run spec normally.
 
 ## Plan Mode (NOT used inside the SDD pipeline)
 

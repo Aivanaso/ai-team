@@ -161,6 +161,30 @@ If none of these appear, **skip this step**. Do not run greps for the sake of it
 
 This step is bounded: do NOT expand into a full audit. Up to 5 greps, then move on.
 
+### Step 4d — Classify Change Type
+
+Classify the change as one of: `infra`, `feature`, `mixed`. The orchestrator uses this to decide whether the spec phase is needed.
+
+| Type | Definition | Examples |
+|------|------------|----------|
+| `infra` | No new business requirements, no user-observable behavior changes. Internal-only | Refactor, dep upgrade, observability, performance without behavior change, plumbing, tooling, internal migration |
+| `feature` | Adds or modifies user-observable behavior, business rules, or UX | New endpoint, new page, new validation rule, changed pricing, OAuth flow |
+| `mixed` | Both at once, OR you are uncertain | Refactor that also fixes a UX bug. "Maybe" cases default here |
+
+**Strict rule**: if there is ANY doubt, classify as `mixed`. The cost of running spec when not needed is one phase of overhead. The cost of skipping spec when needed is silently dropping requirements from the pipeline.
+
+**Self-check before declaring `infra`**:
+1. Are any acceptance criteria worded in terms of user-visible outcomes? If yes → not infra.
+2. Does the proposal change any business rule, validation, pricing, permission, or data shown to a user? If yes → not infra.
+3. Does the proposal modify any existing spec requirement (REQ-ID)? If yes → not infra (`feature` or `mixed`).
+4. Are all affected domains marked `Impact: refactor` (not `new` or `modify`)? If no → consider `mixed`.
+
+If all four answers point to "purely internal" → `infra`.
+
+Record the classification in **two places**:
+- The proposal.md `Change Type` section (see template)
+- The result envelope `change_type` field
+
 ### Step 5 — Write proposal.md
 
 Write `.ai-team/changes/{change-name}/proposal.md` following the template below.
@@ -225,6 +249,12 @@ Return a result envelope per `skills/_shared/result-envelope.md`.
 # Proposal: {Change Name}
 
 > {One-line summary of what this change does}
+
+## Change Type
+
+**Type:** `infra` | `feature` | `mixed`
+
+**Justification:** {1-2 sentences. For `infra`: confirm no business rules / user-observable behavior change. For `feature`: name the user-visible outcome. For `mixed`: describe both halves.}
 
 ## Problem Statement
 
@@ -358,13 +388,14 @@ If `.ai-team/changes/{change-name}/` already exists with a `proposal.md`:
 ```yaml
 status: ok
 executive_summary: "Proposal for {change-name}. Affects {N} domains ({list}). {Key approach summary}. {N} risks identified, {N} open questions."
+change_type: "infra" | "feature" | "mixed"
 artifacts:
   - name: "proposal"
     path: ".ai-team/changes/{change-name}/proposal.md"
   - name: "state"
     path: ".ai-team/changes/{change-name}/state.yaml"
 next_recommended:
-  - "spec"
+  - "spec"   # omit if change_type is "infra" — orchestrator may skip spec
   - "design"
 ```
 
