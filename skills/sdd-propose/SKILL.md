@@ -21,6 +21,7 @@ Before starting any task, follow the context protocol:
 2. Read `skills/_shared/persistence-contract.md` — where to write artifacts
 3. Read `skills/_shared/result-envelope.md` — how to return results
 4. Read `skills/_shared/spec-convention.md` — spec format (to cross-reference existing specs)
+5. Read `skills/_shared/evidence-protocol.md` — Rule 4 (Validate Assumed Invariants) applies to this phase
 
 ## Input
 
@@ -137,6 +138,28 @@ For each distinct user path:
 3. **Update affected domains** — If an existing flow is incompatible, **that domain needs changes**. Do not leave it as "no structural changes" — add it to the Affected Domains table with the required modifications and add ACs for the fix.
 
 **The pattern to catch:** a domain marked "no changes" because the new feature doesn't touch its data model or API — but the new feature's user journey passes through that domain's frontend, which has hardcoded assumptions.
+
+### Step 4c — Validate Assumed Invariants (Evidence Protocol Rule 4)
+
+If the user request OR your draft proposal asserts a codebase-wide invariant — a naming convention, a regex, a "consistency" claim — validate it BEFORE writing the proposal.
+
+**Trigger words** (in user request or your own draft Approach/ACs): `todos`, `todas`, `siempre`, `nunca`, `convención`, `all`, `every`, `always`, `never`, `consistent`, `uniform`, or a stated pattern like "all X follow Y".
+
+If none of these appear, **skip this step**. Do not run greps for the sake of it.
+
+**When triggered**:
+
+1. State the invariant in one sentence: "Proposal assumes X holds for all Y in the codebase."
+2. Run **3-5 greps maximum** that would surface counter-examples. Cheapest first. Stop early if you find them.
+3. **If counter-examples exist**: add a `high` severity row in **Risks** with the count and sample, and add an entry in **Open Questions** offering two paths (fix-all vs allowlist) with a recommendation grounded in scope.
+4. **If clean**: add a single-line note at the bottom of the relevant section: `Invariant validated: <description> — <N> matches, 0 counter-examples (grep: <pattern>)`. Downstream phases reuse this evidence.
+
+**Example** (messenger-buses retrospective):
+- Invariant: "All `messageName()` return `<context>.<event>`"
+- Grep: `grep -rn "function messageName" src/ tests/`
+- Result: 15 violations → list in Risks R-2 with sample, ask user in Open Questions whether to fix or allowlist.
+
+This step is bounded: do NOT expand into a full audit. Up to 5 greps, then move on.
 
 ### Step 5 — Write proposal.md
 

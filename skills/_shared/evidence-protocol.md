@@ -52,6 +52,35 @@ Rationale: mocking a framework boundary (e.g., `MessageBusInterface` as a spy) m
 
 **Exception:** if the project's test infrastructure genuinely cannot run an integration test locally (e.g., requires external services not available in the sandbox), report it as a risk in the envelope rather than silently skipping.
 
+## Rule 4 — Validate Assumed Invariants in Propose Phase
+
+When a proposal depends on a **codebase-wide invariant** (a naming convention, a regex, a contract, a "consistency" assumption), the propose agent MUST validate it with greps before declaring the proposal ready.
+
+**Trigger** — this rule activates ONLY if the proposal text or the user request contains one of these signals about the invariant:
+
+- "todos", "todas", "siempre", "nunca", "convención", "convention"
+- "all", "every", "always", "never", "consistent", "uniform"
+- A regex or pattern stated as currently true (e.g., "all `messageName()` return `<context>.<event>`")
+
+If none of these appear, do NOT run extra greps — propose stays as-is.
+
+**When triggered**:
+
+1. Identify the invariant explicitly (one sentence: "the proposal assumes X holds for all Y").
+2. Run **at most 3-5 greps** that would surface counter-examples. Pick the cheapest first.
+3. If counter-examples exist, list them in the **Risks** table as `severity: high` with the exact list (or "N occurrences, sample: ...") and propose two paths in **Open Questions**: (a) fix all counter-examples in scope, or (b) carve an allowlist.
+4. If grep is clean, add a one-line note in the proposal: `Invariant validated: <description> — N matches, 0 counter-examples (grep: <pattern>)`. This becomes evidence for downstream phases.
+
+**Bad (assumed):**
+> "Add a routing test that asserts all `messageName()` follow `<context>.<event>`."
+
+**Good (validated):**
+> "Add a routing test for `messageName()` convention. Invariant check: 15 legacy events do NOT follow the convention (e.g., `BudgetCreated`, `ProposalSent`). See Risks R-2 — user must decide allowlist vs migration."
+
+**Why this exists**: in the messenger-buses retrospective, 15 legacy `messageName()` violations surfaced in the apply phase (group 1) and forced mid-pipeline re-decisions. They were greppable in propose.
+
+**Out of scope for this rule**: framework-behavior claims (Rule 1 covers them), interface signature sweeps (Rule 2), test execution (Rule 3). Rule 4 is specifically about invariants the proposal *itself* asserts as currently true.
+
 ## Recording Evidence in Artifacts
 
 When writing design.md, tasks.md, or verification-report.md:
