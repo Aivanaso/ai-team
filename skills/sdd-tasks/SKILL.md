@@ -36,6 +36,21 @@ The orchestrator provides:
 5. **Project config** — `.ai-team/config.yaml` (stack, architecture, conventions).
 6. **Skill registry** — `.ai-team/skill-registry.md` (available coding skills).
 
+### Expected Context (injected by orchestrator)
+
+The delegation prompt MUST contain an `## Injected Context (from orchestrator)` block with at minimum:
+
+- `change_name`
+- `change_dir`
+- `model_alias`
+- `proposal_path`
+- `design_path`
+- `change_type`
+- `skip_spec`
+- `spec_paths` (empty list if `skip_spec: true`)
+
+If any of these are missing from the prompt, recover them from `.ai-team/changes/{change_name}/state.yaml` and disk listing, then report `context_resolution: fallback` in the envelope, listing what was missing under `risks`.
+
 ## Process
 
 ### Step 1 — Load Context
@@ -376,6 +391,8 @@ artifacts:
     path: ".ai-team/changes/{change-name}/state.yaml"
 next_recommended:
   - "apply"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Task Plan With Warnings
@@ -392,6 +409,8 @@ next_recommended:
   - "apply"
 risks:
   - "{specific concern — drift, missing tests, large task count}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Blocked
@@ -404,6 +423,8 @@ next_recommended:
   - "{what needs to happen first}"
 risks:
   - "{blocker details}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ## Rules

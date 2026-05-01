@@ -32,6 +32,18 @@ The orchestrator provides:
 3. **Project config** — `.ai-team/config.yaml` (stack, architecture, conventions, skill registry).
 4. **Base specs** — Paths to `.ai-team/specs/{domain}/spec.md` for affected domains (if they exist).
 
+### Expected Context (injected by orchestrator)
+
+The delegation prompt MUST contain an `## Injected Context (from orchestrator)` block with at minimum:
+
+- `change_name`
+- `change_dir`
+- `model_alias`
+- `proposal_path`
+- `change_type` (from propose envelope)
+
+If any of these are missing from the prompt, recover them by reading `.ai-team/changes/{change_name}/state.yaml` and the proposal file, then report `context_resolution: fallback` in the envelope, listing what was missing under `risks`.
+
 ## Process
 
 ### Step 1 — Read the Proposal
@@ -299,6 +311,8 @@ artifacts:
     path: ".ai-team/changes/{change-name}/state.yaml"
 next_recommended:
   - "design"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Partial — Some Domains Need Baseline
@@ -315,6 +329,8 @@ next_recommended:
   - "baseline {domain2}"
 risks:
   - "Domains without baselines: {list}. Run baseline generation before continuing."
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Blocked — No Domains Ready
@@ -328,6 +344,8 @@ next_recommended:
   - "baseline {domain2}"
 risks:
   - "No base specs exist for any affected domain. Baseline generation required."
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ## Rules

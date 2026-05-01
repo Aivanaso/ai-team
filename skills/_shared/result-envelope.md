@@ -72,6 +72,22 @@ risks:
 - The model alias this sub-agent ran on (e.g., `"sonnet"`, `"opus"`, `"haiku"`)
 - Passed by the orchestrator in the prompt — report it back for traceability
 
+### `context_resolution` (REQUIRED)
+
+Compaction canary. Every sub-agent MUST report whether it received its expected context inputs from the orchestrator's delegation prompt, or had to recover them by itself.
+
+Each SKILL.md declares an "Expected Context (injected by orchestrator)" list. At launch, the sub-agent checks whether all those inputs arrived in the prompt:
+
+| Value | Meaning | What it tells the orchestrator |
+|-------|---------|-------------------------------|
+| `injected` | All expected context inputs were present in the prompt | Healthy — Critical Context Forwarding worked |
+| `fallback` | One or more expected inputs were missing; the sub-agent recovered them by reading `.ai-team/changes/{change}/` directly | Cache miss — orchestrator likely lost state (compaction). Re-read state and re-inject in subsequent delegations |
+| `none` | No expected inputs declared for this phase, or the sub-agent had nothing to verify | No signal — phase is context-light (e.g., scout bootstrap) |
+
+The orchestrator inspects this field on every return. See `sdd-orchestrator-protocol.md` → "Context Resolution Feedback" for the self-correction rule.
+
+**Rule for sub-agents**: do not lie. If you read a path that the orchestrator should have given you, report `fallback` and list which inputs were missing in `risks`. Silent fallback defeats the canary.
+
 ### `change_type` (OPTIONAL — propose phase only)
 
 - Classifies the change for orchestrator routing decisions
@@ -102,6 +118,7 @@ artifacts:
     path: ".ai-team/config.yaml"
 next_recommended: []
 model_used: "sonnet"
+context_resolution: "none"
 ```
 
 ### Blocked Spec Phase
@@ -114,4 +131,20 @@ next_recommended: ["propose"]
 risks:
   - "Proposal may need revision before spec work can begin"
 model_used: "sonnet"
+context_resolution: "injected"
+```
+
+### Cache Miss After Compaction
+
+```yaml
+status: ok
+executive_summary: "Tasks generated for change 'oauth-login'. Read design.md and 2 delta specs from disk."
+artifacts:
+  - name: "tasks"
+    path: ".ai-team/changes/oauth-login/tasks.md"
+next_recommended: ["apply"]
+risks:
+  - "Orchestrator did not inject design_path or spec_paths — recovered by listing .ai-team/changes/oauth-login/. Likely compaction event."
+model_used: "sonnet"
+context_resolution: "fallback"
 ```

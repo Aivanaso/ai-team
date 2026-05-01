@@ -29,6 +29,19 @@ The orchestrator provides:
 1. **Change name** -- The slug for this change.
 2. **Project config** -- `.ai-team/config.yaml`.
 
+### Expected Context (injected by orchestrator)
+
+The delegation prompt MUST contain an `## Injected Context (from orchestrator)` block with at minimum:
+
+- `change_name`
+- `change_dir`
+- `model_alias`
+- `change_type`
+- `skip_spec`
+- `spec_paths` (empty list if `skip_spec: true` -- archive becomes a no-op for spec merging in that case)
+
+If any of these are missing from the prompt, recover them from `.ai-team/changes/{change_name}/state.yaml`, then report `context_resolution: fallback` in the envelope, listing what was missing under `risks`.
+
 ## Process
 
 ### Step 1 -- Gate Check
@@ -142,6 +155,8 @@ artifacts:
   - name: "base-spec-{domain}"
     path: ".ai-team/specs/{domain}/spec.md"
 next_recommended: []
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Blocked
@@ -154,6 +169,8 @@ next_recommended:
   - "{what needs to happen first}"
 risks:
   - "{blocker details}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ## Rules

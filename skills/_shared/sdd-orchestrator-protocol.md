@@ -249,6 +249,9 @@ You are the sdd-{phase} executor.
 Do this phase's work yourself. Do NOT delegate or launch sub-agents.
 Do NOT search for SKILL.md files or skill registries — your instructions are below.
 
+## Injected Context (from orchestrator)
+{populate per Critical Context Forwarding table — change_name, change_dir, model_alias, plus phase-specific flags and paths}
+
 ## Instructions
 {paste contents of skills/sdd-{phase}/SKILL.md here}
 
@@ -260,10 +263,7 @@ Do NOT search for SKILL.md files or skill registries — your instructions are b
 {paste contents of skills/_shared/evidence-protocol.md}
 
 ## Task
-{Clear description of what to do}
-
-## Context Files
-{Explicit list of artifact paths the agent should read}
+{Clear description of what to do — references the paths from Injected Context, does not re-list them}
 
 ## Constraints
 {Project-specific constraints or user preferences}
@@ -273,10 +273,77 @@ Do NOT search for SKILL.md files or skill registries — your instructions are b
 
 ## Expected Output
 Return a result envelope per the Result Envelope protocol above.
-Include model_used: "{resolved-model}" in the envelope metadata.
+Include model_used: "{resolved-model}" and context_resolution in the envelope metadata.
 `
 })
 ```
+
+If `strict_tdd: true` and the phase is `apply` or `verify`, append the literal "STRICT TDD MODE IS ACTIVE..." instruction (see Critical Context Forwarding) at the end of the prompt.
+
+### Critical Context Forwarding
+
+Sub-agents are born with **no memory** of prior phases. The orchestrator is the only component that holds session state, so it MUST inject every piece of context the next phase needs — directly into the delegation prompt. Do NOT rely on the sub-agent to discover flags by grepping or by reading state files; discovery is flakey and silently degrades.
+
+Resolve these flags **once per session**, cache them, and inject them into every relevant delegation:
+
+| Flag | Resolved from | Inject in (phases) | When mandatory |
+|------|---------------|--------------------|----------------|
+| `change_name` | user command | every phase | always |
+| `change_dir` | `.ai-team/changes/{change_name}` | every phase | always |
+| `model_alias` | Model Routing table | every phase | always |
+| `change_type` | `sdd-propose` envelope (`infra` / `feature` / `mixed`) | design, tasks, apply, verify, archive | once propose has run |
+| `skip_spec` | proposal approval gate (true if user picked skip-spec on infra) | design, tasks, apply, verify, archive | once gate has resolved |
+| `baseline_path` | `.ai-team/changes/{change_name}/baseline.md` | apply, verify | if file exists |
+| `proposal_path` | `.ai-team/changes/{change_name}/proposal.md` | spec, design, tasks, verify | once propose has run |
+| `design_path` | `.ai-team/changes/{change_name}/design.md` | tasks, apply, verify | once design has run |
+| `spec_paths` | `.ai-team/changes/{change_name}/specs/*/spec.md` (list) | tasks, apply, verify, archive | once spec has run; pass empty list on infra short path |
+| `tasks_path` | `.ai-team/changes/{change_name}/tasks.md` | apply, verify | once tasks has run |
+| `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
+
+Inject as a labelled block at the top of the delegation prompt:
+
+```
+## Injected Context (from orchestrator)
+change_name: oauth-login
+change_dir: .ai-team/changes/oauth-login
+model_alias: sonnet
+change_type: feature
+skip_spec: false
+proposal_path: .ai-team/changes/oauth-login/proposal.md
+spec_paths:
+  - .ai-team/changes/oauth-login/specs/auth/spec.md
+design_path: .ai-team/changes/oauth-login/design.md
+tasks_path: .ai-team/changes/oauth-login/tasks.md
+baseline_path: .ai-team/changes/oauth-login/baseline.md
+strict_tdd: false
+```
+
+The sub-agent treats this block as the source of truth for paths and flags. It does NOT re-derive them from disk unless explicitly told to.
+
+**Strict TDD example** — when `strict_tdd: true`, also append a literal instruction to apply/verify prompts:
+
+> STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. You MUST follow the strict-tdd module: red → green → triangulate → refactor. Do NOT fall back to standard mode.
+
+This is non-negotiable. Do not rely on the sub-agent to discover the flag by reading config — inject it.
+
+### Context Resolution Feedback
+
+Every result envelope includes `context_resolution: injected | fallback | none`. The orchestrator MUST inspect this field after every delegation:
+
+| Reported value | Orchestrator action |
+|----------------|---------------------|
+| `injected` | Healthy. Continue. |
+| `none` | No signal (context-light phase, e.g. scout bootstrap). Continue. |
+| `fallback` | **Cache miss detected.** The Critical Context Forwarding block was incomplete or absent — likely cause: prior context compaction. |
+
+When `fallback` is reported:
+
+1. Re-read `.ai-team/changes/{change_name}/state.yaml` and any envelopes from prior phases stored under `.ai-team/changes/{change_name}/envelopes/` (if present).
+2. Rebuild the cached flag set from scratch (Critical Context Forwarding table).
+3. Inject the rebuilt block in **all subsequent delegations** for this session.
+4. Surface a single warning to the user: `"Detected cache miss in {phase} (context_resolution: fallback) — reloaded session state. Subsequent phases will run with full context."`
+
+This is a self-healing mechanism. Do NOT ignore `fallback` — silent degradation is exactly what this loop is designed to prevent.
 
 ### Non-SDD Delegation
 

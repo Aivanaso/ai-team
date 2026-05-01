@@ -14,6 +14,16 @@ Before starting any task, follow the context protocol:
 2. Read `skills/_shared/persistence-contract.md` — where to write artifacts
 3. Read `skills/_shared/result-envelope.md` — how to return results
 
+## Expected Context (injected by orchestrator)
+
+Scout is mode-dependent. The delegation prompt SHOULD contain an `## Injected Context (from orchestrator)` block with:
+
+- **Bootstrap mode**: `mode: bootstrap`, `model_alias`, `project_root` (absolute path). Nothing else needed — scout discovers the stack from disk.
+- **Explore mode**: `mode: explore`, `model_alias`, `topic` (the user's topic string), `project_root`.
+- **Baseline mode**: `mode: baseline`, `model_alias`, `domain`, `project_root`.
+
+Scout's bootstrap path is context-light by design — if the only fields present are `mode` and `model_alias`, that is healthy. Report `context_resolution: none` for bootstrap. For explore/baseline, report `injected` if the mode-specific fields arrived; `fallback` if they didn't (e.g., topic missing — recover from the user-facing prompt text but flag it).
+
 ## Modes
 
 ### Mode 1: Bootstrap (auto-init)
@@ -225,6 +235,7 @@ artifacts:
     path: ".ai-team/config.yaml"
 next_recommended: []
 model_used: "sonnet"
+context_resolution: "none"
 ```
 
 ---
@@ -292,6 +303,8 @@ artifacts:
   - name: "exploration"
     path: ".ai-team/explorations/{topic}/findings.md"
 next_recommended: []
+model_used: "sonnet"
+context_resolution: "injected"
 ```
 
 ---
@@ -429,6 +442,8 @@ artifacts:
 next_recommended: []
 risks:
   - "Baseline is inferred from code — user should review for accuracy"
+model_used: "sonnet"
+context_resolution: "injected"
 ```
 
 ## Rules

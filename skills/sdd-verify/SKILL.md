@@ -38,6 +38,24 @@ The orchestrator provides:
 5. **Proposal** -- `.ai-team/changes/{change-name}/proposal.md` (acceptance criteria).
 6. **Project config** -- `.ai-team/config.yaml` (stack, conventions, verify commands).
 
+### Expected Context (injected by orchestrator)
+
+The delegation prompt MUST contain an `## Injected Context (from orchestrator)` block with at minimum:
+
+- `change_name`
+- `change_dir`
+- `model_alias`
+- `tasks_path`
+- `design_path`
+- `proposal_path`
+- `change_type`
+- `skip_spec`
+- `spec_paths` (empty list if `skip_spec: true`)
+- `baseline_path` (only when `.ai-team/changes/{change_name}/baseline.md` exists -- critical for distinguishing regressions from pre-existing failures)
+- `strict_tdd` (boolean; when `true`, the orchestrator also appends a literal "STRICT TDD MODE IS ACTIVE" instruction)
+
+If any of these are missing from the prompt, recover them from `.ai-team/changes/{change_name}/state.yaml`, then report `context_resolution: fallback` in the envelope, listing what was missing under `risks`. If `baseline.md` exists on disk but `baseline_path` was not injected, that is a `fallback` -- without it, you risk reporting pre-existing failures as regressions.
+
 ## Severity Levels
 
 Every finding uses one of three severity levels:
@@ -528,6 +546,8 @@ artifacts:
     path: ".ai-team/changes/{change-name}/state.yaml"
 next_recommended:
   - "archive"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Pass With Warnings
@@ -545,6 +565,8 @@ next_recommended:
 risks:
   - "{warning 1}"
   - "{warning 2}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Verification Failed
@@ -562,6 +584,8 @@ next_recommended:
 risks:
   - "{failure 1 -- which tasks need re-apply}"
   - "{failure 2}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Blocked
@@ -574,6 +598,8 @@ next_recommended:
   - "{what needs to happen first}"
 risks:
   - "{blocker details}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ## Rules

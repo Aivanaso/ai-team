@@ -32,6 +32,16 @@ The orchestrator provides:
 3. **Project config** — `.ai-team/config.yaml` (loaded via context protocol).
 4. **Existing specs** — Paths to any `.ai-team/specs/*/spec.md` files that exist (the orchestrator lists them; you read only the relevant ones).
 
+### Expected Context (injected by orchestrator)
+
+The delegation prompt MUST contain an `## Injected Context (from orchestrator)` block with at minimum:
+
+- `change_name`
+- `change_dir`
+- `model_alias`
+
+If any of these are missing from the prompt, recover them yourself (derive `change_dir` from `change_name`, run `git rev-parse --show-toplevel` for project root) and report `context_resolution: fallback` in the envelope, listing what was missing under `risks`.
+
 ## Process
 
 ### Step 1 — Parse User Request
@@ -397,6 +407,8 @@ artifacts:
 next_recommended:
   - "spec"   # omit if change_type is "infra" — orchestrator may skip spec
   - "design"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Needs User Input
@@ -409,6 +421,8 @@ next_recommended: []
 questions:
   - "{Specific question 1 to clarify scope}"
   - "{Specific question 2 to clarify expected behavior}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Blocked
@@ -420,6 +434,8 @@ artifacts: []
 next_recommended: ["continue"]
 risks:
   - "Change {change-name} already has a proposal. Use /ai-team continue to resume."
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ## Rules

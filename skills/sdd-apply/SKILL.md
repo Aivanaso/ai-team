@@ -34,6 +34,23 @@ The orchestrator provides:
 3. **Project config** — `.ai-team/config.yaml` (stack, architecture, conventions, verify commands).
 4. **Scope** (optional) — Specific task IDs to apply (e.g., `["1.1", "2.1"]`). Default: all pending tasks.
 
+### Expected Context (injected by orchestrator)
+
+The delegation prompt MUST contain an `## Injected Context (from orchestrator)` block with at minimum:
+
+- `change_name`
+- `change_dir`
+- `model_alias`
+- `tasks_path`
+- `design_path`
+- `change_type`
+- `skip_spec`
+- `spec_paths` (empty list if `skip_spec: true`)
+- `baseline_path` (only when `.ai-team/changes/{change_name}/baseline.md` exists)
+- `strict_tdd` (boolean; when `true`, the orchestrator also appends a literal "STRICT TDD MODE IS ACTIVE" instruction — follow it)
+
+If any of these are missing from the prompt, recover them from `.ai-team/changes/{change_name}/state.yaml` and `.ai-team/config.yaml`, then report `context_resolution: fallback` in the envelope, listing what was missing under `risks`. Critical: if `strict_tdd: true` was supposed to be set but the literal TDD instruction is absent, that is a `fallback` — do NOT silently fall back to standard mode without flagging it.
+
 ## Process
 
 ### Step 1 — Load Context
@@ -315,6 +332,8 @@ artifacts:
     path: ".ai-team/changes/{change-name}/state.yaml"
 next_recommended:
   - "verify"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Tasks Completed With Warnings
@@ -330,6 +349,8 @@ next_recommended:
 risks:
   - "Task {id} failed: {compilation error or reason}"
   - "Tasks {ids} skipped due to dependency on failed task {id}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ### Blocked
@@ -342,6 +363,8 @@ next_recommended:
   - "{what needs to happen first}"
 risks:
   - "{blocker details}"
+model_used: "{resolved-model}"
+context_resolution: "injected"
 ```
 
 ## Rules
