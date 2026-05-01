@@ -1,29 +1,27 @@
 #!/usr/bin/env bash
 #
-# install.sh -- Install ai-team framework into ~/.claude/ for Claude Code.
+# scripts/install.sh -- ai-team adapter selector
+#
+# Installs the ai-team SDD framework by routing to the chosen adapter installer.
 #
 # Usage:
-#   ./scripts/install.sh
+#   ./scripts/install.sh --adapter=claude-code
+#   ./scripts/install.sh --adapter=opencode
+#   ./scripts/install.sh --adapter=both        # installs both adapters
+#   ./scripts/install.sh claude-code           # positional argument
+#   ./scripts/install.sh                       # interactive prompt (TTY only)
 #
-# What it does:
-#   1. Copies SDD skills to ~/.claude/skills/
-#   2. Injects orchestrator content inline into ~/.claude/CLAUDE.md
-#      between <!-- ai-team:orchestrator --> markers
+# Supported adapters:
+#   claude-code   Claude Code adapter
+#   opencode      OpenCode adapter
+#   both          Both adapters
 #
-# Re-run to update after pulling new changes from the repo.
-# User content outside the markers is never touched.
+# Each adapter installer lives at adapters/<name>/install.sh.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CLAUDE_DIR="${HOME}/.claude"
-
-MARKER_OPEN="<!-- ai-team:orchestrator -->"
-MARKER_CLOSE="<!-- /ai-team:orchestrator -->"
-
-# Legacy @reference to clean up
-LEGACY_REFERENCE="@ai-team-orchestrator.md"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -34,118 +32,100 @@ info() { echo -e "${GREEN}[ai-team]${NC} $1"; }
 warn() { echo -e "${YELLOW}[ai-team]${NC} $1"; }
 die()  { echo -e "${RED}[ai-team]${NC} $1" >&2; exit 1; }
 
-# --- Preflight ---
+SUPPORTED_ADAPTERS="claude-code opencode"
 
-[[ -d "$CLAUDE_DIR" ]] || die "~/.claude/ not found. Is Claude Code installed?"
+# Validate adapter name. Returns 0 if valid, 1 if not.
+is_valid_adapter() {
+  local name="$1"
+  for a in $SUPPORTED_ADAPTERS; do
+    [[ "$a" == "$name" ]] && return 0
+  done
+  return 1
+}
 
-# --- 1. Skills ---
+# Expand "both" to the full adapter list.
+expand_adapters() {
+  local raw="$1"
+  if [[ "$raw" == "both" ]]; then
+    echo "$SUPPORTED_ADAPTERS"
+  else
+    echo "$raw"
+  fi
+}
 
-info "Installing skills..."
-for dir in "$REPO_ROOT/skills/"*/; do
-  name=$(basename "$dir")
-  mkdir -p "$CLAUDE_DIR/skills/$name"
-  cp "$dir"*.md "$CLAUDE_DIR/skills/$name/"
+# --- Argument parsing (resolution order: flag > positional > TTY prompt > error) ---
+
+ADAPTER_RAW=""
+
+# 1. Parse --adapter=<value> long flag
+for arg in "$@"; do
+  case "$arg" in
+    --adapter=*)
+      ADAPTER_RAW="${arg#--adapter=}"
+      break
+      ;;
+  esac
 done
 
-skill_count=$(find "$CLAUDE_DIR/skills/sdd-"* -maxdepth 0 -type d 2>/dev/null | wc -l)
-info "  -> ~/.claude/skills/ ($skill_count phases + _shared)"
-
-# Rewrite skill paths in the orchestrator protocol for installed location
-SDD_PROTOCOL="$CLAUDE_DIR/skills/_shared/sdd-orchestrator-protocol.md"
-if [[ -f "$SDD_PROTOCOL" ]]; then
-  sed -i \
-    -e 's|skills/_shared/|~/.claude/skills/_shared/|g' \
-    -e 's|skills/sdd-|~/.claude/skills/sdd-|g' \
-    "$SDD_PROTOCOL"
-  info "  -> Rewrote skill paths in sdd-orchestrator-protocol.md"
+# 2. Positional argument fallback
+if [[ -z "$ADAPTER_RAW" ]] && [[ $# -gt 0 ]]; then
+  case "$1" in
+    --*)
+      # Unknown flag — skip (will fall through to TTY or error)
+      ;;
+    *)
+      ADAPTER_RAW="$1"
+      ;;
+  esac
 fi
 
-# --- 2. Prepare orchestrator content ---
-
-info "Preparing orchestrator content..."
-
-ORCHESTRATOR_CONTENT=$(cat "$REPO_ROOT/adapters/claude/CLAUDE.md")
-
-# --- 3. Resolve CLAUDE.md (handle symlinks) ---
-
-CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
-
-# If CLAUDE.md is a symlink, resolve to the real file so we write to the
-# actual target (not replace the symlink with a regular file).
-WRITE_TARGET="$CLAUDE_MD"
-if [[ -L "$CLAUDE_MD" ]]; then
-  WRITE_TARGET="$(readlink -f "$CLAUDE_MD")"
-  warn "CLAUDE.md is a symlink -> ${WRITE_TARGET}"
-fi
-
-# Create CLAUDE.md if it doesn't exist
-if [[ ! -f "$WRITE_TARGET" ]]; then
-  touch "$WRITE_TARGET"
-  info "Created ${WRITE_TARGET}"
-fi
-
-EXISTING=$(cat "$WRITE_TARGET")
-
-# --- 4. Clean up legacy @reference (if present) ---
-
-if grep -qF "$LEGACY_REFERENCE" <<< "$EXISTING"; then
-  warn "Removing legacy ${LEGACY_REFERENCE}..."
-  EXISTING=$(grep -vF "$LEGACY_REFERENCE" <<< "$EXISTING")
-fi
-
-# Also remove the old standalone orchestrator file if it exists
-if [[ -f "$CLAUDE_DIR/ai-team-orchestrator.md" ]]; then
-  rm "$CLAUDE_DIR/ai-team-orchestrator.md"
-  warn "Removed legacy ~/.claude/ai-team-orchestrator.md"
-fi
-
-# --- 5. Inject between markers ---
-
-# Build the new section
-SECTION="${MARKER_OPEN}
-${ORCHESTRATOR_CONTENT}
-${MARKER_CLOSE}"
-
-if grep -qF "$MARKER_OPEN" <<< "$EXISTING"; then
-  # Markers exist — replace content between them
-  info "Updating existing orchestrator section..."
-
-  # Use awk to replace everything between markers (inclusive)
-  UPDATED=$(awk -v m_open="$MARKER_OPEN" -v m_close="$MARKER_CLOSE" -v section="$SECTION" '
-    BEGIN { printing=1 }
-    index($0, m_open) { printing=0; print section; next }
-    index($0, m_close) { printing=1; next }
-    printing
-  ' <<< "$EXISTING")
-else
-  # No markers — append section at the end
-  info "Injecting orchestrator section..."
-
-  if [[ -n "$EXISTING" ]]; then
-    UPDATED="${EXISTING}
-
-${SECTION}"
+# 3. Interactive TTY prompt (re-prompt up to 3 times)
+if [[ -z "$ADAPTER_RAW" ]]; then
+  if [[ -t 0 ]]; then
+    echo ""
+    echo "Supported adapters: claude-code, opencode, both"
+    for attempt in 1 2 3; do
+      read -r -p "Select adapter: " ADAPTER_RAW
+      [[ -n "$ADAPTER_RAW" ]] && break
+      warn "No input provided (attempt $attempt/3)"
+    done
+    if [[ -z "$ADAPTER_RAW" ]]; then
+      echo "error: no valid adapter selected after 3 attempts" >&2
+      exit 4
+    fi
   else
-    UPDATED="$SECTION"
+    # 4. No-TTY, no-flag, no-positional
+    echo "error: no adapter selected; pass --adapter=<name>" >&2
+    exit 1
   fi
 fi
 
-# --- 6. Write back ---
+# --- Expand and validate ---
 
-# Write atomically: temp file + move
-TMPFILE=$(mktemp "${WRITE_TARGET}.XXXXXX")
-echo "$UPDATED" > "$TMPFILE"
-mv "$TMPFILE" "$WRITE_TARGET"
+ADAPTERS=$(expand_adapters "$ADAPTER_RAW")
 
-info "  -> ${WRITE_TARGET}"
+for adapter in $ADAPTERS; do
+  if ! is_valid_adapter "$adapter"; then
+    echo "error: unknown adapter '${adapter}'; supported: claude-code, opencode" >&2
+    exit 2
+  fi
+done
 
-# --- Done ---
+# --- Dispatch ---
 
-echo ""
-info "Installation complete!"
-echo ""
-echo "  Skills:       ~/.claude/skills/sdd-*/"
-echo "  Protocols:    ~/.claude/skills/_shared/"
-echo "  Orchestrator: inline in CLAUDE.md (between markers)"
-echo ""
-echo "  Re-run this script to update after pulling new changes."
+export AI_TEAM_ROOT="$REPO_ROOT"
+
+for adapter in $ADAPTERS; do
+  ADAPTER_INSTALLER="$REPO_ROOT/adapters/${adapter}/install.sh"
+
+  if [[ ! -f "$ADAPTER_INSTALLER" ]]; then
+    echo "error: adapter '${adapter}' has no install.sh at adapters/${adapter}/install.sh" >&2
+    exit 3
+  fi
+
+  info "Running adapter: ${adapter}"
+  if ! "$ADAPTER_INSTALLER"; then
+    echo "error: adapter '${adapter}' installer failed (see output above)" >&2
+    exit $?
+  fi
+done
