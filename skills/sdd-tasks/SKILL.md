@@ -156,6 +156,33 @@ Expected task count by design complexity:
 | 20-40 | 10-18 |
 | 40+ | 15-25 (flag for possible proposal split) |
 
+### Step 4.5 — Forecast Review Workload
+
+Estimate whether the planned implementation is likely to exceed the **400 changed-line review budget** (`additions + deletions`). This is a planning guard, not an exact diff count — use available signals: number of files (created/modified/removed), tests/docs included, integration points, generated artifacts, migrations, and how many concerns the change crosses.
+
+Then map groups to **PR slices**:
+
+- **Default**: 1 group = 1 PR slice (each group is already a coherent unit of work).
+- **Merge** small adjacent groups (e.g., layer 6 + 7 cleanup) into one slice if combined size stays within budget.
+- **Split** a single group across slices only if that group alone exceeds budget (rare — usually means the design is too coarse; flag as a risk instead).
+
+Each PR slice MUST be:
+
+- **Autonomous** — compiles and passes existing tests on its own at the slice boundary.
+- **Reviewable alone** — a reviewer does not need to read other slices to understand it.
+- **Rollback-safe** — reverting one slice does not require reverting unrelated slices.
+
+#### Risk Heuristics
+
+| Signal | Risk |
+|--------|------|
+| ≤ 4 files, no migrations, no cross-domain | Low |
+| 5-10 files, 1-2 groups, single domain | Low–Medium |
+| 10-20 files, 3+ groups, or new module | Medium |
+| 20+ files, multi-domain, migrations, or design has 15+ components | High |
+
+If risk is **Medium** or **High**, recommend chained PRs (one per group by default) and assign each task to a slice in the Execution Order table.
+
 ### Step 5 — Order Tasks and Resolve Dependencies
 
 Assign a hierarchical ID to each task: `{group}.{sequence}` (e.g., `1.1`, `2.1`, `3.2`). The first digit is the layer/group, the second is the sequence within the group.
@@ -248,18 +275,49 @@ Return a result envelope per `skills/_shared/result-envelope.md`.
 | Requirements covered | {count} REQs across {N} domains |
 | Acceptance criteria covered | {count}/{total} ACs |
 
+## Review Workload Forecast
+
+| Field | Value |
+|-------|-------|
+| Estimated changed lines | {rough estimate or range, e.g. "~600 (300 new, 300 modified)"} |
+| 400-line budget risk | {Low | Medium | High} |
+| Chained PRs recommended | {Yes | No} |
+| PR slices suggested | {single PR | PR 1 → PR 2 → PR 3} |
+
+The following plain-text lines are the **grep contract** that downstream guards (sdd-apply, orchestrator) MUST be able to match literally. Keep them verbatim, in this exact order:
+
+```text
+400-line budget risk: Low|Medium|High
+Chained PRs recommended: Yes|No
+Decision needed before apply: Yes|No
+```
+
+`Decision needed before apply` is `Yes` when risk is High and no slice plan is set, otherwise `No`.
+
+### Suggested PR Slices
+
+Omit this table when `Chained PRs recommended: No`.
+
+| Slice | Goal | Groups | Estimated lines |
+|-------|------|--------|-----------------|
+| PR 1 | {standalone deliverable} | Group 1 | {rough} |
+| PR 2 | {standalone deliverable} | Groups 2-3 | {rough} |
+
 ## Execution Order
 
-| # | Task | Group | Files | Depends On | Status |
-|---|------|-------|-------|------------|--------|
-| 1.1 | {task name} | {group name} | {count} | — | pending |
-| 1.2 | {task name} | {group name} | {count} | — | pending |
-| 2.1 | {task name} | {group name} | {count} | 1.1 | pending |
-| ... | | | | | |
+| # | Task | Group | PR Slice | Files | Depends On | Status |
+|---|------|-------|----------|-------|------------|--------|
+| 1.1 | {task name} | {group name} | PR 1 | {count} | — | pending |
+| 1.2 | {task name} | {group name} | PR 1 | {count} | — | pending |
+| 2.1 | {task name} | {group name} | PR 2 | {count} | 1.1 | pending |
+| ... | | | | | | |
+
+When `Chained PRs recommended: No`, the `PR Slice` column may be filled with `single PR` for every row.
 
 ## Group 1: {Group Name}
 
 > {One-line description of what this group accomplishes}
+> **PR Slice**: PR 1 (or "shared with Group 2", or "single PR")
 
 ### Task 1.1: {Task Name}
 
@@ -389,6 +447,11 @@ artifacts:
     path: ".ai-team/changes/{change-name}/tasks.md"
   - name: "state"
     path: ".ai-team/changes/{change-name}/state.yaml"
+review_workload:
+  budget_risk: low|medium|high
+  chained_prs_recommended: true|false
+  decision_needed_before_apply: true|false
+  pr_slices: {1 if single PR, else N}
 next_recommended:
   - "apply"
 model_used: "{resolved-model}"
@@ -437,4 +500,5 @@ context_resolution: "injected"
 6. **Trace everything** — Every task traces to REQs and ACs. Every REQ and AC must appear in at least one task. Gaps mean something was missed
 7. **Order by dependency, not by domain** — Tasks are ordered by execution layer (data -> logic -> API -> frontend -> modifications -> cleanup), not by business domain
 8. **Bounded exploration** — Two-phase: free structural scan (glob/grep) + budgeted reads (5-15 files). You are planning, not auditing
-9. **Result envelope always** — Every response MUST end with a result envelope
+9. **Forecast workload up front** — Always include the Review Workload Forecast section near the top of `tasks.md`. The three plain-text grep contract lines (`400-line budget risk:`, `Chained PRs recommended:`, `Decision needed before apply:`) MUST appear verbatim. When risk is Medium or High, recommend chained PRs and assign every task to a PR slice in the Execution Order table
+10. **Result envelope always** — Every response MUST end with a result envelope
