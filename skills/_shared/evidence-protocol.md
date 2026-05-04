@@ -6,7 +6,7 @@
 
 The most common failure mode in SDD runs is **assuming generic framework behavior applies verbatim to this project**. The 4 bugs in the ECO-944 retrospective all shared this pattern: design/tasks/apply relied on "standard framework behavior" instead of validating the specific project configuration.
 
-This protocol defines three hard rules that every sub-agent MUST follow when writing specs, designs, tasks, code, or verification reports.
+This protocol defines five hard rules that every sub-agent MUST follow when writing specs, designs, tasks, code, or verification reports.
 
 ## Rule 1 — Framework / Library Behavior Claims
 
@@ -80,6 +80,73 @@ If none of these appear, do NOT run extra greps — propose stays as-is.
 **Why this exists**: in the messenger-buses retrospective, 15 legacy `messageName()` violations surfaced in the apply phase (group 1) and forced mid-pipeline re-decisions. They were greppable in propose.
 
 **Out of scope for this rule**: framework-behavior claims (Rule 1 covers them), interface signature sweeps (Rule 2), test execution (Rule 3). Rule 4 is specifically about invariants the proposal *itself* asserts as currently true.
+
+## Rule 5 — Cross-Repo Pattern Transplant Check
+
+When propose, design, or tasks cite a pattern from a **sibling/sister repository** as evidence (not the current repo), the agent MUST verify that the pattern's structural prerequisites also hold in the target repo before recommending the transplant.
+
+Rule 1 covers framework behavior in the current repo. This rule covers the gap: "we'll do it like `corev3` does" is NOT sufficient evidence — `corev3`'s pattern depends on `corev3`'s topology, which may not match.
+
+**Trigger** — this rule activates when the agent writes one of these phrases (or their Spanish equivalents):
+
+- "mirror of {repo}", "same pattern as {repo}", "replicate from {repo}", "como hace {repo}"
+- A path that crosses repos (e.g., `../{other-repo}/...`, `~/Proyectos/{other-repo}/...`)
+- An evidence citation pointing outside the current `change_dir` / project root
+
+If none of these appear, do NOT run the check — the proposal/design/tasks stays as-is.
+
+**When triggered**, the agent MUST:
+
+1. **Identify the source pattern** — name the source repo, file, and a 1-line summary of the pattern.
+2. **Identify the target equivalent** — the file in the current repo where the pattern would land. If no equivalent exists, that itself is a precondition gap to escalate.
+3. **Enumerate structural prerequisites** of the source pattern across the relevant axes (pick only those that apply to the pattern):
+
+   | Axis | Question to answer |
+   |------|---------------------|
+   | Build topology | multi-stage vs single-stage; what gets copied in each stage |
+   | Dependency layout | where `composer.json` / `package.json` lives relative to the pattern |
+   | Framework version | the version + minor; whether the cited behavior exists in the target's version |
+   | Runtime topology | shared network / volumes / DNS namespace with other services |
+   | Environment scope | does the pattern run identically in local / CI / PRE / PRO |
+
+4. **Verify each axis** in the target repo with a `grep` or `read` of the equivalent file.
+5. **Decide**:
+   - `proceed` — all relevant axes match.
+   - `adapt` — minor mismatch, document the adaptation inline.
+   - `reject` — at least one axis breaks the pattern's assumption; escalate to user with the failing axis named.
+
+**Citation format** — embed in design.md / proposal.md / tasks.md when a transplant is involved:
+
+```
+Pattern transplant: {one-line description}
+  Source: {origin-repo}/{file}:{line}
+  Target: {target-repo}/{equivalent-file}:{line}   # or "(does not exist yet)"
+  Precondition checks:
+    - {axis}: source={X}, target={Y}, match=Y/N
+    - {axis}: source={X}, target={Y}, match=Y/N
+  Decision: {proceed | adapt | reject}
+  {if adapt or reject: 1-line reason}
+```
+
+**Bad (assumed):**
+> "Mirror of corev3's `1-build-php.sh` — pull-first-or-build pattern."
+
+**Good (validated):**
+> ```
+> Pattern transplant: pull-first-or-build CI pattern
+>   Source: corev3/scripts/1-build-php.sh:42
+>   Target: cuideo-core/scripts/build-php.sh (does not exist yet)
+>   Precondition checks:
+>     - Build topology: source=multi-stage (base = PHP+ext only),
+>                       target=single-stage (base copies composer.json + src/),
+>                       match=N
+>   Decision: REJECT — single-stage base is commit-dependent;
+>             pull-first would serve stale composer.lock.
+> ```
+
+**Why this exists**: in the ECO-971 retrospective, three failures (T1.5 cache miss, `auto_setup` misread, DNS shadowing) all stemmed from transplanting a corev3 pattern without checking that cuideo-core had the same structural prerequisites.
+
+**Out of scope for this rule**: claims about the framework that ARE backed by the current repo's config (Rule 1 covers those); patterns invented from scratch (no transplant happening); patterns cited from generic docs/blog posts (cite the docs as evidence per Rule 1 instead).
 
 ## Recording Evidence in Artifacts
 

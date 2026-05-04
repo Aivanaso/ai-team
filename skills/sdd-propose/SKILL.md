@@ -21,7 +21,7 @@ Before starting any task, follow the context protocol:
 2. Read `skills/_shared/persistence-contract.md` — where to write artifacts
 3. Read `skills/_shared/result-envelope.md` — how to return results
 4. Read `skills/_shared/spec-convention.md` — spec format (to cross-reference existing specs)
-5. Read `skills/_shared/evidence-protocol.md` — Rule 4 (Validate Assumed Invariants) applies to this phase
+5. Read `skills/_shared/evidence-protocol.md` — Rule 4 (Validate Assumed Invariants) and Rule 5 (Cross-Repo Pattern Transplant Check) both apply to this phase
 
 ## Input
 
@@ -170,6 +170,29 @@ If none of these appear, **skip this step**. Do not run greps for the sake of it
 - Result: 15 violations → list in Risks R-2 with sample, ask user in Open Questions whether to fix or allowlist.
 
 This step is bounded: do NOT expand into a full audit. Up to 5 greps, then move on.
+
+### Step 4c-bis — Cross-Repo Pattern Transplant Check (Evidence Protocol Rule 5)
+
+If the user request or your draft proposal cites a pattern from a sibling/sister repository (not the current one) as evidence — phrases like "como hace {repo}", "mirror of {repo}", "replicate from {repo}", or paths like `../{other-repo}/...` — Rule 5 applies.
+
+**Trigger** (in user request or your own draft):
+- A named sibling repo that is NOT the current `change_dir` / project root.
+- A path crossing repo boundaries.
+- An evidence citation pointing outside the current project tree.
+
+If none of these appear, **skip this step**.
+
+**When triggered** (full procedure in `evidence-protocol.md` Rule 5):
+
+1. Identify source repo + file + 1-line pattern summary.
+2. Identify target equivalent (or note it does not exist yet).
+3. Enumerate structural prerequisites of the source pattern across the relevant axes (build topology, dependency layout, framework version, runtime topology, environment scope) — only those that apply.
+4. Verify each axis with a `grep` or `read` of the equivalent target file.
+5. Decide `proceed` / `adapt` / `reject`.
+
+**Where to record**: embed the structured citation block in the **Risks** section (if `adapt` or `reject`) or as an inline note in the **Approach** section (if `proceed`).
+
+**Why this matters**: in ECO-971, three failures cascaded from copying corev3 patterns into cuideo-core without checking that cuideo-core had the same structural shape. The propose phase is the cheapest place to catch them.
 
 ### Step 4d — Classify Change Type
 

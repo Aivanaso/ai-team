@@ -277,6 +277,31 @@ For each requirement, for each scenario:
 
 **Step verdict:** PASS (all MUST scenarios compliant) / WARNING (SHOULD gaps or partial coverage) / CRITICAL (MUST scenarios failing or untested)
 
+### Step 8b -- Drift Summary
+
+Read `state.yaml.decisions:` (the mid-flight decision log -- schema in `skills/_shared/persistence-contract.md`). Compare what shipped against what was originally approved.
+
+**For each entry in `decisions:`** — record one row in the Drift Summary table of the report:
+
+| Phase | Task ref | Decision | Reason | Evidence | Commits |
+|-------|----------|----------|--------|----------|---------|
+| {phase} | {task_ref} | {decision} | {reason} | {evidence} | {commits} |
+
+These represent **approved drift** — they are part of the audit trail and do not count as scope creep.
+
+**Then check for unaccounted drift** — diffs that have no corresponding entry:
+
+1. Run `git diff --name-only HEAD` (or against the change's base branch).
+2. Subtract: files listed in `tasks.md` task plans + files mentioned in any `decisions:` entry.
+3. The remainder is **unaccounted drift** — list each file as a WARNING with: "Unaccounted drift: {file} -- not in tasks.md and not logged in `decisions:`. Either add a retroactive `decisions:` entry or remove the change."
+
+**Severity**:
+- Files outside the task plan that ARE in `decisions:` → no finding (approved).
+- Files outside the task plan that are NOT in `decisions:` → WARNING.
+- A `decisions:` entry whose `commits:` list is empty AND whose `task_ref` does not match any task in tasks.md → SUGGESTION ("decision logged but commit never landed -- confirm whether the deviation actually shipped").
+
+**Step verdict:** PASS (decisions match diff, no unaccounted files) / WARNING (unaccounted drift found) / SUGGESTION-only (orphan decision entries)
+
 ### Step 9 -- Acceptance Criteria Coverage
 
 Cross-reference the proposal's ACs with the full traceability chain:
@@ -339,6 +364,7 @@ Return a result envelope per `skills/_shared/result-envelope.md`.
 | Static correctness | {verdict} | {N}/{total} requirements structurally verified |
 | Design coherence | {verdict} | {N}/{total} decisions followed |
 | Behavioral compliance | {verdict} | {N}/{total} scenarios compliant |
+| Drift summary | {verdict} | {N} approved decisions, {M} unaccounted files |
 | AC coverage | {verdict} | {covered}/{total} ACs |
 
 ## File Inventory
@@ -422,6 +448,20 @@ Return a result envelope per `skills/_shared/result-envelope.md`.
 ...
 
 **Compliance summary**: {N}/{total} scenarios compliant, {N} partial, {N} untested, {N} failing
+
+## Drift Summary
+
+### Approved Drift (from `state.yaml` `decisions:`)
+
+| Phase | Task ref | Decision | Reason | Evidence | Commits |
+|-------|----------|----------|--------|----------|---------|
+| {phase} | {task_ref} | {one-line decision} | {one-line reason} | {evidence ref} | {SHAs} |
+
+{Or: "No mid-flight decisions logged."}
+
+### Unaccounted Drift
+
+{List of files in `git diff` that are NEITHER in any task's file list NOR referenced by any `decisions:` entry. One line per file with a recommendation: add retroactive entry, or revert. Or: "None -- all changes either match the task plan or are logged as approved drift."}
 
 ## AC Coverage
 

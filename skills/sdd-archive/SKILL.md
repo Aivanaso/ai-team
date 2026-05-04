@@ -44,6 +44,42 @@ If any of these are missing from the prompt, recover them from `.ai-team/changes
 
 ## Process
 
+### Step 0 -- Memory Capture Pass (return to orchestrator)
+
+Before doing any merge or archive, run a memory capture pass. The goal is to surface tribal knowledge that will be lost once the change directory is deleted -- things that are NOT obvious from reading the resulting code.
+
+You (sdd-archive) do NOT have access to the orchestrator's memory system. You produce a **list of candidates** and return it in the result envelope under `memory_candidates:`. The orchestrator (Claude main) decides which candidates become memories.
+
+**Surfaces to scan** -- read the change's `proposal.md`, `design.md`, `tasks.md`, `verification-report.md`, and `state.yaml.decisions:` looking for:
+
+| Surface | Examples of capture-worthy items |
+|---------|----------------------------------|
+| **External dependencies** | Forks (PECL, custom GitHub forks), CDN URLs, registry paths, version pins with a load-bearing reason |
+| **Environment quirks** | DNS shadowing, network namespace collisions, secret stores, auth-mode edge cases, mysql `caching_sha2_password`, missing system packages |
+| **Project conventions discovered** | Auto-migration policy, deploy script structure, CI script gotchas, single-stage vs multi-stage Dockerfiles |
+| **Decisions loaded with non-obvious context** | Mid-flight pivots from `decisions:` whose reason will not be discoverable from the resulting code (e.g., "we use `auto_setup: true` because the AMQP transport lazy-declares queues anyway") |
+| **Smoke/canary mechanisms** | Health endpoints, ping commands, debug flags created during the change that should survive long-term |
+
+**Output format** -- one entry per candidate in `memory_candidates:` of the result envelope:
+
+```yaml
+memory_candidates:
+  - type: reference                    # user | feedback | project | reference (per memory protocol)
+    title: "PECL fork URL for ext-amqp"
+    body: "We pin the PECL ext-amqp install to {URL} because upstream broke compatibility with PHP 8.1 in 2025-Q4. Verified working with PHP 8.1.27 + librabbitmq 0.13."
+    rationale: "Surfaced from design.md DD-3 -- not obvious from Dockerfile alone, will be needed if the install ever breaks"
+    surface: "external_dependencies"
+```
+
+**Calibration** -- err on the side of LISTING the candidate. The orchestrator filters down. False positives are cheap (one rejection); false negatives are expensive (lost context that has to be reconstructed).
+
+**Skip the pass entirely** ONLY if all of these are true:
+- `state.yaml.decisions:` is empty (no mid-flight surprises).
+- Verification report has 0 WARNINGS.
+- Proposal `change_type` is `infra` AND every task was a pure refactor with no environment interaction.
+
+In that case, set `memory_candidates: []` and add a note: "Memory pass skipped -- pure mechanical change, no tribal knowledge surfaced."
+
 ### Step 1 -- Gate Check
 
 Read `.ai-team/changes/{change-name}/state.yaml`:
@@ -148,13 +184,20 @@ If verify verdict is PASS WITH WARNINGS:
 
 ```yaml
 status: ok
-executive_summary: "Archived {change-name}. Merged delta specs for {N} domain(s) into base specs. Artifacts preserved in .ai-team/changes/archive/YYYY-MM-DD-{change-name}/."
+executive_summary: "Archived {change-name}. Merged delta specs for {N} domain(s) into base specs. Artifacts preserved in .ai-team/changes/archive/YYYY-MM-DD-{change-name}/. {N} memory candidates surfaced for orchestrator review."
 artifacts:
   - name: "archive"
     path: ".ai-team/changes/archive/YYYY-MM-DD-{change-name}/"
   - name: "base-spec-{domain}"
     path: ".ai-team/specs/{domain}/spec.md"
 next_recommended: []
+memory_candidates:
+  - type: "{user|feedback|project|reference}"
+    title: "{short title}"
+    body: "{the memory content}"
+    rationale: "{where it was surfaced from -- design DD-N, decisions entry, etc.}"
+    surface: "{external_dependencies|env_quirks|conventions|decisions|smoke_canaries}"
+  # Or empty list if nothing capture-worthy was found
 model_used: "{resolved-model}"
 context_resolution: "injected"
 ```
@@ -176,8 +219,9 @@ context_resolution: "injected"
 ## Rules
 
 1. **Gate on verify** -- Never archive a change that hasn't passed verification
-2. **Merge exactly** -- Follow the spec-convention merge algorithm. Don't rewrite, reorder, or "improve" the base spec beyond what the delta specifies
-3. **Always copy first, then delete** -- The archive copy must exist before deleting the active change. If the copy fails, abort
-4. **Preserve everything** -- The archive includes ALL artifacts: proposal, specs, design, tasks, verification report, state.yaml. Don't cherry-pick
-5. **One domain at a time** -- Merge delta specs independently per domain. Don't cross-contaminate
-6. **Result envelope always** -- Every response MUST end with a result envelope, even on failure
+2. **Memory pass before merge** -- Always run the memory capture pass (Step 0) before touching specs or copying to archive. Tribal knowledge that survives only in the change directory is lost the moment Step 4 runs
+3. **Merge exactly** -- Follow the spec-convention merge algorithm. Don't rewrite, reorder, or "improve" the base spec beyond what the delta specifies
+4. **Always copy first, then delete** -- The archive copy must exist before deleting the active change. If the copy fails, abort
+5. **Preserve everything** -- The archive includes ALL artifacts: proposal, specs, design, tasks, verification report, state.yaml (with full `decisions:` log). Don't cherry-pick
+6. **One domain at a time** -- Merge delta specs independently per domain. Don't cross-contaminate
+7. **Result envelope always** -- Every response MUST end with a result envelope, even on failure. The envelope MUST include `memory_candidates:` (possibly empty) -- the orchestrator depends on this field

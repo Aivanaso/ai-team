@@ -53,7 +53,56 @@ phases:
 current_phase: design
 blocked: false
 blocked_reason: ""
+
+decisions: []          # Mid-flight decision log (see below)
 ```
+
+### `decisions:` — Mid-Flight Decision Log
+
+When apply or verify discovers something that requires a deviation from the approved plan (a fix outside `tasks.md`, a pivot from `design.md`, a new dependency, a structural change), the agent MUST append an entry to `state.yaml.decisions:` BEFORE committing the change. This preserves the audit trail across phases — without it, sdd-verify cannot tell legitimate drift from scope creep, and archive ends with documentation that does not match what shipped.
+
+**Schema** (each entry is a list item):
+
+```yaml
+decisions:
+  - date: 2026-05-04T18:30:00Z       # ISO 8601, UTC preferred
+    phase: apply                      # propose | spec | design | tasks | apply | verify
+    task_ref: "T1.5"                  # task ID it affects, or "out-of-plan" for net-new
+    decision: "Drop pull-first caching in cuideo-core CI"
+    reason: "Single-stage base is commit-dependent; pull-first serves stale composer.lock"
+    evidence: "PR 2 PRE deploy missing symfony/messenger from vendor/"
+    commits: ["a489aa1"]              # SHAs (or empty list if not yet committed)
+```
+
+**Field rules:**
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `date` | Yes | ISO 8601 timestamp |
+| `phase` | Yes | The phase the agent is currently in when it logs |
+| `task_ref` | Yes | Use the task ID; use `"out-of-plan"` if the change has no task ancestor; use `"design-pivot"` if it overrides a design.md decision |
+| `decision` | Yes | One sentence, what changed |
+| `reason` | Yes | One sentence, why it had to change |
+| `evidence` | Yes | A grep result, command output, file:line, or test failure that triggered the decision. Per Evidence Protocol Rule 1, a hand-wave like "it didn't work" is not evidence |
+| `commits` | No | SHA list, populated after the fix lands. Empty list is fine when logging before commit |
+
+**When to write a decision entry:**
+
+- A `fix:` commit during apply that was not in `tasks.md`.
+- A change to design assumptions discovered during apply (e.g., "compiler pass approach blocked by autowiring quirk, switching to manual array").
+- A new dependency added during apply that the proposal did not list.
+- A design-document deviation surfaced by verify (the report references the entry instead of generating one).
+
+**When NOT to write a decision entry:**
+
+- Trivial typo fixes inside the scope of an existing task.
+- Test-only adjustments that don't change production behavior.
+- Refactoring the agent does within a single task to keep code readable.
+
+**Reading decisions:**
+
+- `sdd-verify` reads `decisions:` during the Drift Summary step to distinguish approved drift from unaccounted scope creep.
+- `sdd-archive` carries the full list into the archived `state.yaml`. Decisions are part of the audit trail.
 
 ### Status Values
 

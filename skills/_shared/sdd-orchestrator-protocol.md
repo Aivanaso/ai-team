@@ -371,6 +371,23 @@ Include model_used in your response.
 })
 ```
 
+## Archive Memory-Capture Handoff
+
+When `sdd-archive` returns its envelope, inspect the `memory_candidates:` field. The sub-agent surfaces tribal knowledge that would otherwise be lost when the change directory is deleted, but it has no access to the orchestrator's memory system — it is your job to grade and persist them.
+
+For each candidate:
+
+1. Read the `type`, `title`, `body`, `rationale`, and `surface` fields.
+2. Decide:
+   - **Save** — non-obvious, not derivable from current code, will help future sessions. Write the memory file (per memory protocol) and add a pointer to `MEMORY.md`.
+   - **Skip** — already in code/CLAUDE.md, generic, or duplicates an existing memory. Note the reason briefly when you summarize to the user.
+   - **Merge** — extend an existing memory file rather than creating a new one when the topic overlaps.
+3. Summarize the result to the user in 2-3 lines: "Archive surfaced {N} candidates: saved {X}, merged {Y}, skipped {Z}."
+
+If `memory_candidates: []` (empty), no action — proceed to wrap up the SDD run.
+
+This handoff is the cheapest place in the pipeline to capture knowledge. Do NOT skip it because the run "felt routine" — the candidates list is precisely the agent's judgment about what was non-routine.
+
 ## Error Handling
 
 | Situation | Action |
@@ -380,3 +397,4 @@ Include model_used in your response.
 | Sub-agent returns `needs_input` | Show questions to user, then re-delegate with answers |
 | Sub-agent returns `warning` | Show risks, ask if user wants to proceed |
 | Missing artifact | Check if previous phase completed; if not, run it first |
+| `apply` returns `ok` but `state.yaml.decisions:` is empty AND `git diff` shows files outside `tasks.md` | Apply skipped the mid-flight log. Ask the user whether to retroactively populate decisions before proceeding to verify, or accept the drift as un-logged (verify will flag it). |
