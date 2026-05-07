@@ -123,6 +123,7 @@ All SDD artifacts live in `.ai-team/` within the target project:
 
 ```
 /ai-team new <change-name>       # Start a new SDD change
+/ai-team ff <change-name>        # Fast-forward planning (propose → spec → design → tasks)
 /ai-team continue [change-name]  # Resume an active change
 /ai-team status [change-name]    # Show change progress
 /ai-team explore <topic>         # Investigate without starting SDD

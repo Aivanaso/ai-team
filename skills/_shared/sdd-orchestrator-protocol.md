@@ -6,6 +6,7 @@
 ## Commands
 
 - `/ai-team new <change-name>` -- Start a new SDD change
+- `/ai-team ff <change-name>` -- Fast-forward planning: propose → spec → design → tasks (apply/verify/archive remain manual)
 - `/ai-team continue [change-name]` -- Resume an active change
 - `/ai-team status [change-name]` -- Show change progress
 - `/ai-team explore <topic>` -- Investigate a codebase topic without starting SDD
@@ -13,7 +14,7 @@
 
 ## Auto-Init (before any SDD phase)
 
-Before executing any SDD command (`/ai-team new`, `/ai-team continue`, `/ai-team explore`, `/ai-team baseline`):
+Before executing any SDD command (`/ai-team new`, `/ai-team ff`, `/ai-team continue`, `/ai-team explore`, `/ai-team baseline`):
 
 1. Check if `.ai-team/config.yaml` exists in the project root
 2. If it exists: proceed normally
@@ -88,6 +89,48 @@ Before the **spec phase**, check if a base spec exists for each domain affected 
 2. For each domain, check if `.ai-team/specs/{domain}/spec.md` exists
 3. If missing: inform user, delegate to sdd-scout in baseline mode, wait, then proceed
 4. If all exist: proceed normally
+
+## Fast-Forward Workflow
+
+`/ai-team ff <change-name>` chains the planning phases (propose → spec → design → tasks) into a single invocation. Conceptually equivalent to running `/ai-team new <name>` followed by `/ai-team continue` until tasks completes. Apply, verify and archive are out of scope and still require explicit `/ai-team continue`.
+
+### Sequence
+
+1. Auto-Init (per the section above) if `.ai-team/config.yaml` is missing.
+2. Delegate to `sdd-propose`.
+3. **Proposal approval gate (blocking)** — same behavior as the standard path. Pause, present the proposal, wait for user approval. Honour the infra short-path (skip-spec) if `change_type: infra`.
+4. Delegate to `sdd-spec` (skipped if the user took the infra short-path).
+5. **Security threat-model gate (blocking, conditional)** — fires only if the proposal envelope reports `security_touchpoints: [...]` non-empty. Same delegation contract as the standard path.
+6. Delegate to `sdd-design`.
+7. Delegate to `sdd-tasks`.
+8. Stop. Report final summary. Do NOT continue into apply.
+
+### Execution mode
+
+On the first `/ai-team ff` invocation in a session, ask the user which mode to use and cache the answer for the rest of the session (do not ask again unless the user explicitly changes it):
+
+- **`auto`** — runs phases back-to-back. Pauses ONLY at blocking gates (proposal approval, security threat-model). Reports a single combined summary with the four phase outputs at the end.
+- **`interactive`** (default) — after each phase completes, show a concise summary of what the phase produced + what the next phase will do, then ask "¿Continuamos?" / "Continue?". Accept yes / no / specific feedback. If feedback is given, incorporate it before launching the next phase.
+
+If the user does not specify, default to `interactive` (safer; gives the user control).
+
+### Behavior at blocking gates
+
+In both modes the orchestrator pauses at every blocking gate:
+
+- **Proposal approval**: pause, present the proposal, wait for OK. On rejection or cancel, FF aborts; report where it stopped.
+- **Security threat-model** (only if `security_touchpoints` non-empty): pause, present findings, wait for OK. On cancel, FF aborts and writes `state.yaml.blocked: true` with `blocked_reason` listing the finding IDs (same as the standard path).
+
+### Failure / `needs_input`
+
+If any phase returns `status: needs_input` or fails, FF aborts immediately. Report:
+- Which phase stopped the FF.
+- The phase's reason (`needs_input` questions or error).
+- What the user can do next (`/ai-team continue` once resolved, or restart with adjusted inputs).
+
+### Note on sub-agent contract
+
+`execution_mode` is an orchestrator concern only — it controls whether the orchestrator pauses between phases. Sub-agents do NOT receive this flag; their contract (Critical Context Forwarding) is unchanged. Each phase still runs end-to-end and returns its envelope; the orchestrator decides whether to launch the next phase immediately (auto) or pause for user feedback (interactive).
 
 ## Approval Gates
 
