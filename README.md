@@ -140,7 +140,17 @@ propose → spec ──→ tasks → apply → verify → archive
 | verify | sdd-verify | sonnet | Two-layer validation: static + behavioral |
 | archive | sdd-archive | haiku | Merge delta specs into base, archive artifacts |
 
-Approval gates pause after **propose** and before **apply** for user review.
+Approval gates pause after **propose** and before **apply**. Additional security gates (threat-model and code-audit) fire when the change touches sensitive surfaces.
+
+### Fast-Forward
+
+For straightforward changes you can chain the planning phases (propose → spec → design → tasks) in a single invocation:
+
+```
+/ai-team ff <change-name>
+```
+
+Default mode is `interactive` (pause with a summary after each phase). Switch to `auto` for back-to-back execution that only pauses at blocking gates. Apply, verify and archive remain manual.
 
 ### Verify: Two-Layer Compliance
 
@@ -175,6 +185,7 @@ All SDD artifacts live in `.ai-team/` within the target project:
 
 ```
 /ai-team new <change-name>       # Start a new SDD change
+/ai-team ff <change-name>        # Fast-forward planning (propose → spec → design → tasks)
 /ai-team continue [change-name]  # Resume an active change
 /ai-team status [change-name]    # Show change progress
 /ai-team explore <topic>         # Investigate without starting SDD

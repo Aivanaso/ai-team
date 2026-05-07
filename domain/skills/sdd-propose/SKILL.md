@@ -21,7 +21,7 @@ Before starting any task, follow the context protocol:
 2. Read `skills/_shared/persistence-contract.md` — where to write artifacts
 3. Read `skills/_shared/result-envelope.md` — how to return results
 4. Read `skills/_shared/spec-convention.md` — spec format (to cross-reference existing specs)
-5. Read `skills/_shared/evidence-protocol.md` — Rule 4 (Validate Assumed Invariants) applies to this phase
+5. Read `skills/_shared/evidence-protocol.md` — Rule 4 (Validate Assumed Invariants) and Rule 5 (Cross-Repo Pattern Transplant Check) both apply to this phase
 
 ## Input
 
@@ -171,6 +171,29 @@ If none of these appear, **skip this step**. Do not run greps for the sake of it
 
 This step is bounded: do NOT expand into a full audit. Up to 5 greps, then move on.
 
+### Step 4c-bis — Cross-Repo Pattern Transplant Check (Evidence Protocol Rule 5)
+
+If the user request or your draft proposal cites a pattern from a sibling/sister repository (not the current one) as evidence — phrases like "como hace {repo}", "mirror of {repo}", "replicate from {repo}", or paths like `../{other-repo}/...` — Rule 5 applies.
+
+**Trigger** (in user request or your own draft):
+- A named sibling repo that is NOT the current `change_dir` / project root.
+- A path crossing repo boundaries.
+- An evidence citation pointing outside the current project tree.
+
+If none of these appear, **skip this step**.
+
+**When triggered** (full procedure in `evidence-protocol.md` Rule 5):
+
+1. Identify source repo + file + 1-line pattern summary.
+2. Identify target equivalent (or note it does not exist yet).
+3. Enumerate structural prerequisites of the source pattern across the relevant axes (build topology, dependency layout, framework version, runtime topology, environment scope) — only those that apply.
+4. Verify each axis with a `grep` or `read` of the equivalent target file.
+5. Decide `proceed` / `adapt` / `reject`.
+
+**Where to record**: embed the structured citation block in the **Risks** section (if `adapt` or `reject`) or as an inline note in the **Approach** section (if `proceed`).
+
+**Why this matters**: in ECO-971, three failures cascaded from copying corev3 patterns into cuideo-core without checking that cuideo-core had the same structural shape. The propose phase is the cheapest place to catch them.
+
 ### Step 4d — Classify Change Type
 
 Classify the change as one of: `infra`, `feature`, `mixed`. The orchestrator uses this to decide whether the spec phase is needed.
@@ -194,6 +217,30 @@ If all four answers point to "purely internal" → `infra`.
 Record the classification in **two places**:
 - The proposal.md `Change Type` section (see template)
 - The result envelope `change_type` field
+
+### Step 4e — Classify Security Sensitivity
+
+Walk the nine touchpoints. For each, check whether the proposal mentions the listed keywords. Emit the matching slugs as `security_touchpoints`.
+
+1. **`auth/authz`** — proposal mentions login, permissions, roles, API tokens, session, JWT
+2. **`crypto`** — proposal mentions encryption, hashing, signing, certificates, randomness, secrets
+3. **`deserialization`** — proposal mentions JSON/XML/YAML parsing of untrusted input, `unserialize`, pickle
+4. **`file-io-uploads`** — proposal mentions file uploads, downloads, path manipulation
+5. **`network-ssrf`** — proposal mentions outbound HTTP from server, URL fetching, webhooks
+6. **`db-direct-input`** — proposal mentions raw SQL, query builder with user input, NoSQL queries with user input
+7. **`new-dependencies`** — proposal lists a new library/package not currently in the project
+8. **`env-secrets`** — proposal mentions env vars, secrets, API keys, credentials, `.env`, vault
+9. **`regex-external-input`** — proposal mentions regex matching against user-supplied strings
+
+Note on separator format: `auth/authz` uses a slash (locked by spec Scenario P1.1); the other eight slugs use dashes. Do NOT normalise to all-dashes or all-slashes.
+
+**Bootstrap self-classification (R-2):** If Step 4e is being run on a proposal that introduces Step 4e itself (i.e., the sdd-security change), the `security_touchpoints` list is filled manually based on the proposal's Security Sensitivity section already drafted — the automated heuristic cannot read its own output.
+
+**Empty list semantics:** If no touchpoint matches, emit `security_touchpoints: []` — explicit empty list, not omitted. An omitted field is ambiguous; an explicit empty list signals that the classification ran and found nothing.
+
+Record `security_touchpoints` in:
+- The proposal.md `Security Sensitivity` section (see template)
+- The result envelope `security_touchpoints` field
 
 ### Step 5 — Write proposal.md
 
@@ -330,6 +377,17 @@ For each question, include a brief recommendation based on your code analysis an
 - **{Question}** — {Context from code analysis or PRD}. *Recommendation:* {Your suggested answer and why}.
 - **{Question 2}** — {Context}. *Recommendation:* {Suggestion}.
 
+## Security Sensitivity
+
+**Touchpoints triggered:** {comma-separated list, or "none"}
+
+**Rationale per touchpoint:**
+
+- **{touchpoint}** — {one-line evidence: where in the proposal the touchpoint surfaced}
+- {repeat per triggered touchpoint, or "N/A — no security-sensitive touchpoints detected"}
+
+**Overall classification:** security-sensitive: yes | no
+
 ## References
 
 - {Links to relevant existing specs, explorations, or external docs}
@@ -399,6 +457,7 @@ If `.ai-team/changes/{change-name}/` already exists with a `proposal.md`:
 status: ok
 executive_summary: "Proposal for {change-name}. Affects {N} domains ({list}). {Key approach summary}. {N} risks identified, {N} open questions."
 change_type: "infra" | "feature" | "mixed"
+security_touchpoints: []   # empty list = not security-sensitive; non-empty = list of touchpoint slugs
 artifacts:
   - name: "proposal"
     path: ".ai-team/changes/{change-name}/proposal.md"

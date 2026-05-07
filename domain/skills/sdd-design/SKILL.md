@@ -13,7 +13,7 @@ You are **sdd-design**, a technical design agent. You take approved proposals an
 3. **You write ONLY `.ai-team/changes/{change-name}/design.md`** — your single artifact (plus `state.yaml` updates).
 4. **Design follows existing patterns** — If the project uses repository pattern, your design uses repository pattern. Don't introduce new paradigms unless the proposal explicitly calls for it.
 5. **Concrete, not abstract** — Name the actual files, classes, interfaces, and methods. The next agent (sdd-tasks) needs to turn this into a task list.
-6. **Evidence > Assumption** — See `_shared/evidence-protocol.md`. Every framework/project-behavior claim in your design (routing, serialization, transactions, DI, lifecycle) MUST cite a config line or an existing caller. Never write "Symfony does X" or "Doctrine handles Y" without a concrete project-specific reference.
+6. **Evidence > Assumption** — See `_shared/evidence-protocol.md`. Every framework/project-behavior claim in your design (routing, serialization, transactions, DI, lifecycle) MUST cite a config line or an existing caller. Never write "Symfony does X" or "Doctrine handles Y" without a concrete project-specific reference. **Rule 5 also applies here**: if your design transplants a pattern from a sibling repo, you MUST run the precondition check before recommending it.
 
 ## Shared Protocols
 
@@ -23,7 +23,7 @@ Before starting any task, follow the context protocol:
 2. Read `skills/_shared/persistence-contract.md` — where to write artifacts
 3. Read `skills/_shared/result-envelope.md` — how to return results
 4. Read `skills/_shared/spec-convention.md` — to understand the delta specs you consume
-5. Read `skills/_shared/evidence-protocol.md` — grounding framework claims in project evidence
+5. Read `skills/_shared/evidence-protocol.md` — grounding framework claims in project evidence; pay extra attention to Rule 5 (cross-repo transplant) since design is the phase most prone to "let's do it like {sibling-repo}"
 
 ## Input
 
@@ -157,6 +157,27 @@ After designing, assess:
 - **Technical risks** — Performance concerns, migration complexity, breaking changes.
 - **Design decisions** — Choices you made and why (alternatives considered).
 - **Open questions** — Things that need discussion or depend on external factors.
+
+#### 7a — Cross-Repo Transplant Check (Evidence Protocol Rule 5)
+
+If any of your design decisions cite a sibling repo as the source of the pattern — "mirror of corev3", "same as {other-repo}", a path like `../{other-repo}/...` — apply Rule 5 BEFORE finalizing the design (full procedure in `evidence-protocol.md`):
+
+1. Identify the source repo + file and the target equivalent file.
+2. Enumerate structural prerequisites that the source pattern depends on (build topology, dependency layout, framework version, runtime topology, environment scope — only the ones that apply).
+3. Verify each axis with a grep or read of the target file.
+4. Decide `proceed` / `adapt` / `reject` and embed the structured citation block in the **Design Decisions** table (or as a note inline with the affected decision).
+
+If you decide `reject`, surface it in **Open Questions** with the failing axis named — do NOT silently substitute a different pattern without user input.
+
+#### 7b — Side Effects of Topology Decisions
+
+For any decision that touches networking, runtime topology, shared secrets, environment variables, or DNS — add an explicit "Side Effects" sub-bullet under the decision listing:
+
+- Which namespaces become shared (DNS, env, volumes, secrets).
+- Which names in those namespaces could collide.
+- What the runtime behavior is on collision (silent shadow, error, race).
+
+Topology decisions evaluated only on their direct merits ("faster, less config") miss the systemic effects. The ECO-971 DNS-shadowing incident (joining corev3's external network silently shadowed local services with the same names) is the canonical example.
 
 ### Step 8 — Write design.md
 
