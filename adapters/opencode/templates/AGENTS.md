@@ -151,6 +151,7 @@ Read model assignments from `~/.config/opencode/opencode.json` at session start.
 | apply | sdd-apply | sonnet |
 | verify | sdd-verify | sonnet |
 | archive | sdd-archive | haiku |
+| security | sdd-security | opus (covers both modes) |
 
 ## Context Resolution Feedback
 
