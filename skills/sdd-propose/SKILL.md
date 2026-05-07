@@ -218,6 +218,30 @@ Record the classification in **two places**:
 - The proposal.md `Change Type` section (see template)
 - The result envelope `change_type` field
 
+### Step 4e — Classify Security Sensitivity
+
+Walk the nine touchpoints. For each, check whether the proposal mentions the listed keywords. Emit the matching slugs as `security_touchpoints`.
+
+1. **`auth/authz`** — proposal mentions login, permissions, roles, API tokens, session, JWT
+2. **`crypto`** — proposal mentions encryption, hashing, signing, certificates, randomness, secrets
+3. **`deserialization`** — proposal mentions JSON/XML/YAML parsing of untrusted input, `unserialize`, pickle
+4. **`file-io-uploads`** — proposal mentions file uploads, downloads, path manipulation
+5. **`network-ssrf`** — proposal mentions outbound HTTP from server, URL fetching, webhooks
+6. **`db-direct-input`** — proposal mentions raw SQL, query builder with user input, NoSQL queries with user input
+7. **`new-dependencies`** — proposal lists a new library/package not currently in the project
+8. **`env-secrets`** — proposal mentions env vars, secrets, API keys, credentials, `.env`, vault
+9. **`regex-external-input`** — proposal mentions regex matching against user-supplied strings
+
+Note on separator format: `auth/authz` uses a slash (locked by spec Scenario P1.1); the other eight slugs use dashes. Do NOT normalise to all-dashes or all-slashes.
+
+**Bootstrap self-classification (R-2):** If Step 4e is being run on a proposal that introduces Step 4e itself (i.e., the sdd-security change), the `security_touchpoints` list is filled manually based on the proposal's Security Sensitivity section already drafted — the automated heuristic cannot read its own output.
+
+**Empty list semantics:** If no touchpoint matches, emit `security_touchpoints: []` — explicit empty list, not omitted. An omitted field is ambiguous; an explicit empty list signals that the classification ran and found nothing.
+
+Record `security_touchpoints` in:
+- The proposal.md `Security Sensitivity` section (see template)
+- The result envelope `security_touchpoints` field
+
 ### Step 5 — Write proposal.md
 
 Write `.ai-team/changes/{change-name}/proposal.md` following the template below.
@@ -353,6 +377,17 @@ For each question, include a brief recommendation based on your code analysis an
 - **{Question}** — {Context from code analysis or PRD}. *Recommendation:* {Your suggested answer and why}.
 - **{Question 2}** — {Context}. *Recommendation:* {Suggestion}.
 
+## Security Sensitivity
+
+**Touchpoints triggered:** {comma-separated list, or "none"}
+
+**Rationale per touchpoint:**
+
+- **{touchpoint}** — {one-line evidence: where in the proposal the touchpoint surfaced}
+- {repeat per triggered touchpoint, or "N/A — no security-sensitive touchpoints detected"}
+
+**Overall classification:** security-sensitive: yes | no
+
 ## References
 
 - {Links to relevant existing specs, explorations, or external docs}
@@ -422,6 +457,7 @@ If `.ai-team/changes/{change-name}/` already exists with a `proposal.md`:
 status: ok
 executive_summary: "Proposal for {change-name}. Affects {N} domains ({list}). {Key approach summary}. {N} risks identified, {N} open questions."
 change_type: "infra" | "feature" | "mixed"
+security_touchpoints: []   # empty list = not security-sensitive; non-empty = list of touchpoint slugs
 artifacts:
   - name: "proposal"
     path: ".ai-team/changes/{change-name}/proposal.md"

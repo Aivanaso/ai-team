@@ -72,6 +72,13 @@ decisions:
     reason: "Single-stage base is commit-dependent; pull-first serves stale composer.lock"
     evidence: "PR 2 PRE deploy missing symfony/messenger from vendor/"
     commits: ["a489aa1"]              # SHAs (or empty list if not yet committed)
+  - date: 2026-05-07T10:30:00Z
+    phase: security-code-audit
+    task_ref: "security-override"
+    decision: "Accept CRITICAL finding F-3 (path traversal in upload handler)"
+    reason: "Upload path is admin-only, behind authenticated middleware; risk acceptable"
+    evidence: ".ai-team/changes/{name}/audit-report.md#finding-F-3"
+    commits: []
 ```
 
 **Field rules:**
@@ -79,8 +86,8 @@ decisions:
 | Field | Required | Notes |
 |-------|----------|-------|
 | `date` | Yes | ISO 8601 timestamp |
-| `phase` | Yes | The phase the agent is currently in when it logs |
-| `task_ref` | Yes | Use the task ID; use `"out-of-plan"` if the change has no task ancestor; use `"design-pivot"` if it overrides a design.md decision |
+| `phase` | Yes | The phase the agent is currently in when it logs. Recognised values: `propose | spec | design | tasks | apply | verify | security-threat-model | security-code-audit` |
+| `task_ref` | Yes | Use the task ID; or one of the recognised non-task identifiers: `"out-of-plan"` (no task ancestor), `"design-pivot"` (overrides a design.md decision), `"security-override"` (user accepted CRITICAL security finding) |
 | `decision` | Yes | One sentence, what changed |
 | `reason` | Yes | One sentence, why it had to change |
 | `evidence` | Yes | A grep result, command output, file:line, or test failure that triggered the decision. Per Evidence Protocol Rule 1, a hand-wave like "it didn't work" is not evidence |
