@@ -59,6 +59,9 @@ You (sdd-archive) do NOT have access to the orchestrator's memory system. You pr
 | **Project conventions discovered** | Auto-migration policy, deploy script structure, CI script gotchas, single-stage vs multi-stage Dockerfiles |
 | **Decisions loaded with non-obvious context** | Mid-flight pivots from `decisions:` whose reason will not be discoverable from the resulting code (e.g., "we use `auto_setup: true` because the AMQP transport lazy-declares queues anyway") |
 | **Smoke/canary mechanisms** | Health endpoints, ping commands, debug flags created during the change that should survive long-term |
+| **Security findings worth remembering** | Project-specific recurring vulnerability patterns surfaced by `threat-model.md` or `audit-report.md`. Calibration: only patterns that are likely to recur on future changes. NOT one-off audit findings. |
+
+> **Security calibration**: a one-off audit finding (e.g., "this PR's path traversal in `upload.ts:42`") is captured in the audit report and the override decision entry — those survive in the archive copy. Memory candidates from this surface should be project-level patterns the next change is likely to see again (e.g., "this codebase uses raw `${var}` interpolation in SQL across the legacy DAO layer — every change touching that layer needs explicit parameterisation review"). Err on the side of NOT capturing one-off findings.
 
 **Output format** -- one entry per candidate in `memory_candidates:` of the result envelope:
 

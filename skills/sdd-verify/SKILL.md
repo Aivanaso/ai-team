@@ -279,7 +279,7 @@ For each requirement, for each scenario:
 
 ### Step 8b -- Drift Summary
 
-Read `state.yaml.decisions:` (the mid-flight decision log -- schema in `skills/_shared/persistence-contract.md`). Compare what shipped against what was originally approved.
+Read `state.yaml.decisions:` (the mid-flight decision log -- schema in `skills/_shared/persistence-contract.md`). Compare what shipped against what was originally approved. Entries with `phase: security-threat-model` or `phase: security-code-audit` and `task_ref: "security-override"` represent ACKed security findings — they appear in the Drift Summary table as approved drift, with `evidence` referencing the audit artifact (`threat-model.md` or `audit-report.md`) by finding ID. They are NOT scope creep.
 
 **For each entry in `decisions:`** — record one row in the Drift Summary table of the report:
 
@@ -287,7 +287,7 @@ Read `state.yaml.decisions:` (the mid-flight decision log -- schema in `skills/_
 |-------|----------|----------|--------|----------|---------|
 | {phase} | {task_ref} | {decision} | {reason} | {evidence} | {commits} |
 
-These represent **approved drift** — they are part of the audit trail and do not count as scope creep.
+These represent **approved drift** — they are part of the audit trail and do not count as scope creep. (security-override entries in particular point to a specific finding in the audit artifact — carry the entry through to the report verbatim, including a file:line reference from the `evidence` field).
 
 **Then check for unaccounted drift** — diffs that have no corresponding entry:
 

@@ -48,15 +48,17 @@ The `.gitignore` should ignore active changes and explorations but keep specs an
 Standard path (`change_type: feature` or `mixed`):
 
 ```
-proposal --> specs ---> tasks --> apply --> verify --> archive
-          -> design -/
+proposal --> [security:tm if sensitive] --> specs ---> tasks --> apply --> [security:ca if sensitive] --> verify --> archive
+                                         -> design -/
 ```
 
-Infra-only short path (`change_type: infra`, user approved skip-spec at proposal gate):
+Infra-only short path (`change_type: infra`, user approved skip-spec):
 
 ```
-proposal --> design --> tasks --> apply --> verify --> archive
+proposal --> [security:tm if sensitive] --> design --> tasks --> apply --> [security:ca if sensitive] --> verify --> archive
 ```
+
+Convention: bracketed phases are conditional. Readers infer the condition from the Approval Gates table (the `Conditional on` column).
 
 | Phase | Skill | Requires (standard) | Requires (infra short path) | Produces |
 |-------|-------|---------------------|------------------------------|----------|
@@ -67,6 +69,8 @@ proposal --> design --> tasks --> apply --> verify --> archive
 | apply | sdd-apply | tasks | tasks | code changes |
 | verify | sdd-verify | tasks | tasks | verification report |
 | archive | sdd-archive | verify | verify | merged specs (no-op if no specs) |
+| security-threat-model | sdd-security (mode: threat-model) | proposal-approval | proposal-approval | `threat-model.md` |
+| security-code-audit   | sdd-security (mode: code-audit)   | apply            | apply            | `audit-report.md` |
 
 Utility: **sdd-scout** (bootstrap, explore, baseline) -- invoked by the orchestrator, not part of the DAG.
 
@@ -87,10 +91,12 @@ Before the **spec phase**, check if a base spec exists for each domain affected 
 
 ## Approval Gates
 
-| Gate | After | Before |
-|------|-------|--------|
-| **Proposal approval** | propose | spec, design |
-| **Apply approval** | tasks | apply |
+| Gate | After | Before | Conditional on |
+|------|-------|--------|----------------|
+| **Proposal approval** | propose | spec, design | always |
+| **Security: threat-model** | proposal-approval | spec, design | `security_touchpoints` non-empty |
+| **Apply approval** | tasks | apply | always |
+| **Security: code-audit** | apply | verify | `security_touchpoints` non-empty |
 
 At each gate:
 1. Present a concise summary of the completed phase
@@ -117,6 +123,74 @@ When the user picks skip-spec:
 - Verify and archive proceed normally; verify's traceability matrix maps ACs from proposal directly to tests (no requirement IDs)
 
 When `change_type` is `feature` or `mixed`, do NOT offer the skip option — run spec normally.
+
+### Security gates
+
+**When to enter the gate:** Read `security_touchpoints` from the most recent `sdd-propose` envelope. If non-empty, run the security gate; if `[]`, skip silently.
+
+#### threat-model gate flow
+
+1. Delegate `sdd-security` with `mode: threat-model`, model `opus`, injected `security_touchpoints` and `proposal_path`.
+2. Inspect returned envelope. If `verdict: critical`: present override prompt (3 options — see below).
+3. If `verdict: no-findings` or `warnings-only`: no override prompt — pass straight to spec/design.
+4. Inject the envelope's `security_requirements` into the next phase delegation prompt (spec phase normally; design phase if `skip_spec: true` per Q6).
+
+#### code-audit gate flow
+
+1. Delegate `sdd-security` with `mode: code-audit`, model `sonnet`, injected `tasks_path`, `change_branch`, `base_branch`. Note: `base_branch` MUST be the merge-base of the change branch (not `main`) — see DR-10.
+2. Inspect returned envelope. If `verdict: critical`: present override prompt.
+3. If `verdict: no-findings` or `warnings-only`: no override — pass to verify.
+
+#### Override prompt (3 options) — exact wording
+
+> Security gate produced **{N} CRITICAL finding(s)**:
+>
+> {one-line summary per CRITICAL finding from the artifact}
+>
+> Options:
+> - **Fix and re-run** — close this run; you address the findings and the orchestrator re-runs the gate.
+> - **Accept and proceed** — log the override in `state.yaml.decisions:` and continue. You will be asked for the override `reason` (one sentence) and the override `evidence` field will reference the finding ID(s).
+> - **Cancel the change** — abort. The change directory remains for inspection.
+
+#### Cancel write rule (REQ-ORCHESTRATOR-003 Scenario O3.3)
+
+When the user picks "Cancel the change":
+1. Write `state.yaml.blocked: true`.
+2. Write `state.yaml.blocked_reason: "Security gate: user cancelled on finding(s) {finding-id-list}"`.
+3. Stop. Do NOT delete the change directory. Do NOT continue to spec/verify.
+
+#### Override write rule (accept-and-proceed)
+
+Write a `decisions:` entry:
+
+```yaml
+- date: {now}
+  phase: security-threat-model    # or security-code-audit
+  task_ref: "security-override"
+  decision: "Accept CRITICAL security finding(s) {finding-id-list}"
+  reason: "{user-provided one sentence}"
+  evidence: "{artifact-path}#finding-{id}"
+  commits: []
+```
+
+#### Q7 — Override-propagation rule
+
+When an override happens during threat-model, append to the spec delegation prompt under:
+
+```
+## Overridden Security Findings (informational SHOULD)
+The following findings were ACKed by the user but should be captured as informational SHOULD requirements per `decisions:` entry {N}:
+- {finding-id}: {finding text}
+```
+
+The spec phase ingests these as SHOULD requirements with a footnote linking to the override. Verify treats them as informational.
+
+#### Q6 — Infra short path interaction
+
+When `change_type: infra` AND `security_touchpoints` non-empty:
+- Still run the threat-model gate.
+- Route `security_requirements` into the design phase delegation prompt (not spec, which is skipped).
+- Design incorporates them as constraint sections; tasks reads them from design.md.
 
 ## Plan Mode (NOT used inside the SDD pipeline)
 
@@ -223,6 +297,8 @@ Read this table at session start, cache it, and pass the model in every `Agent()
 | sdd-apply | sonnet | Code generation from specs |
 | sdd-verify | sonnet | Validation against spec |
 | sdd-archive | haiku | Copy and close |
+| sdd-security (threat-model) | opus   | Architectural reasoning across the proposal surface |
+| sdd-security (code-audit)   | sonnet | Pattern matching over the diff |
 | default | sonnet | Non-SDD general delegation |
 
 ### Project Override
@@ -299,6 +375,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `spec_paths` | `.ai-team/changes/{change_name}/specs/*/spec.md` (list) | tasks, apply, verify, archive | once spec has run; pass empty list on infra short path |
 | `tasks_path` | `.ai-team/changes/{change_name}/tasks.md` | apply, verify | once tasks has run |
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
+| `security_touchpoints` | `sdd-propose` envelope (list of touchpoint slugs; empty list = not sensitive) | every phase after propose | once propose has run |
 
 Inject as a labelled block at the top of the delegation prompt:
 
@@ -316,6 +393,7 @@ design_path: .ai-team/changes/oauth-login/design.md
 tasks_path: .ai-team/changes/oauth-login/tasks.md
 baseline_path: .ai-team/changes/oauth-login/baseline.md
 strict_tdd: false
+security_touchpoints: ["auth/authz", "crypto"]   # or [] for non-sensitive
 ```
 
 The sub-agent treats this block as the source of truth for paths and flags. It does NOT re-derive them from disk unless explicitly told to.
@@ -368,6 +446,102 @@ Agent({
 When done, report: what you changed, what you tested, any issues found.
 Include model_used in your response.
 `
+})
+```
+
+### Delegating to sdd-security
+
+When invoking the security gate, set `mode:` in the Injected Context block.
+
+**For threat-model** — invoke after proposal approval, before spec/design:
+
+```
+Agent({
+  description: "sdd-security: threat-model for {change-name}",
+  subagent_type: "general-purpose",
+  model: "opus",
+  prompt: `
+You are the sdd-security executor.
+Do this phase's work yourself. Do NOT delegate or launch sub-agents.
+Do NOT search for SKILL.md files or skill registries — your full instructions are pasted inline.
+
+## Injected Context (from orchestrator)
+change_name: {name}
+change_dir: .ai-team/changes/{name}
+model_alias: opus
+mode: threat-model
+proposal_path: .ai-team/changes/{name}/proposal.md
+project_root: {abs-path}
+security_touchpoints:
+  - {slug}
+  - {slug}
+
+## Instructions
+{paste skills/sdd-security/SKILL.md}
+
+## Shared Protocols
+{paste context-protocol.md, persistence-contract.md, result-envelope.md, spec-convention.md, evidence-protocol.md}
+
+## Task
+Run mode threat-model. Read the proposal at proposal_path. For each touchpoint in security_touchpoints,
+walk the codebase to identify security-relevant surfaces. Apply the 5-category audit prompt. Produce
+threat-model.md and the security_requirements: block in the envelope.
+
+## Project Root
+{abs-path}
+
+## Expected Output
+Result envelope per result-envelope.md plus the sdd-security extensions (mode, findings, security_requirements, verdict, suppressed_count).
+  `
+})
+```
+
+**For code-audit** — invoke after apply, before verify:
+
+```
+Agent({
+  description: "sdd-security: code-audit for {change-name}",
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  prompt: `
+You are the sdd-security executor.
+Do this phase's work yourself. Do NOT delegate or launch sub-agents.
+Do NOT search for SKILL.md files or skill registries — your full instructions are pasted inline.
+
+## Injected Context (from orchestrator)
+change_name: {name}
+change_dir: .ai-team/changes/{name}
+model_alias: sonnet
+mode: code-audit
+tasks_path: .ai-team/changes/{name}/tasks.md
+proposal_path: .ai-team/changes/{name}/proposal.md
+project_root: {abs-path}
+change_branch: {branch}
+base_branch: {base}
+
+IMPORTANT — base_branch semantics (DR-10): base_branch MUST be the merge-base of the change branch
+relative to main, NOT simply "main". Use `git merge-base main {change_branch}` to compute it.
+Injecting "main" directly reads the entire history since the branch diverged and inflates the diff scope.
+Compute the merge-base once and pass the resulting SHA as base_branch.
+
+## Instructions
+{paste skills/sdd-security/SKILL.md}
+
+## Shared Protocols
+{paste context-protocol.md, persistence-contract.md, result-envelope.md, spec-convention.md, evidence-protocol.md}
+
+## Task
+Run mode code-audit. Run `git diff {base_branch}..{change_branch}` to identify changed files.
+Read each. Read up to 10 1-hop callers for reachability context. If config.yaml declares
+test_commands.security, invoke it. Apply the 5-category audit prompt to the diff. Produce
+audit-report.md.
+
+## Project Root
+{abs-path}
+
+## Expected Output
+Result envelope per result-envelope.md plus the sdd-security extensions (mode, findings, verdict, suppressed_count).
+  `
 })
 ```
 
