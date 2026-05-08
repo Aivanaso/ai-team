@@ -38,6 +38,24 @@ info() { echo -e "${GREEN}[ai-team]${NC} $1"; }
 warn() { echo -e "${YELLOW}[ai-team]${NC} $1"; }
 die()  { echo -e "${RED}[ai-team]${NC} $1" >&2; exit 1; }
 
+verify_install() {
+  local missing=0
+  local target_dir="$1"
+  while IFS= read -r -d '' src; do
+    rel="${src#$REPO_ROOT/domain/skills/}"
+    dst="$target_dir/$rel"
+    if [[ ! -f "$dst" ]]; then
+      echo "[ai-team] missing: $src -> $dst" >&2
+      missing=$((missing + 1))
+    fi
+  done < <(find "$REPO_ROOT/domain/skills" -type f -print0)
+
+  if (( missing > 0 )); then
+    die "verify-install: $missing file(s) failed to copy. See errors above."
+  fi
+  info "  -> verify-install: all $(find "$REPO_ROOT/domain/skills" -type f | wc -l) source files present"
+}
+
 # --- Preflight ---
 
 command -v jq >/dev/null 2>&1 || die "jq required for OpenCode adapter. Install it (brew install jq / apt install jq) and retry."
@@ -50,12 +68,23 @@ mkdir -p "$OPENCODE_DIR"
 info "Installing skills..."
 for dir in "$REPO_ROOT/domain/skills/"*/; do
   name=$(basename "$dir")
-  mkdir -p "$OPENCODE_DIR/skills/$name"
-  cp "$dir"*.md "$OPENCODE_DIR/skills/$name/" 2>/dev/null || true
+  dest="$OPENCODE_DIR/skills/$name"
+
+  # Wipe destination first to avoid stale files from prior installs.
+  rm -rf "$dest"
+  mkdir -p "$dest"
+
+  # Recursive copy: includes references/ subdirectories.
+  if ! cp -R "$dir." "$dest/" 2>/dev/null; then
+    die "skill $name: failed to copy from $dir to $dest"
+  fi
 done
 
 skill_count=$(find "$OPENCODE_DIR/skills/sdd-"* -maxdepth 0 -type d 2>/dev/null | wc -l)
 info "  -> ~/.config/opencode/skills/ ($skill_count phases + _shared)"
+
+# Verify every source file landed at the corresponding destination.
+verify_install "$OPENCODE_DIR/skills"
 
 # Rewrite skill paths in the orchestrator protocol for installed location.
 # Guard: skip if already-rewritten absolute prefix is present (idempotency fix).
