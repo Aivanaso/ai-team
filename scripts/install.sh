@@ -34,6 +34,23 @@ info() { echo -e "${GREEN}[ai-team]${NC} $1"; }
 warn() { echo -e "${YELLOW}[ai-team]${NC} $1"; }
 die()  { echo -e "${RED}[ai-team]${NC} $1" >&2; exit 1; }
 
+verify_install() {
+  local missing=0
+  while IFS= read -r -d '' src; do
+    rel="${src#$REPO_ROOT/skills/}"
+    dst="$CLAUDE_DIR/skills/$rel"
+    if [[ ! -f "$dst" ]]; then
+      echo "[ai-team] missing: $src -> $dst" >&2
+      missing=$((missing + 1))
+    fi
+  done < <(find "$REPO_ROOT/skills" -type f -print0)
+
+  if (( missing > 0 )); then
+    die "verify-install: $missing file(s) failed to copy. See errors above."
+  fi
+  info "  -> verify-install: all $(find "$REPO_ROOT/skills" -type f | wc -l) source files present"
+}
+
 # --- Preflight ---
 
 [[ -d "$CLAUDE_DIR" ]] || die "~/.claude/ not found. Is Claude Code installed?"
@@ -43,12 +60,24 @@ die()  { echo -e "${RED}[ai-team]${NC} $1" >&2; exit 1; }
 info "Installing skills..."
 for dir in "$REPO_ROOT/skills/"*/; do
   name=$(basename "$dir")
-  mkdir -p "$CLAUDE_DIR/skills/$name"
-  cp "$dir"*.md "$CLAUDE_DIR/skills/$name/"
+  dest="$CLAUDE_DIR/skills/$name"
+
+  # Wipe destination first to avoid stale files from prior installs (R-8).
+  rm -rf "$dest"
+  mkdir -p "$dest"
+
+  # Recursive copy: includes references/ subdirectories.
+  # cp -R (POSIX) not cp -r (GNU). Trailing /. copies directory contents into $dest.
+  if ! cp -R "$dir." "$dest/" 2>/dev/null; then
+    die "skill $name: failed to copy from $dir to $dest"
+  fi
 done
 
 skill_count=$(find "$CLAUDE_DIR/skills/sdd-"* -maxdepth 0 -type d 2>/dev/null | wc -l)
 info "  -> ~/.claude/skills/ ($skill_count phases + _shared)"
+
+# Verify every source file landed at the corresponding destination.
+verify_install
 
 # Rewrite skill paths in the orchestrator protocol for installed location
 SDD_PROTOCOL="$CLAUDE_DIR/skills/_shared/sdd-orchestrator-protocol.md"
