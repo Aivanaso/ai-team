@@ -25,7 +25,7 @@ Do not add sections outside this list. Do not reorder.
 
 The following items MUST remain in the SKILL.md body and must NOT be moved to `references/`:
 
-- **9 security touchpoint slugs** (verbatim, including slashes): `auth/authz`, `crypto`, `deserialization`, `file-io`, `network/SSRF`, `db-queries`, `new-deps`, `env/secrets`, `regex-external`
+- **9 security touchpoint slugs** (verbatim, `auth/authz` with slash; the other 8 with dashes): `auth/authz`, `crypto`, `deserialization`, `file-io-uploads`, `network-ssrf`, `db-direct-input`, `new-dependencies`, `env-secrets`, `regex-external-input`
 - **Severity vocabulary**: `CRITICAL` / `WARNING` / `SUGGESTION`
 - **Evidence Protocol Rule citations**: Rule 1, Rule 2, Rule 3, Rule 4, Rule 5 (cite by number; full text lives in `evidence-protocol.md`)
 - **`decisions:` schema keys**: `phase`, `task_ref`, `decision`, `reason`, `evidence`, `commits`
