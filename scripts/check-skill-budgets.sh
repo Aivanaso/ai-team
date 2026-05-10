@@ -19,7 +19,7 @@ over=0
 total=0
 
 shopt -s nullglob
-files=("$REPO_ROOT"/skills/sdd-*/SKILL.md)
+files=("$REPO_ROOT"/domain/skills/sdd-*/SKILL.md)
 shopt -u nullglob
 
 if (( ${#files[@]} == 0 )); then

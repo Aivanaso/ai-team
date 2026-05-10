@@ -15,3 +15,7 @@ Thumbs.db
 
 # Self-generated ai-team artifacts (this is a framework, not a target project)
 .ai-team/
+
+# Override global ignore for template files: adapter templates MUST ship with the repo
+!adapters/*/templates/CLAUDE.md
+!adapters/*/templates/AGENTS.md

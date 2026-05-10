@@ -4,16 +4,16 @@ A tool-agnostic framework for spec-driven development with AI agents.
 
 ## Architecture
 
-Claude Code acts as the **orchestrator**: small tasks inline, large tasks via SDD with sub-agents. The orchestrator classifies every task by size and delegates accordingly.
+Each supported AI coding tool runs an **orchestrator** agent: small tasks inline, large tasks via SDD with sub-agents. The orchestrator classifies every task by size and delegates accordingly.
 
 ```
-User ↔ Claude Code (orchestrator)
-           │
-           ├── Small: inline (no delegation)
-           ├── Medium: plan + delegate to sub-agent
-           └── Large: full SDD pipeline with phase sub-agents
-                         ↓
-                    .ai-team/    ← filesystem is the shared memory
+User ↔ Claude Code (orchestrator)          User ↔ OpenCode (sdd-orchestrator agent)
+           │                                             │
+           ├── Small: inline                             ├── Small: inline
+           ├── Medium: plan + delegate                   ├── Medium: plan + delegate
+           └── Large: full SDD pipeline                  └── Large: full SDD pipeline
+                         ↓                                             ↓
+                    domain/skills/    ←─── shared skills ───→    domain/skills/
 ```
 
 ### Core Principles
@@ -22,42 +22,92 @@ User ↔ Claude Code (orchestrator)
 - **Specs as source of truth** -- Committed to git, living documentation
 - **Filesystem-only persistence** -- Human-readable, version-controllable, no external services
 - **Fresh context per delegation** -- Sub-agents start clean, receive instructions inline
+- **Tool-agnostic skills** -- Skills in `domain/skills/` are adapter-independent
 
 ## Project Structure
 
 ```
 ai-team/
-├── skills/
-│   ├── _shared/                  # Protocols shared by all skills
-│   │   ├── context-protocol.md   # Sub-agent startup sequence
-│   │   ├── persistence-contract.md
-│   │   ├── result-envelope.md    # Structured return format
-│   │   ├── spec-convention.md    # Spec format and merge rules
-│   │   └── sdd-orchestrator-protocol.md  # DAG, model routing, delegation
-│   ├── sdd-scout/                # Project inspector + codebase explorer
-│   ├── sdd-propose/              # Feature → proposal with ACs
-│   ├── sdd-spec/                 # Proposal → domain delta specs
-│   ├── sdd-design/               # Specs → technical design
-│   ├── sdd-tasks/                # Design → ordered task plan
-│   ├── sdd-apply/                # Tasks → code implementation
-│   ├── sdd-verify/               # Two-layer compliance validation
-│   └── sdd-archive/              # Merge specs + archive artifacts
+├── domain/
+│   └── skills/
+│       ├── _shared/                  # Protocols shared by all skills
+│       │   ├── context-protocol.md
+│       │   ├── persistence-contract.md
+│       │   ├── result-envelope.md
+│       │   ├── spec-convention.md
+│       │   ├── evidence-protocol.md
+│       │   └── sdd-orchestrator-protocol.md  # DAG, model routing, delegation
+│       ├── sdd-scout/
+│       ├── sdd-propose/
+│       ├── sdd-spec/
+│       ├── sdd-design/
+│       ├── sdd-tasks/
+│       ├── sdd-apply/
+│       ├── sdd-verify/
+│       └── sdd-archive/
 ├── adapters/
-│   └── claude/                   # Claude Code orchestrator adapter
-│       └── CLAUDE.md             # Injected into ~/.claude/CLAUDE.md
+│   ├── claude-code/                  # Claude Code adapter
+│   │   ├── install.sh
+│   │   ├── templates/
+│   │   │   └── CLAUDE.md             # Injected into ~/.claude/CLAUDE.md
+│   │   └── README.md
+│   └── opencode/                     # OpenCode adapter
+│       ├── install.sh
+│       ├── templates/
+│       │   ├── AGENTS.md             # Copied to ~/.config/opencode/AGENTS.md
+│       │   ├── opencode.json         # Merged into ~/.config/opencode/opencode.json
+│       │   └── commands/             # Slash commands (sdd-new, sdd-continue, etc.)
+│       └── README.md
 ├── scripts/
-│   └── install.sh                # Install skills + orchestrator
+│   └── install.sh                    # Adapter selector (routes to adapters/<name>/install.sh)
 └── config/
     └── project-config.template.yaml
 ```
 
 ## Installation
 
+### Claude Code
+
 ```bash
-./scripts/install.sh
+./scripts/install.sh --adapter=claude-code
 ```
 
-This copies skills to `~/.claude/skills/` and injects the orchestrator into `~/.claude/CLAUDE.md` between `<!-- ai-team:orchestrator -->` markers. Re-run after pulling updates.
+Copies skills to `~/.claude/skills/` and injects the orchestrator into `~/.claude/CLAUDE.md` between `<!-- ai-team:orchestrator -->` markers.
+
+### OpenCode
+
+```bash
+./scripts/install.sh --adapter=opencode
+```
+
+Requires `jq`. Copies skills to `~/.config/opencode/skills/`, installs `AGENTS.md`, merges agent definitions into `opencode.json`, and copies slash commands to `~/.config/opencode/commands/`.
+
+### Both adapters
+
+```bash
+./scripts/install.sh --adapter=both
+```
+
+### Interactive prompt
+
+```bash
+./scripts/install.sh          # prompts if no adapter specified
+```
+
+Re-run after pulling updates to refresh skills and adapter templates.
+
+## Choosing an Adapter
+
+Each adapter installs an independent copy of the framework into its tool's config directory. Multi-adapter install is supported via `--adapter=both`. Adapters do not share installed files — `~/.claude/` and `~/.config/opencode/` are completely separate. Both adapters use the same `domain/skills/` source, so the SDD pipeline logic is identical regardless of which tool you use.
+
+## Adapters
+
+| Adapter | Status | Install target |
+|---------|--------|----------------|
+| Claude Code | Done | `~/.claude/` |
+| OpenCode | Done | `~/.config/opencode/` |
+
+Contributions for other tools welcome — see `adapters/claude-code/` or `adapters/opencode/` as reference implementations.
 
 ## How It Works
 
@@ -109,7 +159,7 @@ The verify phase validates applied code through two complementary layers:
 - **Static correctness** -- Code review: does the code structurally handle each spec scenario?
 - **Behavioral compliance** -- Test execution: does a passing test prove each scenario works?
 
-A scenario is only COMPLIANT when both layers pass. Code existing is not enough -- tests must prove it.
+A scenario is only COMPLIANT when both layers pass.
 
 ### Persistence
 
@@ -131,6 +181,8 @@ All SDD artifacts live in `.ai-team/` within the target project:
 
 ## Commands
 
+### Claude Code
+
 ```
 /ai-team new <change-name>       # Start a new SDD change
 /ai-team ff <change-name>        # Fast-forward planning (propose → spec → design → tasks)
@@ -140,14 +192,19 @@ All SDD artifacts live in `.ai-team/` within the target project:
 /ai-team baseline <domain>       # Document existing code as a spec
 ```
 
-## Adapters
+### OpenCode
 
-ai-team is tool-agnostic. The orchestrator protocol can be adapted to any AI coding tool:
+OpenCode users invoke these as slash commands routed to the `sdd-orchestrator` agent:
 
-| Adapter | Status |
-|---------|--------|
-| Claude Code | Done |
-| Others | Contributions welcome |
+```
+/sdd-new <change-name>     Start a new SDD change
+/sdd-continue [change]     Resume an active change
+/sdd-status [change]       Show change progress
+/sdd-explore <topic>       Investigate without starting SDD
+/sdd-baseline <domain>     Document existing code as a spec
+```
+
+OpenCode uses `/sdd-new`, Claude Code uses `/ai-team new`. The underlying SDD pipeline is identical.
 
 ## Status
 

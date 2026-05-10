@@ -358,7 +358,7 @@ When delegating to an SDD phase sub-agent:
 2. Read the shared protocols yourself
 3. Inject both as text into the prompt — sub-agents receive instructions inline, they do NOT read skill files
 
-Sub-agents now use a `## References` section in their SKILL.md to point at extracted material under `skills/sdd-{phase}/references/`. The orchestrator does NOT paste these reference files inline — it injects the directory path (`references_dir:` in the Critical Context Forwarding block) and the sub-agent reads the relevant files on demand during execution. This keeps delegation prompts compact and lets the model load templates only when a step explicitly needs them.
+Sub-agents now use a `## References` section in their SKILL.md to point at extracted material under `domain/skills/sdd-{phase}/references/`. The orchestrator does NOT paste these reference files inline — it injects the directory path (`references_dir:` in the Critical Context Forwarding block) and the sub-agent reads the relevant files on demand during execution. This keeps delegation prompts compact and lets the model load templates only when a step explicitly needs them.
 
 ```
 Agent({
@@ -421,7 +421,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `tasks_path` | `.ai-team/changes/{change_name}/tasks.md` | apply, verify | once tasks has run |
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
 | `security_touchpoints` | `sdd-propose` envelope (list of touchpoint slugs; empty list = not sensitive) | every phase after propose | once propose has run |
-| `references_dir` | `skills/sdd-{phase}/references/` (literal — not project-relative) | every phase | always |
+| `references_dir` | `domain/skills/sdd-{phase}/references/` (literal — not project-relative) | every phase | always |
 | `current_iso_utc` | `date -u +%Y-%m-%dT%H:%M:%SZ` (orchestrator at delegation time) | every phase that writes `state.yaml` | always |
 
 Inject as a labelled block at the top of the delegation prompt:
@@ -441,7 +441,7 @@ tasks_path: .ai-team/changes/oauth-login/tasks.md
 baseline_path: .ai-team/changes/oauth-login/baseline.md
 strict_tdd: false
 security_touchpoints: ["auth/authz", "crypto"]   # or [] for non-sensitive
-references_dir: skills/sdd-design/references/
+references_dir: domain/skills/sdd-design/references/
 current_iso_utc: 2026-05-10T15:23:00Z
 ```
 

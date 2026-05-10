@@ -95,6 +95,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    **Critical deliverable guard:** if any missing path matches `*.e2e-spec.ts`, `*.e2e.test.ts`, or any `*.spec.ts` whose task description references Testcontainers / docker / real DB, this is a CRITICAL gap regardless of unit-test counts. End-to-end tests catch bugs that unit tests with mocks cannot.
 
    The verify phase has its own audit, but the apply envelope MUST be the first line of defense — the orchestrator should not need to discover skips during verify.
+
 8. Return the envelope per [references/envelope-examples.md](references/envelope-examples.md).
 
 ## Output Contract

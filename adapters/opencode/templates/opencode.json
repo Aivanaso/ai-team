@@ -1,0 +1,152 @@
+{
+  "agent": {
+    "sdd-orchestrator": {
+      "mode": "primary",
+      "description": "ai-team SDD Orchestrator — coordinates sub-agents, never does work inline",
+      "prompt": "{file:./AGENTS.md}",
+      "permission": {
+        "task": {
+          "*": "deny",
+          "sdd-scout": "allow",
+          "sdd-propose": "allow",
+          "sdd-spec": "allow",
+          "sdd-design": "allow",
+          "sdd-tasks": "allow",
+          "sdd-apply": "allow",
+          "sdd-verify": "allow",
+          "sdd-archive": "allow",
+          "sdd-security": "allow"
+        },
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "delegate": true,
+        "delegation_read": true,
+        "delegation_list": true
+      }
+    },
+    "sdd-scout": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Project inspector and codebase explorer",
+      "model": "sonnet",
+      "prompt": "You are an SDD executor for the scout phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-scout/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "sdd-propose": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Feature-to-proposal with acceptance criteria and risks",
+      "model": "opus",
+      "prompt": "You are an SDD executor for the propose phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-propose/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "sdd-spec": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Proposal-to-domain-delta specifications (Given/When/Then)",
+      "model": "sonnet",
+      "prompt": "You are an SDD executor for the spec phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-spec/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "sdd-design": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Specs-to-technical-design grounded in codebase",
+      "model": "opus",
+      "prompt": "You are an SDD executor for the design phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-design/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "sdd-tasks": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Design-to-ordered-implementation-task-plan",
+      "model": "sonnet",
+      "prompt": "You are an SDD executor for the tasks phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-tasks/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "sdd-apply": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Tasks-to-code implementation, one task at a time",
+      "model": "sonnet",
+      "prompt": "You are an SDD executor for the apply phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-apply/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "sdd-verify": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Two-layer compliance validation (static + behavioral)",
+      "model": "sonnet",
+      "prompt": "You are an SDD executor for the verify phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-verify/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "sdd-archive": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Merge delta specs into base and archive completed change artifacts",
+      "model": "haiku",
+      "prompt": "You are an SDD executor for the archive phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-archive/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "sdd-security": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Security audit in two modes — threat-model (after propose, before spec/design) and code-audit (after apply, before verify)",
+      "model": "opus",
+      "prompt": "You are an SDD executor for the security phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-security/SKILL.md and follow it exactly. The orchestrator will inject `mode: threat-model` or `mode: code-audit` in your input — execute the corresponding mode.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    }
+  }
+}
