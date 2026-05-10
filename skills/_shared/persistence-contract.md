@@ -128,7 +128,7 @@ decisions:
 |------|-------------|
 | **Atomic writes** | Write complete files, not partial updates |
 | **state.yaml is truth** | Always update `state.yaml` AFTER writing artifacts, not before |
-| **Timestamps** | Use ISO 8601 format (`YYYY-MM-DDTHH:MM:SSZ`) |
+| **Timestamps** | Use the `current_iso_utc` value injected by the orchestrator (Injected Context block) for all `completed:`, `started:`, `updated:` and `decisions[].date` fields. Format is ISO 8601 (`YYYY-MM-DDTHH:MM:SSZ`). Sub-agents MUST NOT generate timestamps from their own sense of "now" — that drifts (observed in me-profile retro 2026-05-09: `2026-05-09T23:25:00Z` written when real date was `2026-05-08`). If the Injected Context block lacks `current_iso_utc`, surface as a `risk:` and use `date -u +%Y-%m-%dT%H:%M:%SZ` from Bash; do NOT fabricate. |
 | **No orphan artifacts** | Every artifact MUST be tracked in `state.yaml` |
 | **UTF-8 only** | All files MUST be UTF-8 encoded |
 

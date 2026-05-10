@@ -422,6 +422,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
 | `security_touchpoints` | `sdd-propose` envelope (list of touchpoint slugs; empty list = not sensitive) | every phase after propose | once propose has run |
 | `references_dir` | `skills/sdd-{phase}/references/` (literal — not project-relative) | every phase | always |
+| `current_iso_utc` | `date -u +%Y-%m-%dT%H:%M:%SZ` (orchestrator at delegation time) | every phase that writes `state.yaml` | always |
 
 Inject as a labelled block at the top of the delegation prompt:
 
@@ -441,6 +442,7 @@ baseline_path: .ai-team/changes/oauth-login/baseline.md
 strict_tdd: false
 security_touchpoints: ["auth/authz", "crypto"]   # or [] for non-sensitive
 references_dir: skills/sdd-design/references/
+current_iso_utc: 2026-05-10T15:23:00Z
 ```
 
 The sub-agent treats this block as the source of truth for paths and flags. It does NOT re-derive them from disk unless explicitly told to.

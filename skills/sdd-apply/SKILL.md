@@ -18,6 +18,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 - Evidence Protocol Rule 3: if a task generates integration tests, execute them before marking `status: ok`. Unit-only is not sufficient.
 - Skill-first: load project skills before writing code. Skills define naming, imports, patterns, test structure. Code that ignores skills is wrong even if it compiles.
 - Read before modifying: always read a file in full before applying changes.
+- Before composing the result envelope, verify every CREATE/MODIFY/REMOVE listed in `tasks.md` actually happened on disk. Self-reporting "X/X tasks done" without on-disk verification is a contract violation. See Step 7.
 
 ## Decision Gates
 
@@ -77,19 +78,36 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    **Cost gate:** trivial typos, test-only tweaks, or refactors within a single task do NOT need an entry. Log only when the approved plan is being deviated from.
 
 6. After all tasks: update `state.yaml` — `phases.apply.status → done`, `phases.apply.completed → ISO 8601`, `phases.apply.agent → sdd-apply`, `current_phase → apply`, `updated → now`. If some tasks failed, status is still `done`; record `failed` and `skipped` in `progress`.
-7. Return the envelope per [references/envelope-examples.md](references/envelope-examples.md).
+7. **Deliverables audit (mandatory, before composing the envelope).**
+
+   For each task in `tasks.md` with a `Files:` block:
+   - Each CREATE path MUST exist on disk. Verify with `find {project_root}/{path}` or `ls`.
+   - Each MODIFY path MUST appear in `git diff HEAD --name-only` (or have an uncommitted change in the working tree if commits are deferred).
+   - Each REMOVE path MUST be gone.
+
+   Build a `tasks_status` map: `{ completed: [...ids], partial: [...ids], skipped: [...ids] }`. A task is `partial` if any of its declared deliverables is missing.
+
+   If any task is `partial` or `skipped`:
+   - Set envelope `status: warning` (NOT `ok`).
+   - Surface each missing deliverable in `risks:` with task ID + path.
+   - Do NOT report "X/X tasks done" in `executive_summary` — report `completed/partial/skipped` counts truthfully.
+
+   **Critical deliverable guard:** if any missing path matches `*.e2e-spec.ts`, `*.e2e.test.ts`, or any `*.spec.ts` whose task description references Testcontainers / docker / real DB, this is a CRITICAL gap regardless of unit-test counts. End-to-end tests catch bugs that unit tests with mocks cannot.
+
+   The verify phase has its own audit, but the apply envelope MUST be the first line of defense — the orchestrator should not need to discover skips during verify.
+8. Return the envelope per [references/envelope-examples.md](references/envelope-examples.md).
 
 ## Output Contract
 
-Write application source files per `tasks.md`. Update `state.yaml` (`phases.apply.status → done`, `phases.apply.completed → ISO 8601`, `phases.apply.agent → sdd-apply`, `current_phase → apply`, `updated → now`). Return a result envelope with `status`, `executive_summary`, `artifacts`, `next_recommended`, `risks` (if any), `model_used`, `context_resolution`.
+Write application source files per `tasks.md`. Update `state.yaml` (`phases.apply.status → done`, `phases.apply.completed → ISO 8601`, `phases.apply.agent → sdd-apply`, `current_phase → apply`, `updated → now`). Return a result envelope with `status`, `executive_summary` (truthful completed/partial/skipped counts per Step 7), `artifacts`, `tasks_status`, `next_recommended`, `risks` (populated when any deliverable is missing), `model_used`, `context_resolution`.
 
 ## References
 
 - [references/task-execution-loop.md](references/task-execution-loop.md) — Step 3a-3f detailed prose, gate check rules, implementation order, CREATE/MODIFY/REMOVE per-action prose, compilation flow, drift detection; load at Step 5.
 - [references/decisions-log-examples.md](references/decisions-log-examples.md) — worked decision entries (out-of-plan, design-pivot, task-level with SHA); load when writing a `decisions:` entry.
-- [references/envelope-examples.md](references/envelope-examples.md) — all-succeeded, with-warnings, blocked envelope variants; load at Step 7.
+- [references/envelope-examples.md](references/envelope-examples.md) — all-succeeded, with-warnings, blocked envelope variants; load at Step 8.
 - [references/edge-cases.md](references/edge-cases.md) — Resumed Execution, Compilation Failure, File Already Exists, Missing File for MODIFY, Circular Dependency, No Verify Commands, Scope Limiting; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
 - `../_shared/persistence-contract.md` — write rules, `decisions:` full schema; load at Step 1.
-- `../_shared/result-envelope.md` — envelope schema; load at Step 7.
+- `../_shared/result-envelope.md` — envelope schema; load at Step 8.
 - `../_shared/evidence-protocol.md` — Rules 1-5 (Rule 3 governs integration test execution before status:ok).
