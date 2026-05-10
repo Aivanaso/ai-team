@@ -16,6 +16,7 @@ Run when the orchestrator launches the archive phase for an SDD change whose ver
 - Apply the merge algorithm exactly: ADDED appends, MODIFIED replaces, REMOVED deletes. No creative interpretation.
 - Copy to archive BEFORE deleting the active change directory. If copy fails, abort.
 - Always include `memory_candidates:` in the envelope (possibly empty). The orchestrator depends on this field.
+- `memory_candidates:` MUST be populated BEFORE any destructive step (`cp -r`, `rm -rf`). If destructive steps fail (e.g., Bash denied), return `status: warning` with the populated `memory_candidates:` — never return without them. Memory is the only output that cannot be reconstructed from disk; specs/copies are recoverable by re-running the failed step.
 
 ## Decision Gates
 
@@ -32,10 +33,11 @@ Run when the orchestrator launches the archive phase for an SDD change whose ver
 
 1. Run the memory capture pass per [references/memory-capture.md](references/memory-capture.md). Surface candidates from proposal, design, tasks, verification-report, and `state.yaml.decisions:`.
 2. Read `state.yaml`; verify the gate per Decision Gates above.
-3. For each delta spec under `.ai-team/changes/{change-name}/specs/{domain}/spec.md`, apply ADDED / MODIFIED / REMOVED to `.ai-team/specs/{domain}/spec.md` per `_shared/spec-convention.md`. If `skip_spec: true`, skip this step.
-4. Copy `.ai-team/changes/{change-name}/` to `.ai-team/changes/archive/YYYY-MM-DD-{change-name}/` using ISO 8601 date.
-5. Delete the active change directory.
-6. Return the envelope per [references/envelope-examples.md](references/envelope-examples.md). Include `memory_candidates:` (possibly empty).
+3. **Compose envelope draft** with `memory_candidates:` populated from Step 1, `status` undecided yet, `artifacts:` empty. Hold it in memory; do not emit yet. This guarantees that if any subsequent destructive step fails, the orchestrator still receives the memory list.
+4. For each delta spec under `.ai-team/changes/{change-name}/specs/{domain}/spec.md`, apply ADDED / MODIFIED / REMOVED to `.ai-team/specs/{domain}/spec.md` per `_shared/spec-convention.md`. If `skip_spec: true`, skip this step.
+5. Copy `.ai-team/changes/{change-name}/` to `.ai-team/changes/archive/YYYY-MM-DD-{change-name}/` using ISO 8601 date.
+6. Delete the active change directory.
+7. **Emit final envelope** per [references/envelope-examples.md](references/envelope-examples.md). If steps 4-6 succeeded → `status: ok` with completed paths in `artifacts:`. If any of 4-6 failed (Bash denied, copy collision, etc.) → `status: warning` with the same `memory_candidates:` from Step 3, completed steps listed in `artifacts:`, and failed steps listed in `risks:` with the exact failure (e.g., "Bash denied for `cp -r`; orchestrator must complete copy and delete inline").
 
 ## Output Contract
 
@@ -44,9 +46,9 @@ Write `.ai-team/changes/archive/YYYY-MM-DD-{change-name}/` (full copy of artifac
 ## References
 
 - [references/memory-capture.md](references/memory-capture.md) — surfaces table, calibration, output schema, skip conditions; load at Step 1.
-- [references/envelope-examples.md](references/envelope-examples.md) — successful + blocked envelope variants; load at Step 6.
+- [references/envelope-examples.md](references/envelope-examples.md) — successful + blocked envelope variants; load at Step 7.
 - [references/edge-cases.md](references/edge-cases.md) — REQ-ID not found, REMOVED still referenced, multiple domains, verify with warnings; load when an unexpected merge condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
-- `../_shared/persistence-contract.md` — archive copy rules; load at Step 4.
-- `../_shared/result-envelope.md` — envelope schema; load at Step 6.
-- `../_shared/spec-convention.md` — merge algorithm; load at Step 3.
+- `../_shared/persistence-contract.md` — archive copy rules; load at Step 5.
+- `../_shared/result-envelope.md` — envelope schema; load at Step 7.
+- `../_shared/spec-convention.md` — merge algorithm; load at Step 4.
