@@ -18,6 +18,7 @@ Run when the orchestrator launches the spec phase for an SDD change after the pr
 - Use RFC 2119 keywords (`MUST`, `SHOULD`, `MAY`, `MUST NOT`) for priority fields — no synonyms.
 - REQ-ID format: `REQ-{DOMAIN}-{NNN}` — uppercase domain slug, zero-padded three-digit counter. Continue from the highest existing ID in the base spec; never reuse removed IDs.
 - Specs are behavioral: describe WHAT the system does, not HOW. No class names, method signatures, or DB column names in requirement text.
+- Every constraint with a quantitative threshold (max/min/range), a qualitative pattern (regex/format/enum), or a refined invariant MUST have at least one Given/When/Then scenario explicitly testing the rejection case at the threshold (e.g., "When value = max + 1, Then reject"). A constraint declared without a boundary scenario is incomplete: downstream phases may implement enforcement that silently no-ops, and the test gap will not surface until a hostile input lands in production.
 
 ## Decision Gates
 

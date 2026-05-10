@@ -19,6 +19,8 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 - Skill-first: load project skills before writing code. Skills define naming, imports, patterns, test structure. Code that ignores skills is wrong even if it compiles.
 - Read before modifying: always read a file in full before applying changes.
 - Before composing the result envelope, verify every CREATE/MODIFY/REMOVE listed in `tasks.md` actually happened on disk. Self-reporting "X/X tasks done" without on-disk verification is a contract violation. See Step 7.
+- Commit incrementally per logical group: after a coherent set of tasks leaves the working tree compilable AND with relevant tests green, create a commit. Do NOT batch all commits to the end of the phase — a watchdog stall, a context interruption, or a re-engage between groups otherwise loses every uncommitted change.
+- Do not invent entities to satisfy a failing test. If a test references a symbol, file, route, command, or interface that does not exist in the system under test, the FIRST hypothesis is that the test has the wrong contract, not that the SUT needs the missing piece. Verify the test before adding the entity. Add the entity only if a documented `REQ` (in spec) or an active `decisions[]` entry justifies it. Adding undocumented surface to make a test pass is scope creep.
 
 ## Decision Gates
 

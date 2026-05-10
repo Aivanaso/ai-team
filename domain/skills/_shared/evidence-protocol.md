@@ -6,7 +6,7 @@
 
 The most common failure mode in SDD runs is **assuming generic framework behavior applies verbatim to this project**. The 4 bugs in the ECO-944 retrospective all shared this pattern: design/tasks/apply relied on "standard framework behavior" instead of validating the specific project configuration.
 
-This protocol defines five hard rules that every sub-agent MUST follow when writing specs, designs, tasks, code, or verification reports.
+This protocol defines six hard rules that every sub-agent MUST follow when writing specs, designs, tasks, code, or verification reports.
 
 ## Rule 1 — Framework / Library Behavior Claims
 
@@ -147,6 +147,34 @@ Pattern transplant: {one-line description}
 **Why this exists**: in the ECO-971 retrospective, three failures (T1.5 cache miss, `auto_setup` misread, DNS shadowing) all stemmed from transplanting a corev3 pattern without checking that cuideo-core had the same structural prerequisites.
 
 **Out of scope for this rule**: claims about the framework that ARE backed by the current repo's config (Rule 1 covers those); patterns invented from scratch (no transplant happening); patterns cited from generic docs/blog posts (cite the docs as evidence per Rule 1 instead).
+
+## Rule 6 — Sub-Agent Envelope Is a Declaration, Not a Verification
+
+Sub-agent result envelopes are self-reports. The orchestrator MUST treat them as claims, not as proof, and run an independent verification before delegating to the next phase when the change is non-trivial.
+
+This rule covers the orchestrator's responsibility *after* receiving an envelope. Rule 3 covers what apply must do *internally* before composing its envelope (test execution). Rule 6 covers what the orchestrator does on top.
+
+**Trigger** — activate when ALL of:
+
+- The phase is `apply` or `verify`
+- The change has >3 tasks, OR >1 affected domain, OR any open question / cross-cutting decision was resolved
+- The envelope returned `status: ok` or `status: warning`
+
+**When triggered**, the orchestrator MUST cross-check four things (operational details in `sdd-orchestrator-protocol.md → Post-Apply Independent Audit`):
+
+1. **Scope drift** — every file in `git diff --name-only` traces to a `tasks.md` `Files:` block or a `decisions[]` entry. Unaccounted files = scope creep to flag.
+2. **Resolution coverage** — every open question, design decision, and cross-cutting requirement recorded in the spec/design appears in the diff (grep by keyword/invariant). A resolution that does not surface anywhere is a silent skip.
+3. **Audit trail completeness** — every commit outside the original task plan has a corresponding `decisions[]` entry with the matching phase. Zero `decisions[]` for a phase that visibly drifted = broken audit trail.
+4. **Test discovery sanity** — if new test files were added, the global test count grew proportionally to the count of new files. Disk-present tests with a flat global counter indicate dormant tests (runner glob/discover misconfigured).
+
+**Decision**:
+
+- All four checks pass → advance to the next phase.
+- Any check fails → re-engage the same phase sub-agent with an enumerated gap list (1/N…N/N). Log a `decisions[]` entry with `task_ref: post-{phase}-audit-gap` describing what was missing.
+
+**Why this exists**: in retrospective analysis of large multi-domain SDDs, apply sub-agents have returned `status: ok` while (a) silently skipping entire cross-cutting concerns, (b) failing to log mid-flight decisions, and (c) placing test files where the runner did not pick them up. The on-disk deliverables audit inside `sdd-apply` (Step 7) catches missing files but cannot detect resolution gaps or runner-discovery failures — those require the orchestrator's full-plan view.
+
+**Out of scope**: trivial single-task applies (1 file, no OQs, no decisions); the propose / spec / design phases — their evidence requirements are covered by Rules 1, 4, 5.
 
 ## Recording Evidence in Artifacts
 

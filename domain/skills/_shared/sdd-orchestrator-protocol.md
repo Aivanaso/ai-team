@@ -49,14 +49,14 @@ The `.gitignore` should ignore active changes and explorations but keep specs an
 Standard path (`change_type: feature` or `mixed`):
 
 ```
-proposal --> [security:tm if sensitive] --> specs ---> tasks --> apply --> [security:ca if sensitive] --> verify --> archive
+proposal --> [security:tm if sensitive] --> specs ---> tasks --> apply --> [orchestrator-audit] --> [security:ca if sensitive] --> verify --> archive
                                          -> design -/
 ```
 
 Infra-only short path (`change_type: infra`, user approved skip-spec):
 
 ```
-proposal --> [security:tm if sensitive] --> design --> tasks --> apply --> [security:ca if sensitive] --> verify --> archive
+proposal --> [security:tm if sensitive] --> design --> tasks --> apply --> [orchestrator-audit] --> [security:ca if sensitive] --> verify --> archive
 ```
 
 Convention: bracketed phases are conditional. Readers infer the condition from the Approval Gates table (the `Conditional on` column).
@@ -234,6 +234,33 @@ When `change_type: infra` AND `security_touchpoints` non-empty:
 - Still run the threat-model gate.
 - Route `security_requirements` into the design phase delegation prompt (not spec, which is skipped).
 - Design incorporates them as constraint sections; tasks reads them from design.md.
+
+## Post-Apply Independent Audit
+
+After `sdd-apply` returns its envelope, the orchestrator runs an independent audit BEFORE advancing to security:code-audit (conditional) or verify. This materialises Evidence Protocol Rule 6.
+
+**Skip when:** the change has ≤3 tasks AND zero open questions AND zero cross-cutting decisions. For everything else, mandatory.
+
+**Mandatory checks (all four):**
+
+1. **Diff vs declared scope.** Run `git diff --name-only {apply_base}..HEAD`. Every changed file MUST trace to one of:
+   - A `Files:` block in `tasks.md` (for any task in the phase)
+   - A `path:` field in any `state.yaml.decisions[]` entry with `phase: apply`
+   - The change directory itself (`.ai-team/changes/{change}/...`) or `state.yaml`
+
+   Any unaccounted file = scope drift. Surface to user with file list.
+
+2. **Resolution coverage.** For each open question recorded in `state.yaml.open_questions[]` AND each cross-cutting decision in `proposal.md` / `design.md`, grep the diff for the resolution keyword or invariant. Example: an OQ resolved as "header X mandatory cross-cutting" must produce diff hits in every domain that handles requests. Zero diff hits for a recorded resolution = silent skip.
+
+3. **Audit trail check.** Run `grep -c "phase: apply" {state_yaml}`. Compare to the count of `fix:` or off-plan commits in `git log {apply_base}..HEAD`. If the off-plan commit count > `decisions[]` count for `phase: apply`, the audit trail is incomplete.
+
+4. **Test discovery sanity.** Compare baseline test count (from `baseline.md`) to the count reported in the apply envelope. If the diff added N new test files but the global counter grew by far less than N test cases, suspect dormant tests (runner discovery glob misconfigured for the directory where the files landed).
+
+**On any failure**: do NOT advance to the next phase. Re-engage `sdd-apply` with an enumerated gap list (`Gap 1/N: …`, `Gap 2/N: …`) and explicit success criteria per gap. Log the re-engagement in `state.yaml.decisions[]` with `phase: apply`, `task_ref: post-apply-audit-gap`, `summary:` describing the gaps.
+
+**On all-pass**: advance to security:code-audit (if `security_touchpoints` non-empty) or to verify.
+
+**Why this lives in the orchestrator and not in `sdd-apply`:** the apply sub-agent self-reports. Sub-agent self-reports have failed in practice — silent OQ skips, unlogged decisions, dormant tests. The orchestrator holds the full plan (proposal + spec + design + tasks + state) and can grep-check independently. This audit is the single non-negotiable crosscheck between apply and downstream phases.
 
 ## Plan Mode (NOT used inside the SDD pipeline)
 
