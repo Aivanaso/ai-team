@@ -621,6 +621,27 @@ Result envelope per result-envelope.md plus the sdd-security extensions (mode, f
 })
 ```
 
+## Tool Availability by Phase
+
+Sub-agents inherit Bash from the parent session — they CAN run commands. The harness does not message the model when Bash would be denied; auto-restriction is a model behavior, not a permission gate. Each phase prompt MUST make availability explicit.
+
+The orchestrator forwards the relevant block below as Injected Context when delegating to each phase. Sub-agents reading this contract MUST NOT return `needs_input` on the assumption that Bash is unavailable — they MUST attempt the command first and only escalate on real failure (non-zero exit captured in output).
+
+### apply
+- Bash: AVAILABLE. Run `pnpm test*`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `git status`, `git diff*` freely.
+- Commit: YOU are responsible. Commit per logical group per Hard Rules. NEVER `git push` (orchestrator handles remote).
+- Destructive: not expected at this phase. If a task requires `rm -rf` or `cp -r` outside the working tree, return `needs_input` listing the exact command and reason.
+- Honesty: if you decide NOT to execute tests/typecheck/lint, return `status: needs_input` with the commands required — do NOT declare `status: ok` without execution output as evidence. Self-reported "all tests passing" without a captured command output is an Evidence Protocol Rule 3 violation.
+
+### verify
+- Bash: AVAILABLE. Step 5 (test execution) is mandatory and non-skippable.
+- Writes: read-only on application code. Only `verification-report.md` + `state.yaml` may change.
+- Honesty: a spec scenario is COMPLIANT only when a test that covers it has PASSED with captured output. If unable to execute the suite, return `status: needs_input` listing the required commands — never declare COMPLIANT on inference.
+
+### archive
+- Bash: AVAILABLE. Run `cp -r .ai-team/changes/{name}/ .ai-team/changes/archive/` and `rm -rf .ai-team/changes/{name}/` per Steps freely.
+- Safety net: the `memory_candidates`-first Hard Rule still applies — if any destructive step fails despite Bash being available (collision, permission edge case, disk error), return `status: warning` with the populated `memory_candidates` intact.
+
 ## Archive Memory-Capture Handoff
 
 When `sdd-archive` returns its envelope, inspect the `memory_candidates:` field. The sub-agent surfaces tribal knowledge that would otherwise be lost when the change directory is deleted, but it has no access to the orchestrator's memory system — it is your job to grade and persist them.

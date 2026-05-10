@@ -17,6 +17,7 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
 - Evidence required. Every verdict needs a command output, file:line reference, or test name:result. "Looks correct" is not evidence.
 - Run real commands. Compile, lint, test. Do not guess whether the build passes.
 - Tests are behavioral proof. A spec scenario is only COMPLIANT when a test that covers it has PASSED. Code existing in the codebase is structural evidence (Step 6), not behavioral proof (Step 8).
+- Bash is available — see "Tool Availability by Phase: verify" in `_shared/sdd-orchestrator-protocol.md`. Step 5 (test execution) is non-skippable: if unable to execute, return `status: needs_input` listing the required commands — never declare COMPLIANT without test execution evidence.
 
 ## Decision Gates
 

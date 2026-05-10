@@ -17,6 +17,7 @@ Run when the orchestrator launches the archive phase for an SDD change whose ver
 - Copy to archive BEFORE deleting the active change directory. If copy fails, abort.
 - Always include `memory_candidates:` in the envelope (possibly empty). The orchestrator depends on this field.
 - `memory_candidates:` MUST be populated BEFORE any destructive step (`cp -r`, `rm -rf`). If destructive steps fail (e.g., Bash denied), return `status: warning` with the populated `memory_candidates:` — never return without them. Memory is the only output that cannot be reconstructed from disk; specs/copies are recoverable by re-running the failed step.
+- Bash is available — see "Tool Availability by Phase: archive" in `_shared/sdd-orchestrator-protocol.md`. Run `cp -r` and `rm -rf` per Steps freely; the `memory_candidates`-first rule above remains the safety net for any failure.
 
 ## Decision Gates
 
