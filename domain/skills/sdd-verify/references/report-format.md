@@ -97,6 +97,18 @@
 
 **Compliance summary**: {N}/{total} scenarios compliant, {N} partial, {N} untested, {N} failing
 
+## Spec Compliance Matrix
+
+> Produced per logical group when tasks.md has >1 group (REQ-VERIFY-006).
+
+### Group G1: {Group Name}
+
+| REQ-ID | Scenario | State | Evidence |
+|--------|----------|-------|---------|
+| REQ-FOO-001 | Given … When … Then … | COMPLIANT | "describe > it" PASS |
+| REQ-FOO-002 | Given … When … Then … | FAILING | "describe > it" FAIL |
+| REQ-BAR-001 | Given … When … Then … | UNTESTED | no test found |
+
 ## Drift Summary
 
 ### Approved Drift (from `state.yaml` `decisions:`)
@@ -110,6 +122,15 @@
 ### Unaccounted Drift
 
 {List of files in `git diff` that are NEITHER in any task's file list NOR referenced by any `decisions:` entry. One line per file with recommendation: add retroactive entry, or revert. Or: "None -- all changes either match the task plan or are logged as approved drift."}
+
+### Absorbed Checks Summary
+
+| Check | Status | Finding |
+|-------|--------|---------|
+| Check 1 — Diff vs declared scope | PASS / WARNING / CRITICAL | {count} undeclared files or "clean" |
+| Check 2 — Resolution coverage | PASS / WARNING | {count} unresolved decision keywords or "clean" |
+| Check 3 — Audit-trail completeness | PASS / CRITICAL | {count} fix commits vs decisions[] entries or "clean" |
+| Check 4 — Test discovery sanity | PASS / WARNING / SKIPPED | {note} |
 
 ## AC Coverage
 
@@ -145,4 +166,12 @@
 {1-2 sentence justification.}
 
 **Recommendation:** {Proceed to archive / Re-run apply for tasks {IDs} / Review issues with user}
+
+## Re-engage Routing Hint
+
+**failure_class:** `implementation` | `test_contract` | `spec_gap` | null
+**failed_groups:** [`G1`, `G2`]
+**Rationale:** {one sentence explaining the dominant failure cause}
+
+Orchestrator routing: implementation → re-engage sdd-apply; test_contract → re-engage sdd-tasks; spec_gap → escalate to user.
 ````

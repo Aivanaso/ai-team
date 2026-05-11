@@ -75,13 +75,13 @@ After all files in the task are written, run the project's compile command:
    - If the next task does NOT depend on this one → continue.
    - If the next task depends on this one → skip dependent tasks, flag in result.
 
-## Step 3e — Group Boundary Tests
+## Step 3e — Group boundary detection and hand-off
 
-When the last task in a group completes, run tests for that group:
-
-- If any task in the group created test files → run those specific tests.
-- Use the project's test runner from `config.yaml` (e.g., `npx jest --testPathPattern=...` or `npx vitest run ...`).
-- Test results are **informational** — failures produce warnings, not blockers. `sdd-verify` does the thorough validation.
+1. Detect last-task-in-group per `_shared/common-rules.md` "Logical group" rule: if the next row in tasks.md Execution Order table belongs to a different group, this task is the last in the current group.
+2. (3e.1) Run group informational tests: if any task in the group created scaffold files, run those test files only (not the full suite). Use the project's test runner from `config.yaml`. Failures produce warnings, not blockers — sdd-verify is authoritative.
+3. (3e.2) Update state.yaml: set `phases.apply.progress[{group_id}] = done`. The group_id is the literal string "G1", "G2", etc. from the Execution Order table.
+4. (3e.3) Return control to the orchestrator. NEVER run `git commit`. The orchestrator will invoke `work-unit-commits` per REQ-ORCHESTRATOR-010.
+5. Watchdog-resilience: the `progress[group_id] = done` marker is durable; a resumed run reads it and skips re-execution.
 
 ## Step 3f — Progress Update
 

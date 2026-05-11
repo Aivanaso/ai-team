@@ -133,6 +133,20 @@ sdd-apply to implement without reading the full design.}
 | AC-02 | REQ-CLAIMS-002 | 2.1 |
 | ... | | |
 
+## AC↔Test Traceability
+
+| REQ-ID | test_file | test_id |
+|--------|-----------|---------|
+| REQ-XXX-001 | path/to/test.spec.ts | "describe block name > it block name" |
+
+## Manual Review Checklist
+
+> Used only when `config.yaml.stack.testing: []` (meta-project path per REQ-TASKS-020).
+
+| Criterion ID | REQ-ID covered | Bash command | Expected result | Maps to |
+|---|---|---|---|---|
+| C-001 | REQ-APPLY-021 | `grep -nE 'git [a-z]' domain/skills/sdd-apply/SKILL.md \| grep -vE 'git (diff --name-only\|status --porcelain)'` | exit 1 (zero matches) | COMPLIANT if exit 1; FAILING otherwise |
+
 ## Drift Warnings
 
 {Any discrepancies found between the design and current codebase. Empty if none.}

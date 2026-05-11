@@ -35,6 +35,8 @@ conventions:
   - "path aliases via @/"
   # Add detected conventions: "PSR-4 autoloading", "Conventional Commits", "E2E tests with Playwright", etc.
 
+commit_strategy: auto  # commit strategy for work-unit-commits skill: auto | manual
+
 structure:
   source: "src/"
   tests: "src/**/*.test.ts"
