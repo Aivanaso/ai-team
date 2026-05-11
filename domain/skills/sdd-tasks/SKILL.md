@@ -1,6 +1,6 @@
 ---
 name: sdd-tasks
-description: "Trigger: orchestrator launches tasks after design (and threat-model gate). Decompose design into ordered task list with PR slicing."
+description: "Trigger: orchestrator launches tasks after design (and threat-model gate). Decompose design into ordered task list with PR slicing, test scaffolds, and AC↔test traceability."
 disable-model-invocation: true
 user-invocable: false
 ---
@@ -11,12 +11,13 @@ Run when the orchestrator launches the tasks phase for an SDD change. Produces `
 
 ## Hard Rules
 
-- **Read application code, never modify it** — source files are read only to verify design assumptions.
-- **Write only tasks.md** — one artifact per change (plus state.yaml update).
-- **Decompose, don't redesign** — flag disagreements as risks; do not alter interfaces or add components.
-- **Every task must leave the codebase compilable** — new unused code is fine; broken builds are not.
-- **Embed enough context** — each task must be implementable by sdd-apply without re-reading the full design.
-- **Evidence > Assumption** — public interface changes require an "Implementors sweep" sub-task; cross-repo pattern transplants must embed the Rule 5 precondition citation block.
+- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Decompose, don't redesign. Flag disagreements as risks; do NOT alter interfaces or add components beyond what design.md specifies.
+- Every task must leave the codebase compilable (or in the meta-project case: leave the framework files in a valid SKILL.md structure).
+- Embed enough context in each task that sdd-apply does not need to re-read the full design.
+- Evidence > Assumption: cross-repo pattern transplants embed the Rule 5 precondition block per evidence-protocol.
+- Declare a test scaffold file per AC in the delta spec, listed in the relevant task's `Files:` block. Emit the AC↔Test Traceability table in tasks.md per REQ-TASKS-019. Meta-project exception (`config.yaml.stack.testing: []`): emit a Manual Review Checklist instead — see Step 7b.
+- Number groups sequentially starting at G1 with no gaps. A task belongs to exactly one group. The Execution Order table is the canonical source — see `_shared/common-rules.md` "Logical group" section (REQ-CR-006, REQ-TASKS-021).
 
 ## Decision Gates
 
@@ -27,6 +28,7 @@ Run when the orchestrator launches the tasks phase for an SDD change. Produces `
 | Severe drift (file deleted, module restructured) | Return `status: warning`; still produce tasks for unaffected parts. |
 | Circular dependency between tasks | Merge tasks or introduce a shared types task; never leave cycles in the plan. |
 | Cohesion risk is High and no slice plan set | Set `Decision needed before apply: Yes`; assign every task to a feature-level PR slice. |
+| `config.yaml.stack.testing` is empty | Emit Manual Review Checklist (REQ-TASKS-020 exception path); set `test_file` cells to `#manual-checklist`, `test_id` to `manual-{AC-N}`. |
 
 ## Execution Steps
 
@@ -35,9 +37,10 @@ Run when the orchestrator launches the tasks phase for an SDD change. Produces `
 3. Read design.md in full; extract components (name, type, path, action, domain, dependencies). Read delta specs for REQ-IDs and proposal for ACs.
 4. **Phase A** (free) — glob/grep every file path the design mentions: verify existing files exist, new files don't, module registrations match.
 5. **Phase B** (budgeted, 5-15 files) — read only files where Phase A found discrepancies or where critical interface assumptions need confirmation.
-6. Build component inventory; group into tasks by execution layer (see Layer Ordering below). Check compilability after each task in the sequence.
+6. Build component inventory; group into tasks by execution layer (see Layer Ordering below). Assign each task to exactly one group; number groups sequentially from G1. Check compilability after each task in the sequence.
 7. **Forecast Review Workload** — classify cohesion risk, propose PR slices, emit the grep contract lines (see Output Contract). Use `references/tasks-template.md` for the full tasks.md structure.
-8. Map traceability: every REQ must appear in ≥1 task; every AC must trace through ≥1 REQ. Flag gaps as risks.
+7b. **Test scaffold generation:** If `config.yaml.stack.testing` is non-empty, declare one scaffold file per AC in the delta spec (in the task's `Files:` block) using `references/scaffold-templates.md` dispatch table. Then emit the AC↔Test Traceability table. If `config.yaml.stack.testing: []` (meta-project), emit a Manual Review Checklist table instead with one Bash criterion per AC — see `references/scaffold-templates.md` "Manual Review Checklist Template" section.
+8. Map traceability: every REQ must appear in ≥1 task; every AC must trace through ≥1 REQ. Flag gaps as risks. The AC↔Test Traceability table from Step 7b complements this.
 9. Write `.ai-team/changes/{change-name}/tasks.md` using `references/tasks-template.md`.
 10. Persist: update `state.yaml` (tasks.status → done, completed → ISO 8601, agent → sdd-tasks, current_phase → tasks, updated → now). Return envelope from `_shared/result-envelope.md`.
 
@@ -110,6 +113,7 @@ review_workload:
 ## References
 
 - [references/tasks-template.md](references/tasks-template.md) — full tasks.md markdown template; load when writing tasks.md.
+- [references/scaffold-templates.md](references/scaffold-templates.md) — test scaffold dispatch table and templates per framework; Manual Review Checklist template for meta-project path; load at Step 7b.
 - [references/envelope-examples.md](references/envelope-examples.md) — ok / warning / blocked envelope variants; load when composing the result envelope.
 - [references/edge-cases.md](references/edge-cases.md) — trivial change, massive change, no delta specs, drift, no test strategy, circular deps; load when a gate fires.
 - `../_shared/context-protocol.md` — startup sequence.

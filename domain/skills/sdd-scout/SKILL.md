@@ -11,11 +11,10 @@ Run when the orchestrator launches scout at the start of a new SDD change or on 
 
 ## Hard Rules
 
-- Read application code; never modify it.
-- Write only to `.ai-team/` (config, specs, explorations).
+- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
 - Bootstrap: do not overwrite an existing `config.yaml` — return `status: blocked` if it exists.
-- Baseline: document what the code **actually does**, not what you think it should. Mark ambiguous behavior `[unclear]`.
-- Result envelope always: every response ends with an envelope per `_shared/result-envelope.md`.
+- Baseline: document what the code **actually does**, not what you think it should.
+- Bootstrap writes a `commit_strategy: auto` field at the root of generated `config.yaml`. Existing configs without the field are valid (backward-compatible default).
 
 ## Decision Gates
 
@@ -46,7 +45,7 @@ Run when the orchestrator launches scout at the start of a new SDD change or on 
 
 ### Write artifacts
 
-9. **Bootstrap**: generate `.ai-team/config.yaml` using [references/config-template.md](references/config-template.md). Language detection heuristics:
+9. **Bootstrap**: generate `.ai-team/config.yaml` using [references/config-template.md](references/config-template.md). In addition to existing fields, write `commit_strategy: auto` at the root level of `config.yaml`. This is mandatory for new bootstraps (REQ-SCOUT-015). Language detection heuristics:
    - Monorepo: `turbo.json` OR `pnpm-workspace.yaml` OR `lerna.json` OR `workspaces` field in `package.json` OR multiple package manifests in direct child dirs.
    - App vs library: `main.ts`/routes/controllers → `app`; `package.json` with `main`/`exports`/`types` and no server code → `library`.
    - Package manager lock file precedence: `pnpm-lock.yaml` > `yarn.lock` > `bun.lockb` > `package-lock.json` > `composer.lock`.

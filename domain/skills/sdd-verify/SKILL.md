@@ -1,6 +1,6 @@
 ---
 name: sdd-verify
-description: "Trigger: orchestrator launches verify after apply (and code-audit gate). Validate change against ACs, run tests, produce verification report."
+description: "Trigger: orchestrator launches verify after apply (and code-audit gate). Validate change against ACs per group, run tests, emit Spec Compliance Matrix with failure_class, produce verification report."
 disable-model-invocation: true
 user-invocable: false
 ---
@@ -11,13 +11,15 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
 
 ## Hard Rules
 
-- Read-only on application code. Not a single character changed, not even to fix a bug.
-- Write only `verification-report.md` (plus `state.yaml` update).
+- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
 - Verify against specs, not opinion. If the code does what the spec says, it passes.
 - Evidence required. Every verdict needs a command output, file:line reference, or test name:result. "Looks correct" is not evidence.
 - Run real commands. Compile, lint, test. Do not guess whether the build passes.
-- Tests are behavioral proof. A spec scenario is only COMPLIANT when a test that covers it has PASSED. Code existing in the codebase is structural evidence (Step 6), not behavioral proof (Step 8).
+- Tests are behavioral proof. A spec scenario is only COMPLIANT when a test that covers it has PASSED. Code existing in the codebase is structural evidence (Step 7), not behavioral proof (Step 9).
 - Bash is available — see "Tool Availability by Phase: verify" in `_shared/sdd-orchestrator-protocol.md`. Step 5 (test execution) is non-skippable: if unable to execute, return `status: needs_input` listing the required commands — never declare COMPLIANT without test execution evidence.
+- Spec Compliance Matrix per group: every scenario gets exactly one of {COMPLIANT | FAILING | UNTESTED | PARTIAL}. The matrix is per logical group (REQ-VERIFY-006) when tasks.md has >1 group. -- see Step 9 and Step 11.
+- `failure_class` in envelope: emit exactly one of {implementation | test_contract | spec_gap} per failed group (null on PASS). Priority: spec_gap > test_contract > implementation. -- see Step 15 (envelope composition).
+- Absorbed scope/coverage checks (Check 1-4): diff vs declared scope, resolution coverage, audit-trail completeness, test discovery sanity. -- see Step 3b inserted between Step 3 and Step 4.
 
 ## Decision Gates
 
@@ -29,37 +31,52 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
 | SUGGESTION only | Record. No gate action. Verdict not downgraded. |
 | Failure in `baseline.md` | Not a regression -- pre-existing. Do not report as CRITICAL. |
 | Design drift that has a `state.yaml.decisions:` entry with `task_ref` | Approved drift. Carry verbatim into Drift Summary table. Not scope creep. |
-| Missing test infrastructure (no runner, no tests) | Downgrade all UNTESTED from CRITICAL to WARNING. Status: warning with manual check note. |
+| Missing test infrastructure (no runner, no tests) | Execute Manual Review Checklist rows as Bash; map to COMPLIANT/FAILING/UNTESTED per row. |
 | `baseline_path` not injected but `baseline.md` exists on disk | Recover from disk. Report `context_resolution: fallback`. |
+| `config.yaml.stack.testing: []` (meta-project) | Execute Manual Review Checklist rows as Bash; map to COMPLIANT/FAILING/UNTESTED per row. |
 
 ## Execution Steps
 
 1. Read `_shared/context-protocol.md` (startup), `_shared/persistence-contract.md` (write rules). Validate injected context. Recover missing fields from `state.yaml`; report `context_resolution: fallback` if any were missing.
-2. Load: `config.yaml` (stack, verify commands), `state.yaml` (`phases.apply.status`, apply progress), `tasks.md` (full), delta specs (all domains), `proposal.md` (ACs), `design.md`. If `baseline.md` exists, read it -- failures present there are pre-existing, not regressions.
+2. Load: `config.yaml` (stack, verify commands), `state.yaml` (`phases.apply.status`, apply progress, `decisions[]`), `tasks.md` (full), delta specs (all domains), `proposal.md` (ACs), `design.md`. If `baseline.md` exists, read it -- failures present there are pre-existing, not regressions.
 3. File inventory: for each task/file pair verify CREATE exists, MODIFY exists-and-changed, REMOVE is gone. Run `git diff --name-only HEAD`; files in diff but not in any task = scope creep WARNING.
+
+   **Step 3b — Absorbed scope/coverage checks (REQ-VERIFY-004):**
+   - Check 1 — Diff vs declared scope: `git diff --name-only HEAD` vs tasks.md `Files:` blocks. Files in diff but not declared = WARNING per file.
+   - Check 2 — Resolution coverage: grep `decisions[].decision` keywords against diff. Zero hits for a decision keyword = WARNING (may indicate unresolved change).
+   - Check 3 — Audit-trail completeness: count `decisions[]` apply-phase entries vs `fix:` commits. `fix:` commits > decisions[] entries = WARNING (unlogged deviation).
+   - Check 4 — Test discovery sanity: count new `*.spec.{ext}` files vs test count delta in test runner output. Significant discrepancy = WARNING. Meta-project: skip with note ("meta-project, no test runner").
+
 4. Build: run compile command from `config.yaml`. Compilation error = CRITICAL. Run lint on created/modified files; lint error = CRITICAL, lint warning = WARNING.
-5. Test execution: run new test files created by tasks (CRITICAL if failing). Run regression suite for affected modules (CRITICAL if regressions). No test runner configured = WARNING, not CRITICAL.
+5. Test execution: run new test files created by tasks (CRITICAL if failing). Run regression suite for affected modules (CRITICAL if regressions). No test runner configured = WARNING, not CRITICAL. Meta-project: execute Manual Review Checklist Bash criteria; map each row to COMPLIANT/FAILING/UNTESTED.
 6. Task criteria: for each task verify each checklist item. Unmet critical criteria = CRITICAL; unmet optional criteria = WARNING.
 7. Static correctness: for each delta-spec requirement, read implementing files (use tasks.md traceability). Assess Given/When/Then structurally. Verdict per requirement: Implemented / Partial / Missing. MUST gaps = CRITICAL; SHOULD gaps = WARNING.
 8. Design coherence: for each key design decision verify the approach was followed. Deviation = WARNING (design is a guide, not law).
-9. Behavioral compliance: cross-reference every spec scenario against Step 5 test results. COMPLIANT = test exists AND passed. FAILING = test failed = CRITICAL. UNTESTED MUST = CRITICAL (WARNING if no test infra). UNTESTED SHOULD = WARNING.
-10. **Step 8b -- Drift Summary:** Read `state.yaml.decisions:` (schema in `_shared/persistence-contract.md`). For each entry with `phase` and `task_ref`, write one row in the Drift Summary table (Phase / Task ref / Decision / Reason / Evidence / Commits) -- these are approved drift, not scope creep. Security-override entries (`task_ref: "security-override"`) reference finding IDs in the audit artifact -- carry verbatim. Unaccounted drift (diff files not in tasks.md and not in any `decisions:` entry) = WARNING.
-11. AC coverage: for each AC, combine static (Step 7) and behavioral (Step 9) verdicts. COVERED = all traced reqs Implemented + Compliant. PARTIAL = some gaps. NOT COVERED = missing or failing. Report in `| AC | Status | Evidence |` table.
-12. Overall verdict: FAIL if any CRITICAL. PASS WITH WARNINGS if warnings only. PASS if zero findings.
-13. Write `verification-report.md` per [references/report-format.md](references/report-format.md).
-14. Update `state.yaml`: `phases.verify.status → done`, `phases.verify.completed → ISO 8601`, `phases.verify.agent → sdd-verify`, `current_phase → verify`, `updated → now`. Return envelope per [references/envelope-examples.md](references/envelope-examples.md).
+9. Behavioral compliance per group: cross-reference every spec scenario against Step 5 test results. COMPLIANT = test exists AND passed. FAILING = test failed = CRITICAL. UNTESTED MUST = CRITICAL (WARNING if no test infra). UNTESTED SHOULD = WARNING. Produce per-group results for Step 11.
+10. **Step 8b -- Drift Summary:** Read `state.yaml.decisions:`. For each entry with `phase` and `task_ref`, write one row in the Drift Summary table -- these are approved drift, not scope creep. Unaccounted drift (diff files not in tasks.md and not in any `decisions:` entry) = WARNING. See [references/report-format.md](references/report-format.md) "Absorbed Checks Summary" subsection.
+11. **Spec Compliance Matrix (REQ-VERIFY-006):** When tasks.md has >1 group, build a per-group matrix. For each group G{N}: collect all REQ-IDs covered by tasks in that group; for each REQ-ID, find its Given/When/Then scenarios in the delta spec; assign verdict {COMPLIANT | FAILING | UNTESTED | PARTIAL}. Format per [references/report-format.md](references/report-format.md) "Spec Compliance Matrix" section.
+12. AC coverage: for each AC, combine static (Step 7) and behavioral (Step 9) verdicts. COVERED = all traced reqs Implemented + Compliant. PARTIAL = some gaps. NOT COVERED = missing or failing. Report in `| AC | Status | Evidence |` table.
+13. **failure_class composition (REQ-VERIFY-003):** For each failed group, assign exactly one class using priority order:
+    - `spec_gap` — any MUST scenario UNTESTED in the group (spec decomposition incomplete)
+    - `test_contract` — any FAILING where the test assertion disagrees with the spec (not the code)
+    - `implementation` — any FAILING where the code fails a correct test
+    - `null` — no failures in this group (PASS)
+14. Overall verdict: FAIL if any CRITICAL. PASS WITH WARNINGS if warnings only. PASS if zero findings.
+15. Write `verification-report.md` per [references/report-format.md](references/report-format.md). Include: Spec Compliance Matrix (per-group), Re-engage Routing Hint (failure_class + failed_groups + rationale), Absorbed Checks Summary, Drift Summary.
+16. Update `state.yaml`: `phases.verify.status → done`, `phases.verify.completed → ISO 8601`, `phases.verify.agent → sdd-verify`, `current_phase → verify`, `updated → now`. Return envelope per [references/envelope-examples.md](references/envelope-examples.md).
 
 ## Output Contract
 
-Write `.ai-team/changes/{change}/verification-report.md`. Update `state.yaml` (`phases.verify.status → done`, `completed`, `agent`, `current_phase → verify`, `updated`). Return a result envelope with `status`, `executive_summary`, `artifacts`, `next_recommended`, `risks` (if any), `model_used`, `context_resolution`.
+Write `.ai-team/changes/{change}/verification-report.md`. Update `state.yaml`. Return a result envelope with `status`, `executive_summary`, `artifacts`, `failure_class` (null or one of {implementation | test_contract | spec_gap}), `failed_groups` (list of group IDs), `next_recommended`, `risks` (if any), `model_used`, `context_resolution`.
 
 ## References
 
-- [references/report-format.md](references/report-format.md) — full verification-report template (Summary table, AC Coverage, Static Correctness, Behavioral Compliance, Drift Summary, Issues, Verdict); load at Step 13.
-- [references/envelope-examples.md](references/envelope-examples.md) — PASS, PASS WITH WARNINGS, FAIL, Blocked envelope variants; load at Step 14.
+- [references/report-format.md](references/report-format.md) — full verification-report template including Spec Compliance Matrix, Absorbed Checks Summary, Re-engage Routing Hint sections; load at Step 15.
+- [references/envelope-examples.md](references/envelope-examples.md) — PASS, PASS WITH WARNINGS, FAIL, Blocked envelope variants; load at Step 16.
 - [references/edge-cases.md](references/edge-cases.md) — Apply Partially Failed, No Tests, No Delta Specs, Large Codebase, Compilation Passes But Code Wrong, Resumed Verification, Verify Commands Missing, Design Missing; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
 - `../_shared/persistence-contract.md` — write rules, `decisions:` schema; load at Step 1.
-- `../_shared/result-envelope.md` — envelope schema; load at Step 14.
-- `../_shared/evidence-protocol.md` — Rules 1-5 (Rule 3 governs real-command execution).
+- `../_shared/result-envelope.md` — envelope schema; load at Step 16.
+- `../_shared/evidence-protocol.md` — Rules 1-6 (Rule 3 governs real-command execution; Rule 6 governs orchestrator post-apply audit handoff).
+- `../_shared/common-rules.md` — consolidated principles; Logical group definition for per-group matrix.
 - `../_shared/spec-convention.md` — REQ-ID format, RFC 2119 keywords; load at Step 7.
