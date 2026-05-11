@@ -11,13 +11,11 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 
 ## Hard Rules
 
-- Read application code; never modify it.
-- Write only `.ai-team/changes/{change-name}/design.md` (plus `state.yaml` update).
+- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
 - Follow existing project patterns — if the project uses repository pattern, use it. Don't introduce paradigms the proposal doesn't call for.
 - Name actual files, classes, interfaces, and methods. Abstract descriptions are not accepted.
 - Evidence > Assumption: every framework or project-behavior claim MUST cite a config line or existing caller. See `_shared/evidence-protocol.md`.
 - If any design decision cites a sibling repo as the pattern source, apply Evidence Protocol Rule 5 before finalizing — verify all 5 axes (build topology, dependency layout, framework version, runtime topology, environment scope).
-- Result envelope always.
 
 ## Decision Gates
 

@@ -11,12 +11,12 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
 
 ## Hard Rules
 
-- Read application code; never write or modify it. Write only to `.ai-team/changes/{change}/`.
+- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Security artifacts write only to `.ai-team/changes/{change}/` (threat-model.md or audit-report.md). No other paths.
 - Every finding cites `file:line` per Evidence Protocol Rule 1. No citation = suppress and tally.
 - Confidence threshold > 80%. Suppress uncertain findings; tally every suppression. False positives are worse than missed low-confidence findings.
 - Severity vocabulary: `CRITICAL` / `WARNING` / `SUGGESTION` only. Never use HIGH / MEDIUM / LOW.
 - Report findings; never fix them. The orchestrator owns the override decision.
-- Return the result envelope always — even on `status: blocked`. The orchestrator cannot continue without it.
 - `security_requirements:` block is populated only for `threat-model` mode. For `code-audit`: `security_requirements: []`.
 
 ## Decision Gates
