@@ -92,45 +92,13 @@ Before the **spec phase**, check if a base spec exists for each domain affected 
 
 ## Fast-Forward Workflow
 
-`/ai-team ff <change-name>` chains the planning phases (propose → spec → design → tasks) into a single invocation. Conceptually equivalent to running `/ai-team new <name>` followed by `/ai-team continue` until tasks completes. Apply, verify and archive are out of scope and still require explicit `/ai-team continue`.
+`/ai-team ff <change-name>` chains the planning phases (propose → spec → design → tasks) into a single invocation. Apply, verify, and archive still require explicit `/ai-team continue`.
 
-### Sequence
+**Sequence:** Auto-Init → propose → proposal-approval gate → spec (skipped if infra short-path) → security threat-model gate (if `security_touchpoints` non-empty) → design → tasks → Stop (report summary; do NOT continue into apply).
 
-1. Auto-Init (per the section above) if `.ai-team/config.yaml` is missing.
-2. Delegate to `sdd-propose`.
-3. **Proposal approval gate (blocking)** — same behavior as the standard path. Pause, present the proposal, wait for user approval. Honour the infra short-path (skip-spec) if `change_type: infra`.
-4. Delegate to `sdd-spec` (skipped if the user took the infra short-path).
-5. **Security threat-model gate (blocking, conditional)** — fires only if the proposal envelope reports `security_touchpoints: [...]` non-empty. Same delegation contract as the standard path.
-6. Delegate to `sdd-design`.
-7. Delegate to `sdd-tasks`.
-8. Stop. Report final summary. Do NOT continue into apply.
+**Mode:** ask once per session: `auto` (back-to-back, pause only at gates) or `interactive` (default — pause after each phase, show summary, ask "Continue?"). On any `needs_input` or failure: FF aborts; report which phase stopped and what to do next.
 
-### Execution mode
-
-On the first `/ai-team ff` invocation in a session, ask the user which mode to use and cache the answer for the rest of the session (do not ask again unless the user explicitly changes it):
-
-- **`auto`** — runs phases back-to-back. Pauses ONLY at blocking gates (proposal approval, security threat-model). Reports a single combined summary with the four phase outputs at the end.
-- **`interactive`** (default) — after each phase completes, show a concise summary of what the phase produced + what the next phase will do, then ask "¿Continuamos?" / "Continue?". Accept yes / no / specific feedback. If feedback is given, incorporate it before launching the next phase.
-
-If the user does not specify, default to `interactive` (safer; gives the user control).
-
-### Behavior at blocking gates
-
-In both modes the orchestrator pauses at every blocking gate:
-
-- **Proposal approval**: pause, present the proposal, wait for OK. On rejection or cancel, FF aborts; report where it stopped.
-- **Security threat-model** (only if `security_touchpoints` non-empty): pause, present findings, wait for OK. On cancel, FF aborts and writes `state.yaml.blocked: true` with `blocked_reason` listing the finding IDs (same as the standard path).
-
-### Failure / `needs_input`
-
-If any phase returns `status: needs_input` or fails, FF aborts immediately. Report:
-- Which phase stopped the FF.
-- The phase's reason (`needs_input` questions or error).
-- What the user can do next (`/ai-team continue` once resolved, or restart with adjusted inputs).
-
-### Note on sub-agent contract
-
-`execution_mode` is an orchestrator concern only — it controls whether the orchestrator pauses between phases. Sub-agents do NOT receive this flag; their contract (Critical Context Forwarding) is unchanged. Each phase still runs end-to-end and returns its envelope; the orchestrator decides whether to launch the next phase immediately (auto) or pause for user feedback (interactive).
+**Sub-agent contract:** `execution_mode` is an orchestrator concern only. Sub-agents do NOT receive this flag; they run end-to-end and return their envelope regardless of mode.
 
 ## Approval Gates
 
@@ -235,55 +203,56 @@ When `change_type: infra` AND `security_touchpoints` non-empty:
 - Route `security_requirements` into the design phase delegation prompt (not spec, which is skipped).
 - Design incorporates them as constraint sections; tasks reads them from design.md.
 
-## Post-Apply Independent Audit
+## Re-engage Routing on failure_class
 
-After `sdd-apply` returns its envelope, the orchestrator runs an independent audit BEFORE advancing to security:code-audit (conditional) or verify. This materialises Evidence Protocol Rule 6.
+When sdd-verify returns a non-null `failure_class`, route as follows:
 
-**Skip when:** the change has ≤3 tasks AND zero open questions AND zero cross-cutting decisions. For everything else, mandatory.
+| `failure_class` | Re-engage target | Action |
+|-----------------|-----------------|--------|
+| `implementation` | `sdd-apply` | Code is wrong; test contract is correct; apply fixes the code |
+| `test_contract` | `sdd-tasks` | Test is wrong; tasks re-evaluates the scaffold and AC↔test mapping |
+| `spec_gap` | User (escalate) | Spec ambiguous or AC decomposition incomplete; clarify before re-engaging |
 
-**Mandatory checks (all four):**
+**Max retries:** 3 per logical group. After 3 failed verify attempts on the same group (any failure_class), escalate to user presenting full failure history. Counter resets if the group's verdict changes to PASS.
 
-1. **Diff vs declared scope.** Run `git diff --name-only {apply_base}..HEAD`. Every changed file MUST trace to one of:
-   - A `Files:` block in `tasks.md` (for any task in the phase)
-   - A `path:` field in any `state.yaml.decisions[]` entry with `phase: apply`
-   - The change directory itself (`.ai-team/changes/{change}/...`) or `state.yaml`
+A "re-engage attempt" = each delegation of sdd-apply or sdd-tasks for the same group after verify FAIL.
 
-   Any unaccounted file = scope drift. Surface to user with file list.
+## work-unit-commits Invocation
 
-2. **Resolution coverage.** For each open question recorded in `state.yaml.open_questions[]` AND each cross-cutting decision in `proposal.md` / `design.md`, grep the diff for the resolution keyword or invariant. Example: an OQ resolved as "header X mandatory cross-cutting" must produce diff hits in every domain that handles requests. Zero diff hits for a recorded resolution = silent skip.
+After sdd-verify returns GREEN (PASS or PASS WITH WARNINGS) for a logical group, invoke work-unit-commits:
 
-3. **Audit trail check.** Run `grep -c "phase: apply" {state_yaml}`. Compare to the count of `fix:` or off-plan commits in `git log {apply_base}..HEAD`. If the off-plan commit count > `decisions[]` count for `phase: apply`, the audit trail is incomplete.
+```
+Inject: group_id={G_id}, mode={config.commit_strategy default auto if absent}, change_name={change_name}
+```
 
-4. **Test discovery sanity.** Compare baseline test count (from `baseline.md`) to the count reported in the apply envelope. If the diff added N new test files but the global counter grew by far less than N test cases, suspect dormant tests (runner discovery glob misconfigured for the directory where the files landed).
+- Invoke ONLY after verify GREEN; never after FAIL.
+- Read `commit_strategy` from `.ai-team/config.yaml`; default `auto` if field absent.
+- `tasks_in_group` is derived by work-unit-commits from tasks.md; do NOT inject it.
+- Model: sonnet.
 
-**On any failure**: do NOT advance to the next phase. Re-engage `sdd-apply` with an enumerated gap list (`Gap 1/N: …`, `Gap 2/N: …`) and explicit success criteria per gap. Log the re-engagement in `state.yaml.decisions[]` with `phase: apply`, `task_ref: post-apply-audit-gap`, `summary:` describing the gaps.
+## Post-Apply Independent Audit (Thin Red-Network)
 
-**On all-pass**: advance to security:code-audit (if `security_touchpoints` non-empty) or to verify.
+After sdd-apply completes, run the four structural greps from REQ-VERIFY-004:
+- Check 1: `git diff --name-only HEAD` vs tasks.md Files: blocks (undeclared files → WARNING)
+- Check 2: grep decisions[].decision tokens against diff (zero hits → WARNING)
+- Check 3: count decisions[] apply entries vs fix: commits (fix-commits > entries → WARNING)
+- Check 4: count new *.spec.{ext} files vs test count delta (discrepancy → WARNING)
 
-**Why this lives in the orchestrator and not in `sdd-apply`:** the apply sub-agent self-reports. Sub-agent self-reports have failed in practice — silent OQ skips, unlogged decisions, dormant tests. The orchestrator holds the full plan (proposal + spec + design + tasks + state) and can grep-check independently. This audit is the single non-negotiable crosscheck between apply and downstream phases.
+On agreement with sdd-apply's envelope: delegate sdd-verify normally.
+On any discrepancy: present WARNING to user ("Pre-verify audit found: {finding}. sdd-verify will rule authoritatively."). Then delegate sdd-verify regardless — it provides the authoritative ruling.
+
+This audit MUST NOT block verify delegation. sdd-verify runs the same four checks authoritatively (REQ-VERIFY-004).
 
 ## Plan Mode (NOT used inside the SDD pipeline)
 
-**Plan mode is NOT entered during the SDD pipeline.** The pipeline's own approval gates (proposal approval after propose, apply approval after tasks) are sufficient to prevent unintended changes.
+**Plan mode is NOT entered during the SDD pipeline.** The pipeline's own approval gates are sufficient.
 
-### Why plan mode is off for SDD
-
-- **The pipeline gates already protect against unintended changes**: propose-approval before any spec/design work, apply-approval before any code is written. Adding plan mode on top is redundant.
-- **Harness bug**: in the real Claude Code harness, plan mode propagates to delegated sub-agents. A sub-agent launched while the orchestrator is in plan mode cannot write artifacts — it silently stages everything in its own plan file. This was observed in ECO-944 (propose 1st run wasted ~86k tokens on a blocked write).
-- **The adapter's classification gate still uses plan mode for Medium and Large-declines-SDD tasks** — it's only inside the SDD pipeline that plan mode is avoided.
-
-### Orchestrator flow for SDD
-
-1. Classification gate triggers Large → user chooses SDD (plan mode may be active at this point from the classification gate — see adapter CLAUDE.md)
+**Orchestrator flow for SDD:**
+1. Classification gate triggers Large → user chooses SDD (plan mode may be active at this point)
 2. **Exit plan mode** (`ExitPlanMode`) as soon as the user confirms SDD
-3. Run auto-init if needed (creates `.ai-team/` dirs)
-4. Run health check (see next section)
-5. Delegate propose → approval gate → delegate spec + design in parallel → delegate tasks → approval gate → delegate apply → delegate verify → delegate archive
-6. No plan mode at any point in this flow
+3. Run auto-init → health check → delegate phases per Dependency Graph → no plan mode at any point
 
-### When the orchestrator might still edit code during SDD
-
-In practice, almost never. The orchestrator coordinates — it delegates all writes to sub-agents. If the user explicitly asks for an inline edit during SDD (e.g., "just fix this typo real quick"), the orchestrator can do it without plan mode. The pipeline gates still protect the larger artifacts.
+**When the orchestrator might still edit code:** the user explicitly requests an inline edit during SDD. The orchestrator can do it without plan mode. The pipeline gates still protect the larger artifacts.
 
 ## Health Check (before propose)
 
@@ -305,36 +274,7 @@ Before delegating to `sdd-propose` on `/ai-team new`, establish a test-suite bas
    - Write `.ai-team/changes/{change-name}/baseline.md`
 3. If `test_commands` is missing: skip the health check, note it as a risk in the proposal delegation prompt, and proceed. Do NOT block on missing config — this is a best-effort safety net, not a hard requirement.
 
-### Baseline file format
-
-```markdown
-# Baseline — {change-name}
-
-**Date:** 2026-04-24T10:30:00Z
-**Git HEAD:** {commit-sha}
-**Branch:** {branch-name}
-
-## Test Runs
-
-### unit
-- **Command:** `{command}`
-- **Exit code:** 0
-- **Summary:** 3012 passed, 0 failed, 0 skipped
-- **Duration:** 12s
-
-### integration
-- **Command:** `{command}`
-- **Exit code:** 1
-- **Summary:** 200 passed, 23 failed (DoctrineSignatureRepository — pre-existing, column `metadata` missing)
-- **Duration:** 180s
-- **Failures (top 5):**
-  - `...::testFoo` — `column metadata does not exist`
-  - ...
-
-## Notes
-
-- 23 integration failures pre-exist on this branch (unrelated to this change). Verify phase should treat these as baseline noise.
-```
+**Baseline file format:** `# Baseline — {change-name}` → `**Date/Git HEAD/Branch**` → `## Test Runs` with one subsection per command (command + exit code + summary + top failures if any). Include a `## Notes` section for pre-existing failures. sdd-verify reads this to exclude pre-existing failures from regression counts.
 
 ### How verify uses the baseline
 
@@ -369,6 +309,7 @@ Read this table at session start, cache it, and pass the model in every `Agent()
 | sdd-archive | haiku | Copy and close |
 | sdd-security (threat-model) | opus   | Architectural reasoning across the proposal surface |
 | sdd-security (code-audit)   | sonnet | Pattern matching over the diff |
+| work-unit-commits | sonnet | — |
 | default | sonnet | Non-SDD general delegation |
 
 ### Project Override
@@ -379,54 +320,14 @@ Check `.ai-team/config.yaml` for `model_overrides` -- project-level overrides ta
 
 IMPORTANT: Always use `subagent_type: "general-purpose"`. Do NOT invent custom subagent types like "sdd-propose" — they don't exist and will error.
 
-When delegating to an SDD phase sub-agent:
+**Delegation pattern (applies to every SDD phase):**
+1. Read `skills/sdd-{phase}/SKILL.md` yourself (the orchestrator reads it; sub-agents do NOT search for skill files).
+2. Read the shared protocols yourself.
+3. Inject both as text into the `Agent()` prompt. Sub-agents receive instructions inline.
+4. Inject `references_dir: domain/skills/sdd-{phase}/references/` — the sub-agent reads reference files on demand; the orchestrator does NOT paste them inline.
+5. If `strict_tdd: true` and the phase is `apply` or `verify`, append: "STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. Follow red → green → triangulate → refactor."
 
-1. Read `skills/sdd-{phase}/SKILL.md` yourself
-2. Read the shared protocols yourself
-3. Inject both as text into the prompt — sub-agents receive instructions inline, they do NOT read skill files
-
-Sub-agents now use a `## References` section in their SKILL.md to point at extracted material under `domain/skills/sdd-{phase}/references/`. The orchestrator does NOT paste these reference files inline — it injects the directory path (`references_dir:` in the Critical Context Forwarding block) and the sub-agent reads the relevant files on demand during execution. This keeps delegation prompts compact and lets the model load templates only when a step explicitly needs them.
-
-```
-Agent({
-  description: "sdd-{phase}: {brief task description}",
-  subagent_type: "general-purpose",
-  model: "{resolved-model}",
-  prompt: `
-You are the sdd-{phase} executor.
-Do this phase's work yourself. Do NOT delegate or launch sub-agents.
-Do NOT search for SKILL.md files or skill registries — your instructions are below.
-
-## Injected Context (from orchestrator)
-{populate per Critical Context Forwarding table — change_name, change_dir, model_alias, plus phase-specific flags and paths}
-
-## Instructions
-{paste contents of skills/sdd-{phase}/SKILL.md here}
-
-## Shared Protocols
-{paste contents of skills/_shared/context-protocol.md}
-{paste contents of skills/_shared/persistence-contract.md}
-{paste contents of skills/_shared/result-envelope.md}
-{paste contents of skills/_shared/spec-convention.md}
-{paste contents of skills/_shared/evidence-protocol.md}
-
-## Task
-{Clear description of what to do — references the paths from Injected Context, does not re-list them}
-
-## Constraints
-{Project-specific constraints or user preferences}
-
-## Project Root
-{absolute path to target project}
-
-## Expected Output
-Return a result envelope per the Result Envelope protocol above.
-Include model_used: "{resolved-model}" and context_resolution in the envelope metadata.
-`
-})
-```
-
-If `strict_tdd: true` and the phase is `apply` or `verify`, append the literal "STRICT TDD MODE IS ACTIVE..." instruction (see Critical Context Forwarding) at the end of the prompt.
+**Prompt structure:** `You are the sdd-{phase} executor. Do this phase's work yourself. Do NOT delegate.` → `## Injected Context` (per Critical Context Forwarding table) → `## Instructions` (SKILL.md contents) → `## Shared Protocols` (context-protocol, persistence-contract, result-envelope, spec-convention, evidence-protocol) → `## Task` (what to do) → `## Project Root` (absolute path) → `## Expected Output` (result envelope with `model_used` and `context_resolution`).
 
 ### Critical Context Forwarding
 
@@ -450,175 +351,38 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `security_touchpoints` | `sdd-propose` envelope (list of touchpoint slugs; empty list = not sensitive) | every phase after propose | once propose has run |
 | `references_dir` | `domain/skills/sdd-{phase}/references/` (literal — not project-relative) | every phase | always |
 | `current_iso_utc` | `date -u +%Y-%m-%dT%H:%M:%SZ` (orchestrator at delegation time) | every phase that writes `state.yaml` | always |
+| `group_id` | tasks.md (the just-passed group) | work-unit-commits | always when invoking work-unit-commits |
+| `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
 
-Inject as a labelled block at the top of the delegation prompt:
+Inject all fields from the table above as a `## Injected Context (from orchestrator)` block at the top of the delegation prompt. The sub-agent treats this block as the source of truth for paths and flags — it does NOT re-derive them from disk.
 
-```
-## Injected Context (from orchestrator)
-change_name: oauth-login
-change_dir: .ai-team/changes/oauth-login
-model_alias: sonnet
-change_type: feature
-skip_spec: false
-proposal_path: .ai-team/changes/oauth-login/proposal.md
-spec_paths:
-  - .ai-team/changes/oauth-login/specs/auth/spec.md
-design_path: .ai-team/changes/oauth-login/design.md
-tasks_path: .ai-team/changes/oauth-login/tasks.md
-baseline_path: .ai-team/changes/oauth-login/baseline.md
-strict_tdd: false
-security_touchpoints: ["auth/authz", "crypto"]   # or [] for non-sensitive
-references_dir: domain/skills/sdd-design/references/
-current_iso_utc: 2026-05-10T15:23:00Z
-```
-
-The sub-agent treats this block as the source of truth for paths and flags. It does NOT re-derive them from disk unless explicitly told to.
-
-**Strict TDD example** — when `strict_tdd: true`, also append a literal instruction to apply/verify prompts:
-
-> STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. You MUST follow the strict-tdd module: red → green → triangulate → refactor. Do NOT fall back to standard mode.
-
-This is non-negotiable. Do not rely on the sub-agent to discover the flag by reading config — inject it.
+When `strict_tdd: true`, append to apply/verify prompts: "STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. Follow red → green → triangulate → refactor."
 
 ### Context Resolution Feedback
 
-Every result envelope includes `context_resolution: injected | fallback | none`. The orchestrator MUST inspect this field after every delegation:
-
-| Reported value | Orchestrator action |
-|----------------|---------------------|
-| `injected` | Healthy. Continue. |
-| `none` | No signal (context-light phase, e.g. scout bootstrap). Continue. |
-| `fallback` | **Cache miss detected.** The Critical Context Forwarding block was incomplete or absent — likely cause: prior context compaction. |
-
-When `fallback` is reported:
-
-1. Re-read `.ai-team/changes/{change_name}/state.yaml` and any envelopes from prior phases stored under `.ai-team/changes/{change_name}/envelopes/` (if present).
-2. Rebuild the cached flag set from scratch (Critical Context Forwarding table).
-3. Inject the rebuilt block in **all subsequent delegations** for this session.
-4. Surface a single warning to the user: `"Detected cache miss in {phase} (context_resolution: fallback) — reloaded session state. Subsequent phases will run with full context."`
-
-This is a self-healing mechanism. Do NOT ignore `fallback` — silent degradation is exactly what this loop is designed to prevent.
+Every result envelope includes `context_resolution: injected | fallback | none`. On `fallback`: re-read `state.yaml` and prior phase envelopes, rebuild the flag cache from the Critical Context Forwarding table, and inject the rebuilt block in all subsequent delegations. Surface one warning: `"Detected cache miss in {phase} — reloaded session state."` Never ignore `fallback` — silent degradation is exactly what this loop prevents.
 
 ### Non-SDD Delegation
 
-For medium tasks that benefit from delegation but don't warrant full SDD:
-
-- Use `model: "sonnet"` (the default tier)
-- Include relevant project context (`.ai-team/config.yaml`, applicable skills)
-- Give clear instructions on what to do and what files to touch
-- Request a brief result summary, not a full envelope
-
-```
-Agent({
-  description: "{brief task description}",
-  subagent_type: "general-purpose",
-  model: "sonnet",
-  prompt: `
-{Clear task description with file paths and expected outcome}
-
-## Project Context
-{Relevant config, conventions, constraints}
-
-When done, report: what you changed, what you tested, any issues found.
-Include model_used in your response.
-`
-})
-```
+For medium tasks that benefit from delegation but don't warrant full SDD: use `model: sonnet`, include relevant project context (config.yaml, applicable skills), give clear file-path instructions, and request a brief summary (not a full envelope).
 
 ### Delegating to sdd-security
 
-When invoking the security gate, set `mode:` in the Injected Context block.
+Use the standard delegation pattern (see above) with the following sdd-security-specific Injected Context fields:
 
-**For threat-model** — invoke after proposal approval, before spec/design:
-
+**threat-model** (after proposal approval, before spec/design — model: opus):
 ```
-Agent({
-  description: "sdd-security: threat-model for {change-name}",
-  subagent_type: "general-purpose",
-  model: "opus",
-  prompt: `
-You are the sdd-security executor.
-Do this phase's work yourself. Do NOT delegate or launch sub-agents.
-Do NOT search for SKILL.md files or skill registries — your full instructions are pasted inline.
-
-## Injected Context (from orchestrator)
-change_name: {name}
-change_dir: .ai-team/changes/{name}
-model_alias: opus
 mode: threat-model
 proposal_path: .ai-team/changes/{name}/proposal.md
-project_root: {abs-path}
-security_touchpoints:
-  - {slug}
-  - {slug}
-
-## Instructions
-{paste skills/sdd-security/SKILL.md}
-
-## Shared Protocols
-{paste context-protocol.md, persistence-contract.md, result-envelope.md, spec-convention.md, evidence-protocol.md}
-
-## Task
-Run mode threat-model. Read the proposal at proposal_path. For each touchpoint in security_touchpoints,
-walk the codebase to identify security-relevant surfaces. Apply the 5-category audit prompt. Produce
-threat-model.md and the security_requirements: block in the envelope.
-
-## Project Root
-{abs-path}
-
-## Expected Output
-Result envelope per result-envelope.md plus the sdd-security extensions (mode, findings, security_requirements, verdict, suppressed_count).
-  `
-})
+security_touchpoints: [{slug}, ...]
 ```
 
-**For code-audit** — invoke after apply, before verify:
-
+**code-audit** (after apply, before verify — model: sonnet):
 ```
-Agent({
-  description: "sdd-security: code-audit for {change-name}",
-  subagent_type: "general-purpose",
-  model: "sonnet",
-  prompt: `
-You are the sdd-security executor.
-Do this phase's work yourself. Do NOT delegate or launch sub-agents.
-Do NOT search for SKILL.md files or skill registries — your full instructions are pasted inline.
-
-## Injected Context (from orchestrator)
-change_name: {name}
-change_dir: .ai-team/changes/{name}
-model_alias: sonnet
 mode: code-audit
 tasks_path: .ai-team/changes/{name}/tasks.md
-proposal_path: .ai-team/changes/{name}/proposal.md
-project_root: {abs-path}
 change_branch: {branch}
-base_branch: {base}
-
-IMPORTANT — base_branch semantics (DR-10): base_branch MUST be the merge-base of the change branch
-relative to main, NOT simply "main". Use `git merge-base main {change_branch}` to compute it.
-Injecting "main" directly reads the entire history since the branch diverged and inflates the diff scope.
-Compute the merge-base once and pass the resulting SHA as base_branch.
-
-## Instructions
-{paste skills/sdd-security/SKILL.md}
-
-## Shared Protocols
-{paste context-protocol.md, persistence-contract.md, result-envelope.md, spec-convention.md, evidence-protocol.md}
-
-## Task
-Run mode code-audit. Run `git diff {base_branch}..{change_branch}` to identify changed files.
-Read each. Read up to 10 1-hop callers for reachability context. If config.yaml declares
-test_commands.security, invoke it. Apply the 5-category audit prompt to the diff. Produce
-audit-report.md.
-
-## Project Root
-{abs-path}
-
-## Expected Output
-Result envelope per result-envelope.md plus the sdd-security extensions (mode, findings, verdict, suppressed_count).
-  `
-})
+base_branch: {merge-base-sha}   # MUST be git merge-base main {branch}, NOT "main" (DR-10)
 ```
 
 ## Tool Availability by Phase
@@ -628,10 +392,8 @@ Sub-agents inherit Bash from the parent session — they CAN run commands. The h
 The orchestrator forwards the relevant block below as Injected Context when delegating to each phase. Sub-agents reading this contract MUST NOT return `needs_input` on the assumption that Bash is unavailable — they MUST attempt the command first and only escalate on real failure (non-zero exit captured in output).
 
 ### apply
-- Bash: AVAILABLE. Run `pnpm test*`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `git status`, `git diff*` freely.
-- Commit: YOU are responsible. Commit per logical group per Hard Rules. NEVER `git push` (orchestrator handles remote).
+- Bash: AVAILABLE. Run `pnpm test*`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `git status`, `git diff --name-only` freely. NEVER invoke `git commit`, `git add`, `git push`, `git stash`, `git reset`, or `git rm` — work-unit-commits owns commits (REQ-APPLY-021).
 - Destructive: not expected at this phase. If a task requires `rm -rf` or `cp -r` outside the working tree, return `needs_input` listing the exact command and reason.
-- Honesty: if you decide NOT to execute tests/typecheck/lint, return `status: needs_input` with the commands required — do NOT declare `status: ok` without execution output as evidence. Self-reported "all tests passing" without a captured command output is an Evidence Protocol Rule 3 violation.
 
 ### verify
 - Bash: AVAILABLE. Step 5 (test execution) is mandatory and non-skippable.
