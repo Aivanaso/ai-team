@@ -45,6 +45,12 @@ phases:
     status: pending
   apply:
     status: pending
+    progress:
+      "1.1": done           # task-keyed entries (existing)
+      "G1": done            # NEW: group-keyed entries (REQ-WUC-007 cross-ref)
+    commits:                # NEW: per-group commit SHAs (REQ-WUC-007)
+      "G1": "abc1234ef9"    # auto mode
+      "G2": "manual-pending"# manual mode
   verify:
     status: pending
   archive:
@@ -87,7 +93,7 @@ decisions:
 |-------|----------|-------|
 | `date` | Yes | ISO 8601 timestamp |
 | `phase` | Yes | The phase the agent is currently in when it logs. Recognised values: `propose | spec | design | tasks | apply | verify | security-threat-model | security-code-audit` |
-| `task_ref` | Yes | Use the task ID; or one of the recognised non-task identifiers: `"out-of-plan"` (no task ancestor), `"design-pivot"` (overrides a design.md decision), `"security-override"` (user accepted CRITICAL security finding) |
+| `task_ref` | Yes | Use the task ID; or one of the recognised non-task identifiers: `"out-of-plan"` (no task ancestor), `"design-pivot"` (overrides a design.md decision), `"security-override"` (user accepted CRITICAL security finding), `"test-contract-correction"` (sdd-apply corrects a test-orphan per REQ-APPLY-023), `"post-apply-audit-gap"` (orchestrator re-engages after Post-Apply Audit discrepancy per REQ-ORCHESTRATOR-010) |
 | `decision` | Yes | One sentence, what changed |
 | `reason` | Yes | One sentence, why it had to change |
 | `evidence` | Yes | A grep result, command output, file:line, or test failure that triggered the decision. Per Evidence Protocol Rule 1, a hand-wave like "it didn't work" is not evidence |
@@ -160,3 +166,13 @@ Standalone investigations (not part of SDD workflow) go to:
 ```
 
 These have no phase tracking — they're one-shot research artifacts.
+
+### Backward compatibility (additive — sdd-redesign-v2)
+
+The following fields were added in sdd-redesign-v2 without breaking older state.yaml files. Parsers MUST tolerate missing values:
+
+- `phases.apply.progress[{group_id}]` — `done` when a group completed; absent for groups not yet completed or for runs that pre-date this SDD.
+- `phases.apply.commits[{group_id}]` — commit SHA (auto mode) or the literal `"manual-pending"` (manual mode); absent if work-unit-commits has not yet run for this group.
+- `decisions[].task_ref` values `"test-contract-correction"` (REQ-APPLY-023) and `"post-apply-audit-gap"` (REQ-ORCHESTRATOR-010 / Rule 6) are now recognised.
+
+Old runs that wrote state.yaml without these fields continue to be readable by sdd-verify, sdd-archive, and the orchestrator. No migration is required.
