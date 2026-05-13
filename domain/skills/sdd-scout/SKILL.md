@@ -11,7 +11,7 @@ Run when the orchestrator launches scout at the start of a new SDD change or on 
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Bootstrap: do not overwrite an existing `config.yaml` — return `status: blocked` if it exists.
 - Baseline: document what the code **actually does**, not what you think it should.
 - Bootstrap writes a `commit_strategy: auto` field at the root of generated `config.yaml`. Existing configs without the field are valid (backward-compatible default).

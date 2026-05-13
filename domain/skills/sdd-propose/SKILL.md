@@ -11,7 +11,7 @@ Run when the orchestrator launches the propose phase for a new SDD change. Produ
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Proposal is strategic, not technical: no file names, no class designs, no schemas in the Approach section.
 - Ground every claim in user input or code analysis. No hallucinated features.
 - Surface conflicts, never silently resolve them. For open questions, always include a grounded recommendation.

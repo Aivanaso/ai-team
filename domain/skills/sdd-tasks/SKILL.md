@@ -11,7 +11,7 @@ Run when the orchestrator launches the tasks phase for an SDD change. Produces `
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Decompose, don't redesign. Flag disagreements as risks; do NOT alter interfaces or add components beyond what design.md specifies.
 - Every task must leave the codebase compilable (or in the meta-project case: leave the framework files in a valid SKILL.md structure).
 - Embed enough context in each task that sdd-apply does not need to re-read the full design.

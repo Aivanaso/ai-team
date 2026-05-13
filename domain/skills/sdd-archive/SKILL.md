@@ -11,7 +11,7 @@ Run when the orchestrator launches the archive phase for an SDD change whose ver
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Run only after verify reports `done` with verdict PASS or PASS WITH WARNINGS; otherwise return `status: blocked`.
 - Apply the merge algorithm exactly: ADDED appends, MODIFIED replaces, REMOVED deletes. No creative interpretation.
 - Copy to archive BEFORE deleting the active change directory. If copy fails, abort.

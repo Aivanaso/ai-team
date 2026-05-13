@@ -11,7 +11,7 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Security artifacts write only to `.ai-team/changes/{change}/` (threat-model.md or audit-report.md). No other paths.
 - Every finding cites `file:line` per Evidence Protocol Rule 1. No citation = suppress and tally.
 - Confidence threshold > 80%. Suppress uncertain findings; tally every suppression. False positives are worse than missed low-confidence findings.

@@ -11,7 +11,7 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Follow existing project patterns — if the project uses repository pattern, use it. Don't introduce paradigms the proposal doesn't call for.
 - Name actual files, classes, interfaces, and methods. Abstract descriptions are not accepted.
 - Evidence > Assumption: every framework or project-behavior claim MUST cite a config line or existing caller. See `_shared/evidence-protocol.md`.

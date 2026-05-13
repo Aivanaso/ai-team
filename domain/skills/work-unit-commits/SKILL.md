@@ -11,7 +11,7 @@ Run when the orchestrator invokes after sdd-verify returns GREEN (PASS or PASS W
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Activate only on orchestrator invocation after verify GREEN (REQ-WUC-001).
 - Stage declared files only — NEVER `git add .` or `git add -A`. Each declared file is staged individually with `git add {file}` (REQ-WUC-006).
 - Resolve mode from `.ai-team/config.yaml.commit_strategy`; if missing, default auto and surface a WARNING (REQ-WUC-002).

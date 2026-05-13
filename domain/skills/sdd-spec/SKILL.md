@@ -11,7 +11,7 @@ Run when the orchestrator launches the spec phase for an SDD change after the pr
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - One delta spec per affected domain — no cross-domain blending.
 - Every requirement MUST trace to a proposal AC via `**Source:** AC-{N}`. No orphans.
 - Use RFC 2119 keywords (`MUST`, `SHOULD`, `MAY`, `MUST NOT`) for priority fields — no synonyms.
