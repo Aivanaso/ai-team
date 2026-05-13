@@ -65,7 +65,7 @@ decisions: []          # Mid-flight decision log (see below)
 
 ### `decisions:` — Mid-Flight Decision Log
 
-When apply or verify discovers something that requires a deviation from the approved plan (a fix outside `tasks.md`, a pivot from `design.md`, a new dependency, a structural change), the agent MUST append an entry to `state.yaml.decisions:` BEFORE committing the change. This preserves the audit trail across phases — without it, sdd-verify cannot tell legitimate drift from scope creep, and archive ends with documentation that does not match what shipped.
+When the SDD pipeline records a deviation from the approved plan (a fix outside `tasks.md`, a design pivot, a new dependency, a structural change, a security override, or an approved drift surfaced by Post-Apply Audit), the **orchestrator** appends an entry to `state.yaml.decisions:`. Sub-agents that detect a deviation MUST signal it via the result envelope (apply via `deviation_report`; verify via `failure_class` + Drift Summary); they MUST NOT author `decisions[]` entries. The orchestrator is the exclusive sub-agent-side writer.
 
 **Schema** (each entry is a list item):
 
@@ -92,22 +92,34 @@ decisions:
 | Field | Required | Notes |
 |-------|----------|-------|
 | `date` | Yes | ISO 8601 timestamp |
-| `phase` | Yes | The phase the agent is currently in when it logs. Recognised values: `propose | spec | design | tasks | apply | verify | security-threat-model | security-code-audit` |
-| `task_ref` | Yes | Use the task ID; or one of the recognised non-task identifiers: `"out-of-plan"` (no task ancestor), `"design-pivot"` (overrides a design.md decision), `"security-override"` (user accepted CRITICAL security finding), `"test-contract-correction"` (sdd-apply corrects a test-orphan per REQ-APPLY-023), `"post-apply-audit-gap"` (orchestrator re-engages after Post-Apply Audit discrepancy per REQ-ORCHESTRATOR-010) |
+| `phase` | Yes | The phase the agent is currently in when it logs. Recognised values: `propose | spec | design | tasks | apply | verify | security-threat-model | security-code-audit | orchestrator`. Going forward, only the orchestrator authors entries; new SDDs use `phase: orchestrator` for orchestrator-authored entries. Legacy archived entries with `phase: apply` or `phase: spec` remain valid; readers (verify, archive) parse them without error. |
+| `task_ref` | Yes | Use the task ID; or one of the recognised non-task identifiers: `"out-of-plan"` (no task ancestor), `"design-pivot"` (overrides a design.md decision), `"security-override"` (user accepted CRITICAL security finding), `"test-contract-correction"` (legacy-recognised, no new writes — new SDDs use `test-orphan-re-engage`), `"test-orphan-re-engage"` (orchestrator-authored when re-engaging sdd-tasks on apply's `deviation_report.kind: test-orphan`), `"post-apply-audit-gap"` (orchestrator re-engages after Post-Apply Audit discrepancy per REQ-ORCHESTRATOR-010) |
 | `decision` | Yes | One sentence, what changed |
 | `reason` | Yes | One sentence, why it had to change |
 | `evidence` | Yes | A grep result, command output, file:line, or test failure that triggered the decision. Per Evidence Protocol Rule 1, a hand-wave like "it didn't work" is not evidence |
 | `commits` | No | SHA list, populated after the fix lands. Empty list is fine when logging before commit |
 
+### Writer Set (exclusive — sub-agent boundary)
+
+`decisions[]` entries are authored by exactly two parties:
+
+| Writer | Triggers | task_ref values used |
+|--------|----------|----------------------|
+| **Orchestrator** (in-session, per Post-Apply Audit and re-engage protocols) | (a) Post-Apply Audit Check 1/2/3/4 discrepancy (Rule 6); (b) apply returns blocked with `deviation_report.kind: out-of-plan` and orchestrator approves drift; (c) apply returns blocked with `deviation_report.kind: design-pivot` and orchestrator re-engages design; (d) apply returns blocked with `deviation_report.kind: test-orphan` and orchestrator re-engages tasks; (e) Post-Apply Audit Check 5 failure → re-engage apply | `post-apply-audit-gap`, `out-of-plan`, `design-pivot`, `test-orphan-re-engage` |
+| **User** (via orchestrator at approval gates) | (a) Security gate "Accept and proceed" override on CRITICAL finding; (b) skip-spec confirmation logged in `phases.spec.skip_reason`, NOT decisions[]; (c) Drift acceptance during a verify warning | `security-override` |
+
+**Sub-agents MUST NOT write decisions[] directly.** Apply signals deviations via the envelope's `deviation_report` block (REQ-APPLY-023 reformulated). Verify signals drift via the Drift Summary table and via the envelope's `failure_class`. work-unit-commits BACKFILLS commit SHA into existing entries (REQ-WUC-003 step 5) but does NOT create entries.
+
 **When to write a decision entry:**
 
-- A `fix:` commit during apply that was not in `tasks.md`.
-- A change to design assumptions discovered during apply (e.g., "compiler pass approach blocked by autowiring quirk, switching to manual array").
-- A new dependency added during apply that the proposal did not list.
-- A design-document deviation surfaced by verify (the report references the entry instead of generating one).
+- A deviation from `tasks.md` approved by the orchestrator (after reviewing apply's `deviation_report`).
+- A design assumption override approved by the orchestrator (after reviewing apply's `deviation_report.kind: design-pivot`).
+- A new dependency or infra change approved during re-engage.
+- A design-document deviation surfaced by verify's Drift Summary and approved by the orchestrator.
 
 **When NOT to write a decision entry:**
 
+- Sub-agents (propose, spec, design, tasks, apply, verify, work-unit-commits, sdd-security executions) MUST NOT write decisions[] entries directly. apply surfaces blocks via `deviation_report`; verify surfaces drift via the Drift Summary table; the orchestrator translates these into `decisions[]` entries.
 - Trivial typo fixes inside the scope of an existing task.
 - Test-only adjustments that don't change production behavior.
 - Refactoring the agent does within a single task to keep code readable.
@@ -176,3 +188,5 @@ The following fields were added in sdd-redesign-v2 without breaking older state.
 - `decisions[].task_ref` values `"test-contract-correction"` (REQ-APPLY-023) and `"post-apply-audit-gap"` (REQ-ORCHESTRATOR-010 / Rule 6) are now recognised.
 
 Old runs that wrote state.yaml without these fields continue to be readable by sdd-verify, sdd-archive, and the orchestrator. No migration is required.
+
+As of sdd-redesign apply-junior, `decisions[].task_ref` value `"test-orphan-re-engage"` (orchestrator-authored per REQ-ORCHESTRATOR-008) is recognised. Legacy `phase: apply` entries (date < this SDD's `state.yaml.created`) are tolerated; new SDDs MUST NOT produce them (sdd-verify Step 10 flags WARNING — see REQ-VERIFY-001 extension).

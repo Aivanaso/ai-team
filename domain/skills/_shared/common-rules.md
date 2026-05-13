@@ -10,7 +10,7 @@ The redesign-v2 invariant grep (Evidence Protocol Rule 4) found these principles
 
 Each SKILL.md Hard Rules section MUST contain exactly one reference line as the FIRST bullet:
 
-    - Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+    - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 
 Skill-specific rules follow this bullet. Verbatim reproduction of the three consolidated principles below is forbidden (REQ-CR-007).
 
@@ -40,7 +40,39 @@ The orchestrator writes to `~/.claude/projects/-home-ivan-Proyectos-ai-team/memo
 
 Every skill execution returns a result envelope. No skill exits silently. Even when blocked, the skill MUST return a `status: blocked` envelope with `executive_summary` explaining why. The envelope schema is defined in `_shared/result-envelope.md`. The `context_resolution` field MUST be populated on every execution: `injected` when all context arrived from the orchestrator, `fallback` when any field was recovered from disk, `none` when the phase is context-light.
 
-## Principle 4 — Startup sequence (REQ-CR-005)
+## Principle 4 — Seniority Model (REQ-CR-008)
+
+Each SDD pipeline role has a single authority and a single product. Roles MUST NOT cross
+authorities; doing so creates separation-of-duties failures (an executor cannot also be its
+own auditor; an auditor cannot also be its own decision-maker).
+
+| Role | Authority | Product | Forbidden |
+|------|-----------|---------|-----------|
+| **Deciding skills** (`sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`) | Decide their domain (scope, requirements, interfaces, task plan) | Domain artifacts (`proposal.md`, delta specs, `design.md`, `tasks.md`) | MUST NOT author `decisions[]` entries — decisions are recorded against an approved plan, which is what these phases produce. |
+| **Diagnosing skill** (`sdd-verify`) | Diagnose factual deviations from spec/design/tasks (run tests, build, lint; compute `failure_class`; emit Drift Summary) | `verification-report.md` + envelope `failure_class` | MUST NOT author `decisions[]` entries — verify reports drift; orchestrator records it. |
+| **Coordinating skill** (the orchestrator, in `_shared/sdd-orchestrator-protocol.md`) | Coordinate phase delegation, run Post-Apply Audit, write `decisions[]` for any approved drift surfaced by sub-agents | `decisions[]` entries in `state.yaml`; phase delegation prompts | MUST NOT execute code, write artifacts, or run tests itself (delegates to skills). |
+| **Implementing skill** (`sdd-apply`) | Implement `tasks.md` exactly; verify compilability; populate `execution_evidence`; OR return `status: blocked` with a structured `deviation_report` | Application source files; `state.yaml.phases.apply.*` (status, progress) | MUST NOT author `decisions[]` entries; MUST NOT modify SDD artifacts (`tasks.md`, `design.md`, specs, proposal); MUST NOT invoke git state-changing commands (work-unit-commits owns commits). |
+| **Mechanical skill** (`work-unit-commits`) | Stage declared files + create commit per group (auto/manual); backfill commit SHA into existing `decisions[]` entries | Commits in the working tree; `state.yaml.phases.apply.commits[group_id]`; commit SHA backfill into existing decisions[] entries | MUST NOT create `decisions[]` entries (only updates `commits[]` field of orchestrator-authored entries). |
+
+### Why this exists
+
+The most common failure mode in apply phases is the executor laundering its own gaps through a
+free-form audit field. The fix is structural: deny the executor the write surface. The audit
+role moves to the orchestrator (which already coordinates and audits via Post-Apply Audit per
+Rule 6 of evidence-protocol).
+
+### Enforcement
+
+- `sdd-apply` removes the `decisions[]` write path from Hard Rules, Decision Gates, Execution
+  Steps, and references (REQ-APPLY-022 audit verifies this).
+- `sdd-verify` Step 10 flags WARNING on any `decisions[]` entry with `phase: apply` AND
+  `date >= state.yaml.created` (lifecycle-scoped check; legacy archives exempt).
+- `persistence-contract.md` enumerates the Writer Set explicitly (orchestrator + user via
+  orchestrator).
+- The reference bullet in every affected SKILL.md's Hard Rules section names this principle
+  by token ("seniority") so a downstream grep can verify propagation.
+
+## Principle 5 — Startup sequence (REQ-CR-005)
 
 Every skill begins by loading `_shared/context-protocol.md` (startup sequence) and `_shared/persistence-contract.md` (write rules, timestamp rules, decisions[] schema). These two protocols govern how the skill reads its context and how it writes state. They MUST be loaded before any application code is read or any artifact is written.
 

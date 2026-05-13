@@ -116,6 +116,43 @@ execution_evidence:
 - All commands are read verbatim from the project's `config.yaml`. The schema does NOT name any specific tool, package manager, or test runner — those are project-level concerns.
 - Apply MUST populate this field before composing the envelope. An empty or absent `execution_evidence` in an apply envelope is a contract violation (equivalent to `status: ok` with no evidence).
 
+### `deviation_report` (OPTIONAL globally; REQUIRED for `sdd-apply` with `status: blocked`)
+
+Structured block apply emits when a deviation from `tasks.md` is required and apply cannot
+self-resolve. Replaces the legacy "apply writes `decisions[]`" path: apply surfaces the
+deviation; the orchestrator decides the action and authors the audit-trail entry.
+
+```yaml
+deviation_report:
+  kind: out-of-plan | design-pivot | test-orphan       # REQUIRED — one of the three exact values
+  task_ref: "<task-id-from-tasks.md>"                   # REQUIRED — the task in scope when the deviation surfaced
+  evidence:                                              # REQUIRED — factual evidence (Evidence Protocol Rule 1)
+    file: "<path or null>"
+    line: <int or null>
+    command: "<verbatim command or null>"
+    output: "<last-15-lines or null>"
+  suggested_action: "re-engage-tasks | re-engage-design | re-engage-apply-refined | escalate-user"
+```
+
+**Multiplicity:** single per envelope. Apply blocks at the FIRST deviation it encounters;
+subsequent task processing in the same run is skipped. Rationale: a single deviation triggers
+an orchestrator round-trip; accumulating multiple deviations adds parsing complexity without
+benefit.
+
+**Required fields:** `kind`, `task_ref`, `evidence` (at least one of `evidence.file`/
+`evidence.command` populated), `suggested_action`.
+
+**Rules:**
+- Apply MUST populate `deviation_report` whenever it returns `status: blocked` with a structured
+  deviation. Absent or empty `deviation_report` on a `status: blocked` apply envelope is a
+  contract violation (orchestrator falls back to "escalate-user").
+- Apply MUST NOT populate `deviation_report` when returning `status: ok`, `status: warning`,
+  or `status: failed`. The field is for the structured-block path only.
+- Other phases MAY include `deviation_report` if they have a structured block to surface, but
+  this is not currently triggered by any phase other than apply.
+- The orchestrator translates `deviation_report` into a `decisions[]` entry per the Deviation
+  Report Ingestion subsection in `sdd-orchestrator-protocol.md`. Apply does NOT touch `decisions:`.
+
 ### `change_type` (OPTIONAL — propose phase only)
 
 - Classifies the change for orchestrator routing decisions
@@ -175,4 +212,40 @@ risks:
   - "Orchestrator did not inject design_path or spec_paths — recovered by listing .ai-team/changes/oauth-login/. Likely compaction event."
 model_used: "sonnet"
 context_resolution: "fallback"
+```
+
+### Apply Blocked with Deviation Report (Test-Orphan)
+
+```yaml
+status: blocked
+executive_summary: "Blocked at task T2.3: test scaffold references entity MissingService that does not exist in the system. Apply cannot self-resolve; orchestrator should re-engage sdd-tasks."
+artifacts:
+  - name: "state"
+    path: ".ai-team/changes/feature-x/state.yaml"
+tasks_status:
+  completed: ["T1.1", "T1.2", "T2.1", "T2.2"]
+  partial: []
+  skipped: ["T2.3", "T2.4"]
+execution_evidence:
+  tests_created:
+    - file: ".../t2.3.test.ts"
+      command: "<runs T2.3 test>"
+      exit_code: 1
+      passed: 0
+      failed: 1
+deviation_report:
+  kind: test-orphan
+  task_ref: "T2.3"
+  evidence:
+    file: "src/app/feature-x/t2.3.test.ts"
+    line: 14
+    command: "<test runner cmd for t2.3.test.ts>"
+    output: "Cannot find module 'MissingService' from src/app/feature-x/t2.3.test.ts:14"
+  suggested_action: "re-engage-tasks"
+next_recommended:
+  - "orchestrator-audit"
+risks:
+  - "Test scaffold references entity not in the system; tasks must correct the scaffold or expand scope."
+model_used: "sonnet"
+context_resolution: "injected"
 ```
