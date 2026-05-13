@@ -217,6 +217,40 @@ When sdd-verify returns a non-null `failure_class`, route as follows:
 
 A "re-engage attempt" = each delegation of sdd-apply or sdd-tasks for the same group after verify FAIL.
 
+### Apply-Blocked Re-engage Routing on `deviation_report.kind`
+
+Two trigger sources feed re-engage: verify's `failure_class` (post-verify) and apply's
+`deviation_report.kind` (apply-blocked, before verify).
+
+| `deviation_report.kind` | Re-engage target | Action |
+|--------------------------|------------------|--------|
+| `out-of-plan` | `sdd-apply` (refined scope) OR user (escalate) | Orchestrator inspects evidence; if drift is mechanical and scoped, approve, write `decisions[]` (`task_ref: "out-of-plan"`), re-engage apply with the approved drift inlined. If scope creep is ambiguous, escalate to user with the evidence block. |
+| `design-pivot` | `sdd-design` | Re-engage design with the failed assumption inlined (file:line from `deviation_report.evidence`). Design re-emits `design.md`; downstream tasks/apply rerun. Write `decisions[]` (`task_ref: "design-pivot"`) capturing the orchestrator's pivot decision. |
+| `test-orphan` | `sdd-tasks` | Re-engage tasks with the failed test name + missing-entity grep result inlined (extracted from `deviation_report.evidence`). Tasks re-emits the scaffold OR expands scope to add the entity (justified by a REQ). Write `decisions[]` (`task_ref: "test-orphan-re-engage"`) capturing the orchestrator's route decision. |
+
+**Re-engage prompt template for test-orphan** — when orchestrator re-engages sdd-tasks on
+`deviation_report.kind: test-orphan`, the delegation prompt MUST include a block:
+
+```
+## Re-engage Reason
+Apply blocked on a test-orphan (REQ-APPLY-023). The test scaffold references an entity
+that does not exist in the system under test.
+
+- Failed test: {deviation_report.evidence.file}:{line or test name}
+- Missing entity: {extracted from deviation_report.evidence.output}
+- Grep result: {deviation_report.evidence.output}
+
+Re-evaluate the test contract:
+(a) If the test is wrong → correct the scaffold (rewrite tasks.md scaffold section,
+    update AC↔Test Traceability).
+(b) If the entity should exist (justified by a REQ) → expand scope; add a new task for
+    the entity (with REQ trace).
+(c) If neither (spec ambiguous) → return status: needs_input.
+```
+
+**Max retries:** unchanged (3 per logical group). A test-orphan re-engage counts as one
+attempt for the group.
+
 ## work-unit-commits Invocation
 
 After sdd-verify returns GREEN (PASS or PASS WITH WARNINGS) for a logical group, invoke work-unit-commits:
@@ -229,6 +263,34 @@ Inject: group_id={G_id}, mode={config.commit_strategy default auto if absent}, c
 - Read `commit_strategy` from `.ai-team/config.yaml`; default `auto` if field absent.
 - `tasks_in_group` is derived by work-unit-commits from tasks.md; do NOT inject it.
 - Model: sonnet.
+
+## Deviation Report Ingestion
+
+When apply returns `status: blocked` with `deviation_report` populated, the orchestrator MUST:
+
+1. Read `deviation_report.kind`, `task_ref`, `evidence`, `suggested_action`.
+2. Author one `decisions[]` entry in `state.yaml`:
+   ```yaml
+   - date: {current_iso_utc}
+     phase: orchestrator
+     task_ref: {map kind → task_ref value below}
+     decision: "Orchestrator handled apply-blocked: {one-sentence summary}"
+     reason: "{from suggested_action context, one sentence}"
+     evidence: "{deviation_report.evidence.file}:{line} — {deviation_report.evidence.command}\n{deviation_report.evidence.output truncated to 200 chars}"
+     commits: []
+   ```
+3. Map `deviation_report.kind` to `task_ref`:
+   - `out-of-plan` → `task_ref: "out-of-plan"`
+   - `design-pivot` → `task_ref: "design-pivot"`
+   - `test-orphan` → `task_ref: "test-orphan-re-engage"`
+4. Take the action per `deviation_report.suggested_action` (orchestrator may override based
+   on its full-pipeline view):
+   - `re-engage-tasks` → delegate sdd-tasks with re-engage prompt template (see above)
+   - `re-engage-design` → delegate sdd-design with the failed assumption inlined
+   - `re-engage-apply-refined` → delegate sdd-apply with the approved drift inlined as
+     additional scope
+   - `escalate-user` → present `deviation_report.evidence` to user; user picks action
+5. Update `state.yaml.updated: {current_iso_utc}`.
 
 ## Post-Apply Independent Audit (Thin Red-Network)
 
@@ -433,3 +495,4 @@ This handoff is the cheapest place in the pipeline to capture knowledge. Do NOT 
 | Sub-agent returns `warning` | Show risks, ask if user wants to proceed |
 | Missing artifact | Check if previous phase completed; if not, run it first |
 | `apply` returns `ok` but `state.yaml.decisions:` is empty AND `git diff` shows files outside `tasks.md` | Apply skipped the mid-flight log. Ask the user whether to retroactively populate decisions before proceeding to verify, or accept the drift as un-logged (verify will flag it). |
+| `apply` returns `blocked` with `deviation_report` | Ingest per **Deviation Report Ingestion** subsection above. Author a `decisions[]` entry mapping `deviation_report.kind` → `task_ref`. Take action per `deviation_report.suggested_action`. Do NOT proceed to verify. |
