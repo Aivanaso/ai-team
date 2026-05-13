@@ -1,6 +1,6 @@
 ---
 name: sdd-apply
-description: "Trigger: orchestrator launches apply after tasks approval. Implement task plan, write application source files. Never commit (work-unit-commits owns commits). NEVER deviate from tasks.md without logging a decision."
+description: "Trigger: orchestrator launches apply after tasks approval. Implement task plan, write application source files. Never commit (work-unit-commits owns commits). When a deviation is required, return status: blocked with a structured deviation_report — never author audit-trail entries."
 disable-model-invocation: true
 user-invocable: false
 ---
@@ -11,19 +11,19 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Writes application source files (exception to read-only principle — apply's primary responsibility). -- see Step 3c.
 - Write code per `tasks.md` exactly. No redesign, no extra files, no bonus refactors. -- see Step 3c.
 - Touch only files listed in tasks. If a task lists 3 files, touch exactly 3 files. -- see Step 3c.
 - Every task leaves the codebase compilable (or for meta-project: leaves framework files in valid Markdown structure). -- see Step 3d.
-- Never modify SDD artifacts (`tasks.md`, `design.md`, specs, proposal). The only `.ai-team/` file you update is `state.yaml` (including `decisions:` when you deviate, and `test-contract-correction` when correcting test orphans). -- see Step 3c, Step 3g.
+- Never modify SDD artifacts (`tasks.md`, `design.md`, specs, proposal). The only `.ai-team/` file you update is `state.yaml` (`phases.apply.*`: status, progress, commits). Never author audit-trail entries. -- see Step 3c.
 - Skill-first: load project skills before writing code. Skills define naming, imports, patterns, test structure. Code that ignores skills is wrong even if it compiles. -- see Step 2.
 - Read before modifying: always read a file in full before applying changes. -- see Step 3c.
 - Before composing the result envelope, verify every CREATE/MODIFY/REMOVE listed in `tasks.md` actually happened on disk. Self-reporting "X/X tasks done" without on-disk verification is a contract violation. -- see Step 7.
 - Group boundary hand-off: when the last task in a group completes, update `state.yaml.phases.apply.progress[group_id] → done` and return control to the orchestrator. NEVER run `git commit` — work-unit-commits owns commits. -- see Step 3e.
 - NEVER invoke `git commit`, `git add`, `git push`, `git stash`, `git reset`, `git rm`, or any other state-changing git command. The only permitted git invocation is `git diff --name-only` (or `git status --porcelain`) used during the deliverables audit. -- see Step 7. Grep contract enforced by verify.
-- Do not invent entities (test-orphan check): if a test references a symbol, file, route, command, or interface not in the system under test, the FIRST hypothesis is test-orphan (wrong contract). Classify as `test-with-AC-trace` (justified by a REQ or decisions[]) or `test-orphan` (no justification). Only test-with-AC-trace entities may be added. -- see Step 3c.
-- Mid-flight decision log: write a `decisions:` entry in `state.yaml` BEFORE any out-of-plan fix commit. Also write a `test-contract-correction` entry when correcting a test-orphan. -- see Step 3g.
+- Do not invent entities (test-orphan): if a test references a symbol, file, route, command, or interface not in the system under test, the FIRST hypothesis is test-orphan (wrong contract). Classify as `test-with-AC-trace` (justified by a REQ in tasks.md) or `test-orphan` (no REQ anchor). For test-orphan: return `status: blocked` with `deviation_report.kind: test-orphan`, failed test name + missing-entity grep result in `evidence`. Never add the entity; never author audit-trail entries. -- see Step 3g-replacement.
+- Seniority: apply implements or blocks; it does NOT author audit-trail entries. Per Seniority Model (REQ-CR-008 in `_shared/common-rules.md`): detect any deviation trigger (out-of-plan, design-pivot, test-orphan, new runtime dependency), compose the `deviation_report` block (schema in `_shared/result-envelope.md`), return `status: blocked`. Do NOT touch the audit trail. -- see Step 3g.
 - Evidence Protocol Rule 3: if a task generates integration tests, execute them before marking `status: ok`. (Meta-project: Manual Review Checklist criteria substitute.) -- see Step 3d–3e.
 - Bash is available — see `_shared/sdd-orchestrator-protocol.md` "Tool Availability by Phase: apply". Honesty: the envelope MUST include `execution_evidence` populated with the literal stdout of every verify command declared in `config.yaml` (typecheck, lint) and of each test file created during this phase. An absent or empty `execution_evidence` is a contract violation — never declare `status: ok` without it. If a verify command cannot be run (Bash denied, missing dependency), set `status: blocked` listing the exact command and reason. NEVER `status: ok` with a note "pending". -- see Step 7.
 
@@ -36,8 +36,8 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 | Dependency is `failed` or `pending` | Check independence. If dependent, mark `skipped`; if independent, proceed. |
 | Compilation fails after 2 attempts | Mark task `failed`; continue to next independent task. |
 | Integration tests generated by this task | Execute them before `status: ok` per Rule 14 (Evidence Protocol Rule 3). |
-| Out-of-plan fix required | Write `decisions:` entry in `state.yaml` FIRST, then apply the fix. |
-| Test entity has no REQ or decisions[] anchor | Classify as test-orphan; write `test-contract-correction` decisions[] entry; do NOT add entity (Rule 12). |
+| Out-of-plan fix required | Return `status: blocked` with `deviation_report.kind: out-of-plan`. Orchestrator decides: approve drift (authors audit-trail entry, re-engages apply with refined scope), or escalate to user. |
+| Test entity has no REQ anchor in tasks.md | Return `status: blocked` with `deviation_report.kind: test-orphan` — failed test inlined, missing-entity grep result attached. Orchestrator routes to sdd-tasks (test contract owner). |
 | `strict_tdd: true` in injected context | Follow strict-tdd module: red → green → triangulate → refactor. |
 | `phases.apply.status` already `done` | Return immediately. Nothing to do. |
 | Tests created by tasks in the current group are red at group boundary | Mark the test-creating task(s) `partial` (not `done`) in `state.yaml`. Set envelope `status: warning`. Record the test stdout in `execution_evidence.tests_created[]`. |
@@ -54,7 +54,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 
    **3b — Set task `active`** in `state.yaml` before touching any file.
 
-   **3c — Implement files** in dependency order (types → entities → DTOs → services → controllers → modules → pages). For new test entities: classify as `test-with-AC-trace` (REQ or decisions[] justifies it) or `test-orphan` (no justification — do NOT add, write decisions[] entry per Step 3g). See [references/task-execution-loop.md](references/task-execution-loop.md) for CREATE / MODIFY / REMOVE per-action prose.
+   **3c — Implement files** in dependency order (types → entities → DTOs → services → controllers → modules → pages). For new test entities: classify as `test-with-AC-trace` (REQ in tasks.md justifies it) or `test-orphan` (no REQ anchor — do NOT add, return `status: blocked` with `deviation_report.kind: test-orphan` per Step 3g). See [references/task-execution-loop.md](references/task-execution-loop.md) for CREATE / MODIFY / REMOVE per-action prose.
 
    **3d — Verify compilation** using `config.yaml` verify commands. Fix up to 2 attempts. Mark `done` or `failed`.
 
@@ -65,28 +65,39 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 
    **3f — Update progress** in `state.yaml` (`done` / `failed` / `skipped`).
 
-   **3g — Mid-flight decision log (mandatory on any deviation):**
+   **3g — On any deviation: compose deviation_report and block (MANDATORY):**
 
-   Write a `decisions:` entry in `state.yaml` BEFORE the fix when any of these trigger:
-   - About to write a fix not produced by a task in `tasks.md`.
-   - Changed a class/file/structure that `design.md` specified differently.
+   When any of these triggers fire, compose a `deviation_report` block and return
+   `status: blocked` immediately. Do NOT touch the audit trail.
+
+   Triggers:
+   - About to write a fix not in any task in `tasks.md` (out-of-plan).
+   - Discovered a design.md assumption that does not hold in the actual codebase (design-pivot).
    - Added a runtime dependency, config flag, or infra piece not in the original task plan.
-   - Correcting a test-orphan (use `task_ref: "test-contract-correction"`).
+   - Test references a symbol/file/route/command/interface absent from the system (test-orphan).
 
-   Entry schema — append one item to `state.yaml.decisions:`:
+   For each trigger, set `deviation_report.kind` to the matching value:
+   `out-of-plan | design-pivot | test-orphan`
+
+   Schema — per `_shared/result-envelope.md`:
 
    ```yaml
-   decisions:
-     - date: "{ISO 8601 timestamp}"
-       phase: apply
-       task_ref: "{task-id | 'out-of-plan' | 'design-pivot' | 'test-contract-correction'}"
-       decision: "{one sentence}"
-       reason: "{one sentence}"
-       evidence: "{grep / command output / test failure / file:line that triggered this}"
-       commits: []
+   deviation_report:
+     kind: out-of-plan | design-pivot | test-orphan
+     task_ref: "{task-id from tasks.md}"
+     evidence:
+       file: "{path or null}"
+       line: {int or null}
+       command: "{verbatim command or null}"
+       output: "{last-15-lines or null}"
+     suggested_action: "re-engage-tasks | re-engage-design | re-engage-apply-refined | escalate-user"
    ```
 
-   **Cost gate:** trivial typos, test-only tweaks, or refactors within a single task do NOT need an entry. Log only when the approved plan is being deviated from.
+   Return `status: blocked`. Populate `tasks_status.skipped` with all tasks not yet attempted.
+   Do NOT continue task execution after the first deviation trigger.
+
+   **Cost gate:** trivial typos, lint fixes, or whitespace corrections within a single task
+   do NOT trigger a block — handle inline without an envelope change.
 
 6. After all tasks: update `state.yaml` — `phases.apply.status → done`, `phases.apply.completed → ISO 8601`, `phases.apply.agent → sdd-apply`, `current_phase → apply`, `updated → now`. If some tasks failed, status is still `done`; record `failed` and `skipped` in `progress`.
 7. **Deliverables audit (mandatory, before composing the envelope).**
@@ -121,16 +132,16 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 
 ## Output Contract
 
-Write application source files per `tasks.md`. Update `state.yaml` (`phases.apply.status → done`, `phases.apply.completed → ISO 8601`, `phases.apply.agent → sdd-apply`, `current_phase → apply`, `updated → now`). Return a result envelope with `status`, `executive_summary` (truthful completed/partial/skipped counts per Step 7), `artifacts`, `tasks_status`, `execution_evidence` (REQUIRED — populated stdout of all verify commands + created test files), `next_recommended`, `risks` (populated when any deliverable is missing), `model_used`, `context_resolution`.
+Write application source files per `tasks.md`. Update `state.yaml` (`phases.apply.status → done`, `phases.apply.completed → ISO 8601`, `phases.apply.agent → sdd-apply`, `current_phase → apply`, `updated → now`). Return a result envelope with `status`, `executive_summary` (truthful completed/partial/skipped counts per Step 7), `artifacts`, `tasks_status`, `execution_evidence` (REQUIRED — populated stdout of all verify commands + created test files), `next_recommended`, `risks` (populated when any deliverable is missing), `model_used`, `context_resolution`, `deviation_report` (REQUIRED when `status: blocked` on any structured deviation — schema in `_shared/result-envelope.md`; ABSENT on `status: ok` or `status: warning`).
 
 ## References
 
 - [references/task-execution-loop.md](references/task-execution-loop.md) — Step 3a-3f detailed prose, gate check rules, implementation order, CREATE/MODIFY/REMOVE per-action prose, compilation flow, drift detection; load at Step 5.
 - [references/hard-rules-execution-map.md](references/hard-rules-execution-map.md) — mapping of each Hard Rule to its Execution Step; audit support for REQ-APPLY-022 and AC-08; load when verify requests orphan-rule audit.
-- [references/decisions-log-examples.md](references/decisions-log-examples.md) — worked decision entries (out-of-plan, design-pivot, test-contract-correction, task-level with SHA); load when writing a `decisions:` entry.
+- [references/block-and-re-engage-examples.md](references/block-and-re-engage-examples.md) — worked deviation_report blocks (out-of-plan, design-pivot, test-orphan); load when composing a `deviation_report` block in a blocked envelope.
 - [references/envelope-examples.md](references/envelope-examples.md) — all-succeeded, with-warnings, blocked envelope variants; load at Step 8.
 - [references/edge-cases.md](references/edge-cases.md) — Resumed Execution, Compilation Failure, File Already Exists, Missing File for MODIFY, Circular Dependency, No Verify Commands, Scope Limiting; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
-- `../_shared/persistence-contract.md` — write rules, `decisions:` full schema; load at Step 1.
+- `../_shared/persistence-contract.md` — write rules, audit-trail schema; load at Step 1.
 - `../_shared/result-envelope.md` — envelope schema; load at Step 8.
 - `../_shared/evidence-protocol.md` — Rules 1-6 (Rule 3 governs integration test execution before status:ok; Rule 6 governs orchestrator post-apply audit).
