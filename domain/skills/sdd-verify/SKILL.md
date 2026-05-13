@@ -11,7 +11,7 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Verify against specs, not opinion. If the code does what the spec says, it passes.
 - Evidence required. Every verdict needs a command output, file:line reference, or test name:result. "Looks correct" is not evidence.
 - Run real commands. Compile, lint, test. Do not guess whether the build passes.
@@ -54,6 +54,18 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
 8. Design coherence: for each key design decision verify the approach was followed. Deviation = WARNING (design is a guide, not law).
 9. Behavioral compliance per group: cross-reference every spec scenario against Step 5 test results. COMPLIANT = test exists AND passed. FAILING = test failed = CRITICAL. UNTESTED MUST = CRITICAL (WARNING if no test infra). UNTESTED SHOULD = WARNING. Produce per-group results for Step 11.
 10. **Step 8b -- Drift Summary:** Read `state.yaml.decisions:`. For each entry with `phase` and `task_ref`, write one row in the Drift Summary table -- these are approved drift, not scope creep. Unaccounted drift (diff files not in tasks.md and not in any `decisions:` entry) = WARNING. See [references/report-format.md](references/report-format.md) "Absorbed Checks Summary" subsection.
+
+   Additionally, scan `state.yaml.decisions[]` for any entry where `phase: apply`
+   AND `entry.date >= state.yaml.created` (ISO 8601 lexicographic comparison — detects
+   in-lifecycle apply-authored entries). For each match:
+
+   Emit one WARNING row in the Drift Summary with text:
+   > "decisions[] entry at index {i} written by apply (phase: apply) — apply MUST NOT
+   > author decisions per Seniority Model (REQ-CR-008); legacy archived entries
+   > (date < state.yaml.created) are exempt."
+
+   Severity: WARNING (not CRITICAL). Legacy entries (date < created) are silently treated
+   as approved legacy drift — no WARNING.
 11. **Spec Compliance Matrix (REQ-VERIFY-006):** When tasks.md has >1 group, build a per-group matrix. For each group G{N}: collect all REQ-IDs covered by tasks in that group; for each REQ-ID, find its Given/When/Then scenarios in the delta spec; assign verdict {COMPLIANT | FAILING | UNTESTED | PARTIAL}. Format per [references/report-format.md](references/report-format.md) "Spec Compliance Matrix" section.
 12. AC coverage: for each AC, combine static (Step 7) and behavioral (Step 9) verdicts. COVERED = all traced reqs Implemented + Compliant. PARTIAL = some gaps. NOT COVERED = missing or failing. Report in `| AC | Status | Evidence |` table.
 13. **failure_class composition (REQ-VERIFY-003):** For each failed group, assign exactly one class using priority order:
