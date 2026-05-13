@@ -25,7 +25,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 - Do not invent entities (test-orphan check): if a test references a symbol, file, route, command, or interface not in the system under test, the FIRST hypothesis is test-orphan (wrong contract). Classify as `test-with-AC-trace` (justified by a REQ or decisions[]) or `test-orphan` (no justification). Only test-with-AC-trace entities may be added. -- see Step 3c.
 - Mid-flight decision log: write a `decisions:` entry in `state.yaml` BEFORE any out-of-plan fix commit. Also write a `test-contract-correction` entry when correcting a test-orphan. -- see Step 3g.
 - Evidence Protocol Rule 3: if a task generates integration tests, execute them before marking `status: ok`. (Meta-project: Manual Review Checklist criteria substitute.) -- see Step 3d–3e.
-- Bash is available — see `_shared/sdd-orchestrator-protocol.md` "Tool Availability by Phase: apply". Honesty: never declare `status: ok` without execution output as evidence. -- see Step 7.
+- Bash is available — see `_shared/sdd-orchestrator-protocol.md` "Tool Availability by Phase: apply". Honesty: the envelope MUST include `execution_evidence` populated with the literal stdout of every verify command declared in `config.yaml` (typecheck, lint) and of each test file created during this phase. An absent or empty `execution_evidence` is a contract violation — never declare `status: ok` without it. If a verify command cannot be run (Bash denied, missing dependency), set `status: blocked` listing the exact command and reason. NEVER `status: ok` with a note "pending". -- see Step 7.
 
 ## Decision Gates
 
@@ -40,6 +40,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 | Test entity has no REQ or decisions[] anchor | Classify as test-orphan; write `test-contract-correction` decisions[] entry; do NOT add entity (Rule 12). |
 | `strict_tdd: true` in injected context | Follow strict-tdd module: red → green → triangulate → refactor. |
 | `phases.apply.status` already `done` | Return immediately. Nothing to do. |
+| Tests created by tasks in the current group are red at group boundary | Mark the test-creating task(s) `partial` (not `done`) in `state.yaml`. Set envelope `status: warning`. Record the test stdout in `execution_evidence.tests_created[]`. |
 
 ## Execution Steps
 
@@ -58,7 +59,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    **3d — Verify compilation** using `config.yaml` verify commands. Fix up to 2 attempts. Mark `done` or `failed`.
 
    **3e — Group boundary detection and hand-off:** when the last task in a group completes:
-   1. (3e.1) Run group informational tests: if any task in the group created scaffold files, run those files only (not the full suite). Failures produce warnings, not blockers — sdd-verify is authoritative.
+   1. (3e.1) Run the test files created by tasks in this group using the test runner from `config.yaml`. Capture command, exit code, passed/failed counts into `execution_evidence.tests_created[]`. If any test file has `exit_code != 0` OR `failed > 0`: mark the corresponding task(s) `partial` (NOT `done`). sdd-verify is the authoritative judge of the full suite, but apply MUST NOT mark a task `done` while the tests it created are red.
    2. (3e.2) Update `state.yaml`: set `phases.apply.progress[{group_id}] = done`. The group_id is the literal string "G1", "G2", etc. from the Execution Order table.
    3. (3e.3) Return control to the orchestrator. NEVER run `git commit`. The orchestrator will invoke `work-unit-commits` per REQ-ORCHESTRATOR-010.
 
@@ -108,11 +109,19 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 
    The verify phase has its own audit, but the apply envelope MUST be the first line of defense — the orchestrator should not need to discover skips during verify.
 
+   **7c — Execution evidence audit (mandatory before composing the envelope):**
+   - Read `config.yaml` verify commands list (typecheck, lint, test).
+   - Confirm `execution_evidence.typecheck.exit_code == 0` (if config declares a typecheck command). Non-zero → envelope `status: warning`.
+   - Confirm `execution_evidence.lint.exit_code == 0` (if config declares a lint command). Non-zero → envelope `status: warning`.
+   - Confirm every entry in `execution_evidence.tests_created[]` has `exit_code == 0` AND `failed == 0`. Any failure → the corresponding task(s) are `partial` (not `done`), envelope `status: warning`.
+   - If a verify command could not run at all (Bash denied, missing tool) → envelope `status: blocked`. NEVER `status: ok` in this case.
+   - Record each check result (pass / fail / skipped-no-config) in `executive_summary`.
+
 8. Return the envelope per [references/envelope-examples.md](references/envelope-examples.md).
 
 ## Output Contract
 
-Write application source files per `tasks.md`. Update `state.yaml` (`phases.apply.status → done`, `phases.apply.completed → ISO 8601`, `phases.apply.agent → sdd-apply`, `current_phase → apply`, `updated → now`). Return a result envelope with `status`, `executive_summary` (truthful completed/partial/skipped counts per Step 7), `artifacts`, `tasks_status`, `next_recommended`, `risks` (populated when any deliverable is missing), `model_used`, `context_resolution`.
+Write application source files per `tasks.md`. Update `state.yaml` (`phases.apply.status → done`, `phases.apply.completed → ISO 8601`, `phases.apply.agent → sdd-apply`, `current_phase → apply`, `updated → now`). Return a result envelope with `status`, `executive_summary` (truthful completed/partial/skipped counts per Step 7), `artifacts`, `tasks_status`, `execution_evidence` (REQUIRED — populated stdout of all verify commands + created test files), `next_recommended`, `risks` (populated when any deliverable is missing), `model_used`, `context_resolution`.
 
 ## References
 

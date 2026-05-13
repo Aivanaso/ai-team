@@ -236,12 +236,14 @@ After sdd-apply completes, run the four structural greps from REQ-VERIFY-004:
 - Check 1: `git diff --name-only HEAD` vs tasks.md Files: blocks (undeclared files → WARNING)
 - Check 2: grep decisions[].decision tokens against diff (zero hits → WARNING)
 - Check 3: count decisions[] apply entries vs fix: commits (fix-commits > entries → WARNING)
-- Check 4: count new *.spec.{ext} files vs test count delta (discrepancy → WARNING)
+- Check 4: count new test files vs test count delta in the baseline (discrepancy → WARNING)
+- **Check 5 — Compilability sanity (BLOCKING):** Read `config.yaml` verify commands (typecheck, lint, test) and run them, scoping the test invocation to files in `git diff --name-only HEAD` from the apply session. Capture exit codes. **Blocking semantics:** any verify command with `exit_code != 0`, OR any entry in apply's reported `execution_evidence.tests_created[]` with `exit_code != 0`, → re-engage `sdd-apply` with the specific failures inlined in the re-engage prompt. Do NOT delegate `sdd-verify` until Check 5 is clean. Log a `decisions[]` entry with `task_ref: post-apply-audit-gap` listing what failed. If `execution_evidence` is absent or empty in the apply envelope → treat as Check 5 failure and re-engage apply.
 
-On agreement with sdd-apply's envelope: delegate sdd-verify normally.
-On any discrepancy: present WARNING to user ("Pre-verify audit found: {finding}. sdd-verify will rule authoritatively."). Then delegate sdd-verify regardless — it provides the authoritative ruling.
+On agreement with sdd-apply's envelope (Checks 1-4): delegate sdd-verify normally.
+On any Check 1-4 discrepancy: present WARNING to user ("Pre-verify audit found: {finding}. sdd-verify will rule authoritatively."). Then delegate sdd-verify regardless — it provides the authoritative ruling.
+On Check 5 failure: re-engage sdd-apply (blocking). Do NOT delegate sdd-verify until Check 5 is clean.
 
-This audit MUST NOT block verify delegation. sdd-verify runs the same four checks authoritatively (REQ-VERIFY-004).
+Checks 1-4 do not block verify delegation (informational WARNINGs surfaced to user, sdd-verify runs authoritatively). Check 5 DOES block — re-engage apply until clean before delegating verify.
 
 ## Plan Mode (NOT used inside the SDD pipeline)
 

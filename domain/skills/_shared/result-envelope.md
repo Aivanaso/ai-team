@@ -88,6 +88,34 @@ The orchestrator inspects this field on every return. See `sdd-orchestrator-prot
 
 **Rule for sub-agents**: do not lie. If you read a path that the orchestrator should have given you, report `fallback` and list which inputs were missing in `risks`. Silent fallback defeats the canary.
 
+### `execution_evidence` (OPTIONAL globally; REQUIRED for `sdd-apply`)
+
+Captures the literal stdout of verify commands and created test files, so the orchestrator can independently confirm apply ran them. Skills where this field is REQUIRED: `sdd-apply` (extensible — other skills may add it without breaking the schema).
+
+```yaml
+execution_evidence:
+  typecheck:               # include only if config.yaml declares a typecheck command
+    command: "<verbatim command from config.yaml>"
+    exit_code: <int>
+    last_lines: |
+      <last ~15 lines of stdout, truncated>
+  lint:                    # include only if config.yaml declares a lint command
+    command: "<verbatim command from config.yaml>"
+    exit_code: <int>
+    summary: "<one-line digest, e.g. error/warning/info counts as reported by the tool>"
+  tests_created:           # one entry per test file created during this apply run
+    - file: "<path/to/created/test/file>"
+      command: "<command that runs THIS file only, derived from config.yaml runner conventions>"
+      exit_code: <int>
+      passed: <int>
+      failed: <int>
+```
+
+**Rules:**
+- If `config.yaml` does not declare a typecheck or lint command, omit the corresponding sub-block (do not leave it empty). Cite the omission in `executive_summary`.
+- All commands are read verbatim from the project's `config.yaml`. The schema does NOT name any specific tool, package manager, or test runner — those are project-level concerns.
+- Apply MUST populate this field before composing the envelope. An empty or absent `execution_evidence` in an apply envelope is a contract violation (equivalent to `status: ok` with no evidence).
+
 ### `change_type` (OPTIONAL — propose phase only)
 
 - Classifies the change for orchestrator routing decisions

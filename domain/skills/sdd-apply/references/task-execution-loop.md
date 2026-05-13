@@ -57,19 +57,15 @@ Process files within a task in this dependency order:
 
 ## Step 3d — Compilation Verification
 
-After all files in the task are written, run the project's compile command:
+After all files in the task are written, run the verify commands declared in `config.yaml` (typecheck, lint, or equivalent). Do NOT invent commands — read them verbatim from the project's `config.yaml`. Capture the full stdout and exit code. Store the captured output in a per-task buffer; at group boundary, aggregate these buffers into `execution_evidence` in the result envelope.
 
-- **TypeScript projects:** `npx tsc --noEmit` or the compile command from `config.yaml`.
-- **PHP projects:** `php -l` on modified files or the lint command from `config.yaml`.
-- **Other stacks:** use the `verify` command from `config.yaml`, or check for a `build` / `typecheck` script in `package.json`.
-
-**On pass:** mark task as `done` in `state.yaml`. Move to next task.
+**On pass (exit_code == 0):** mark task as `done` in `state.yaml`. Move to next task.
 
 **On fail:**
 1. Read the error output.
 2. Identify the cause (missing import, type mismatch, syntax error).
 3. Fix the issue in the relevant file.
-4. Re-run compilation.
+4. Re-run the command from `config.yaml`.
 5. If it passes on second attempt → mark `done`, move on.
 6. If it fails again → mark task as `failed` in `state.yaml`, record the error.
    - If the next task does NOT depend on this one → continue.
@@ -78,7 +74,7 @@ After all files in the task are written, run the project's compile command:
 ## Step 3e — Group boundary detection and hand-off
 
 1. Detect last-task-in-group per `_shared/common-rules.md` "Logical group" rule: if the next row in tasks.md Execution Order table belongs to a different group, this task is the last in the current group.
-2. (3e.1) Run group informational tests: if any task in the group created scaffold files, run those test files only (not the full suite). Use the project's test runner from `config.yaml`. Failures produce warnings, not blockers — sdd-verify is authoritative.
+2. (3e.1) Run the test files created by tasks in this group using the test runner declared in `config.yaml` (do not assume a specific runner — read it from config). For each created test file: capture command, exit code, passed count, and failed count into `execution_evidence.tests_created[]`. If any test file has `exit_code != 0` OR `failed > 0`: mark the corresponding task(s) `partial` in `state.yaml` (NOT `done`). sdd-verify remains the authoritative judge of full-suite compliance, but apply MUST NOT mark a test-creating task `done` while the tests it created are red.
 3. (3e.2) Update state.yaml: set `phases.apply.progress[{group_id}] = done`. The group_id is the literal string "G1", "G2", etc. from the Execution Order table.
 4. (3e.3) Return control to the orchestrator. NEVER run `git commit`. The orchestrator will invoke `work-unit-commits` per REQ-ORCHESTRATOR-010.
 5. Watchdog-resilience: the `progress[group_id] = done` marker is durable; a resumed run reads it and skips re-execution.
