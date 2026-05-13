@@ -394,7 +394,7 @@ Sub-agents inherit Bash from the parent session — they CAN run commands. The h
 The orchestrator forwards the relevant block below as Injected Context when delegating to each phase. Sub-agents reading this contract MUST NOT return `needs_input` on the assumption that Bash is unavailable — they MUST attempt the command first and only escalate on real failure (non-zero exit captured in output).
 
 ### apply
-- Bash: AVAILABLE. Run `pnpm test*`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `git status`, `git diff --name-only` freely. NEVER invoke `git commit`, `git add`, `git push`, `git stash`, `git reset`, or `git rm` — work-unit-commits owns commits (REQ-APPLY-021).
+- Bash: AVAILABLE. Run the verify commands declared in `config.yaml` (typecheck, lint, test, build) and the read-only git commands `git status` and `git diff --name-only` freely. NEVER invoke `git commit`, `git add`, `git push`, `git stash`, `git reset`, or `git rm` — work-unit-commits owns commits (REQ-APPLY-021).
 - Destructive: not expected at this phase. If a task requires `rm -rf` or `cp -r` outside the working tree, return `needs_input` listing the exact command and reason.
 
 ### verify

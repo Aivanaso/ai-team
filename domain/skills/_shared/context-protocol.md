@@ -17,7 +17,7 @@ Read .ai-team/config.yaml
 ```
 
 - Understand the project's tech stack, conventions, and rules
-- Note any project-specific constraints (e.g., "no default exports", "use pnpm")
+- Note any project-specific constraints (e.g., "no default exports", "max line length 120", "snake_case file names")
 
 ### Step 2 — Load Artifacts Referenced by Orchestrator
 
@@ -50,7 +50,7 @@ With context loaded, execute your specific task as defined in your instructions.
 ```
 # 1. Config
 Read .ai-team/config.yaml
-→ Stack: React 19 + TypeScript + Vitest, monorepo with pnpm
+→ Stack: <frameworks> + <language(s)> + <test runner>, package manager <name>
 
 # 2. Artifacts (from orchestrator prompt)
 Read .ai-team/changes/user-auth/proposal.md

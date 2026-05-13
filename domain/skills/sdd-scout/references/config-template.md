@@ -1,39 +1,37 @@
 # config.yaml Template
 
-Annotated YAML template for `.ai-team/config.yaml`. Fill in detected values during bootstrap mode.
+Annotated YAML template for `.ai-team/config.yaml`. Fill in values detected during bootstrap mode.
+
+> **Format**: every block below uses `<placeholder>` or `{placeholder}` syntax for values the scout fills in. Inline comments list common alternatives (e.g. `e.g. typescript | php | go | ...`). The template names no canonical stack — it adapts to whatever the target project uses.
 
 ```yaml
 project:
-  name: "{detected from package.json name or directory name}"
+  name: "{detected from project manifest (package.json / composer.json / Cargo.toml / go.mod / pyproject.toml / Gemfile) or directory name}"
   type: "{app | library | monorepo}"
 
 stack:
   languages:
-    - name: typescript
-      version: "5.x"
-    # Add: php, go, rust, python, ruby as detected
+    - name: "{language}"        # e.g. typescript | php | go | rust | python | ruby
+      version: "{version}"
+    # Repeat the block per detected language.
   frameworks:
-    - name: react
-      version: "19.x"
-    - name: next
-      version: "14.x"
-    # Add any detected framework: nestjs, symfony, laravel, astro, vue, angular, svelte
+    - name: "{framework}"       # e.g. react | next | vue | angular | svelte | astro | nestjs | symfony | laravel | django | flask | rails
+      version: "{version}"
+    # Repeat the block per detected framework. Omit the list entirely if no framework is detected.
   testing:
-    - name: vitest
-    # Add: jest, phpunit, playwright, pytest
+    - name: "{test runner}"     # e.g. vitest | jest | mocha | playwright | cypress | phpunit | pytest | rspec | go test
+    # Repeat the block per detected test runner.
   styling:
-    - name: tailwind
-      version: "4.x"
-    # Add: sass, css-modules, styled-components
-  package_manager: pnpm
-  # Options: pnpm | yarn | bun | npm | composer | cargo | go
+    - name: "{styling}"         # e.g. tailwind | sass | css-modules | styled-components | plain-css | none
+      version: "{version}"      # omit if not versioned
+    # Repeat the block per detected styling tool.
+  package_manager: "{pm}"       # Options: pnpm | yarn | bun | npm | composer | cargo | go | pip | poetry | bundler
 
 conventions:
-  # Extracted from existing config files (tsconfig.json, eslint.config.*, .editorconfig)
-  - "strict TypeScript (strict: true in tsconfig)"
-  - "ESM modules"
-  - "path aliases via @/"
-  # Add detected conventions: "PSR-4 autoloading", "Conventional Commits", "E2E tests with Playwright", etc.
+  # Extract from existing config files (lint config, formatter config, editor config, language strictness flags).
+  # Each entry is a one-line constraint that downstream phases must respect.
+  - "{constraint}"
+  # Common examples (replace with detected): "max line length 120", "no default exports", "snake_case file names", "PSR-4 autoloading", "Conventional Commits", "strict mode enabled".
 
 commit_strategy: auto  # commit strategy for work-unit-commits skill: auto | manual
 

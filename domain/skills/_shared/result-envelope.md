@@ -140,7 +140,7 @@ execution_evidence:
 
 ```yaml
 status: ok
-executive_summary: "Bootstrapped project config. Detected Next.js 14 + TypeScript + Tailwind + pnpm monorepo. Generated config.yaml."
+executive_summary: "Bootstrapped project config. Detected stack (<frameworks> + <language(s)> + <package manager>). Generated config.yaml."
 artifacts:
   - name: "config"
     path: ".ai-team/config.yaml"
