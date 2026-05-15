@@ -370,7 +370,7 @@ Read this table at session start, cache it, and pass the model in every `Agent()
 | sdd-tasks | sonnet | Mechanical breakdown from clear design |
 | sdd-apply | sonnet | Code generation from specs |
 | sdd-verify | sonnet | Validation against spec |
-| sdd-archive | haiku | Copy and close |
+| sdd-archive | sonnet | Memory capture + destructive Bash (cp/rm); haiku auto-restricts on cleanup, see [[haiku-bash-auto-restrict]] |
 | sdd-security (threat-model) | opus   | Architectural reasoning across the proposal surface |
 | sdd-security (code-audit)   | sonnet | Pattern matching over the diff |
 | work-unit-commits | sonnet | — |
