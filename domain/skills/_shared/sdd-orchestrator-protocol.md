@@ -300,12 +300,13 @@ After sdd-apply completes, run the four structural greps from REQ-VERIFY-004:
 - Check 3: count decisions[] apply entries vs fix: commits (fix-commits > entries → WARNING)
 - Check 4: count new test files vs test count delta in the baseline (discrepancy → WARNING)
 - **Check 5 — Compilability sanity (BLOCKING):** Read `config.yaml` verify commands (typecheck, lint, test) and run them, scoping the test invocation to files in `git diff --name-only HEAD` from the apply session. Capture exit codes. **Blocking semantics:** any verify command with `exit_code != 0`, OR any entry in apply's reported `execution_evidence.tests_created[]` with `exit_code != 0`, → re-engage `sdd-apply` with the specific failures inlined in the re-engage prompt. Do NOT delegate `sdd-verify` until Check 5 is clean. Log a `decisions[]` entry with `task_ref: post-apply-audit-gap` listing what failed. If `execution_evidence` is absent or empty in the apply envelope → treat as Check 5 failure and re-engage apply.
+- **Check 6 — Seniority sanity (WARNING):** Scan `state.yaml.decisions[]` for any entry with `phase: apply`. Such entries are Seniority Model violations (REQ-CR-008): apply MUST return `status: blocked` + `deviation_report`, not author audit-trail entries itself. **Action on hit:** author one orchestrator-ack entry per violation with `task_ref: "apply-seniority-violation-ack"`, `decision: "post-hoc orchestrator acknowledgement of apply-authored entry at decisions[{index}] — content kept for audit, authority reattributed"`, and surface the count in the pre-verify summary to user. Does NOT block verify delegation (informational); historical violations may persist across re-engage cycles, the ack is what closes the audit trail.
 
-On agreement with sdd-apply's envelope (Checks 1-4): delegate sdd-verify normally.
-On any Check 1-4 discrepancy: present WARNING to user ("Pre-verify audit found: {finding}. sdd-verify will rule authoritatively."). Then delegate sdd-verify regardless — it provides the authoritative ruling.
+On agreement with sdd-apply's envelope (Checks 1-4, 6): delegate sdd-verify normally.
+On any Check 1-4 or 6 discrepancy: present WARNING to user ("Pre-verify audit found: {finding}. sdd-verify will rule authoritatively."). Then delegate sdd-verify regardless — it provides the authoritative ruling.
 On Check 5 failure: re-engage sdd-apply (blocking). Do NOT delegate sdd-verify until Check 5 is clean.
 
-Checks 1-4 do not block verify delegation (informational WARNINGs surfaced to user, sdd-verify runs authoritatively). Check 5 DOES block — re-engage apply until clean before delegating verify.
+Checks 1-4 and 6 do not block verify delegation (informational WARNINGs surfaced to user, sdd-verify runs authoritatively). Check 5 DOES block — re-engage apply until clean before delegating verify.
 
 ## Plan Mode (NOT used inside the SDD pipeline)
 
@@ -421,6 +422,18 @@ Resolve these flags **once per session**, cache them, and inject them into every
 Inject all fields from the table above as a `## Injected Context (from orchestrator)` block at the top of the delegation prompt. The sub-agent treats this block as the source of truth for paths and flags — it does NOT re-derive them from disk.
 
 When `strict_tdd: true`, append to apply/verify prompts: "STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. Follow red → green → triangulate → refactor."
+
+**Always append to sdd-apply delegation prompts (Seniority reinforcement, mandatory):**
+
+```
+SENIORITY (mandatory): You IMPLEMENT or BLOCK. You do NOT author audit-trail entries.
+- NEVER write to `decisions[]` -- orchestrator owns that surface.
+- On any deviation (out-of-plan, design-pivot, test-orphan, new runtime dep): return `status: blocked` with a structured `deviation_report` block (schema in `_shared/result-envelope.md`). Stop. Do not "fix" inline.
+- Test references a missing symbol/file/route/command? FIRST hypothesis is `test-orphan` -- block, do not invent the entity.
+- Lint/typecheck/test output you cite MUST be from a re-run inside this same Step (no stale snapshots from before autofix).
+```
+
+This block reinforces REQ-CR-008 (Seniority Model in `_shared/common-rules.md`) and `sdd-apply` Step 3g at delegation time. Empirical pattern: apply correctly cites the rules in its SKILL.md but historically violates them when buried mid-prompt -- the literal block keeps the seniority axis visible. Pre-verify auditing of compliance is enforced by Check 6 in Post-Apply Independent Audit.
 
 ### Context Resolution Feedback
 
