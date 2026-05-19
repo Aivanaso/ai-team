@@ -388,7 +388,7 @@ IMPORTANT: Always use `subagent_type: "general-purpose"`. Do NOT invent custom s
 1. Read `skills/sdd-{phase}/SKILL.md` yourself (the orchestrator reads it; sub-agents do NOT search for skill files).
 2. Read the shared protocols yourself.
 3. Inject both as text into the `Agent()` prompt. Sub-agents receive instructions inline.
-4. Inject `references_dir: domain/skills/sdd-{phase}/references/` — the sub-agent reads reference files on demand; the orchestrator does NOT paste them inline.
+4. Inject `references_dir: skills/sdd-{phase}/references/` — the sub-agent reads reference files on demand; the orchestrator does NOT paste them inline.
 5. If `strict_tdd: true` and the phase is `apply` or `verify`, append: "STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. Follow red → green → triangulate → refactor."
 
 **Prompt structure:** `You are the sdd-{phase} executor. Do this phase's work yourself. Do NOT delegate.` → `## Injected Context` (per Critical Context Forwarding table) → `## Instructions` (SKILL.md contents) → `## Shared Protocols` (context-protocol, persistence-contract, result-envelope, spec-convention, evidence-protocol) → `## Task` (what to do) → `## Project Root` (absolute path) → `## Expected Output` (result envelope with `model_used` and `context_resolution`).
@@ -413,7 +413,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `tasks_path` | `.ai-team/changes/{change_name}/tasks.md` | apply, verify | once tasks has run |
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
 | `security_touchpoints` | `sdd-propose` envelope (list of touchpoint slugs; empty list = not sensitive) | every phase after propose | once propose has run |
-| `references_dir` | `domain/skills/sdd-{phase}/references/` (literal — not project-relative) | every phase | always |
+| `references_dir` | `skills/sdd-{phase}/references/` (literal — not project-relative) | every phase | always |
 | `current_iso_utc` | `date -u +%Y-%m-%dT%H:%M:%SZ` (orchestrator at delegation time) | every phase that writes `state.yaml` | always |
 | `group_id` | tasks.md (the just-passed group) | work-unit-commits | always when invoking work-unit-commits |
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
