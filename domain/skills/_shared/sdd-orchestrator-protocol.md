@@ -300,13 +300,14 @@ After sdd-apply completes, run the four structural greps from REQ-VERIFY-004:
 - Check 3: count decisions[] apply entries vs fix: commits (fix-commits > entries → WARNING)
 - Check 4: count new test files vs test count delta in the baseline (discrepancy → WARNING)
 - **Check 5 — Compilability sanity (BLOCKING):** Read `config.yaml` verify commands (typecheck, lint, test) and run them, scoping the test invocation to files in `git diff --name-only HEAD` from the apply session. Capture exit codes. **Blocking semantics:** any verify command with `exit_code != 0`, OR any entry in apply's reported `execution_evidence.tests_created[]` with `exit_code != 0`, → re-engage `sdd-apply` with the specific failures inlined in the re-engage prompt. Do NOT delegate `sdd-verify` until Check 5 is clean. Log a `decisions[]` entry with `task_ref: post-apply-audit-gap` listing what failed. If `execution_evidence` is absent or empty in the apply envelope → treat as Check 5 failure and re-engage apply.
+- **Check 5b — Tests-created completeness (BLOCKING):** Parse `tasks.md` `Files:` blocks for CREATE entries on test paths (heuristic: paths matching `*.test.*`, `*.spec.*`, `*_test.*`, `*_spec.*`, or under `tests/`, `__tests__/`, `test/`, `e2e/`, `spec/`). Build the expected set. Compare against the `path` field of each entry in apply's `execution_evidence.tests_created[]`. **Blocking semantics:** any expected test path missing from `tests_created[]` → re-engage `sdd-apply` with the missing paths inlined in the re-engage prompt; apply silently skipped running them (SKILL Step 3e.1 + the TESTS_CREATED delegation block require execution). Log a `decisions[]` entry with `task_ref: post-apply-audit-gap` listing the missing test files. Do NOT delegate `sdd-verify` until Check 5b is clean. Empirical pattern (2026-05-19 zod-pipe-saneamiento retro): ~20/22 of verify Run 1 regressions traced to test files apply created but never executed.
 - **Check 6 — Seniority sanity (WARNING):** Scan `state.yaml.decisions[]` for any entry with `phase: apply`. Such entries are Seniority Model violations (REQ-CR-008): apply MUST return `status: blocked` + `deviation_report`, not author audit-trail entries itself. **Action on hit:** author one orchestrator-ack entry per violation with `task_ref: "apply-seniority-violation-ack"`, `decision: "post-hoc orchestrator acknowledgement of apply-authored entry at decisions[{index}] — content kept for audit, authority reattributed"`, and surface the count in the pre-verify summary to user. Does NOT block verify delegation (informational); historical violations may persist across re-engage cycles, the ack is what closes the audit trail.
 
 On agreement with sdd-apply's envelope (Checks 1-4, 6): delegate sdd-verify normally.
 On any Check 1-4 or 6 discrepancy: present WARNING to user ("Pre-verify audit found: {finding}. sdd-verify will rule authoritatively."). Then delegate sdd-verify regardless — it provides the authoritative ruling.
-On Check 5 failure: re-engage sdd-apply (blocking). Do NOT delegate sdd-verify until Check 5 is clean.
+On Check 5 or 5b failure: re-engage sdd-apply (blocking). Do NOT delegate sdd-verify until both are clean.
 
-Checks 1-4 and 6 do not block verify delegation (informational WARNINGs surfaced to user, sdd-verify runs authoritatively). Check 5 DOES block — re-engage apply until clean before delegating verify.
+Checks 1-4 and 6 do not block verify delegation (informational WARNINGs surfaced to user, sdd-verify runs authoritatively). Checks 5 and 5b DO block — re-engage apply until clean before delegating verify.
 
 ## Plan Mode (NOT used inside the SDD pipeline)
 
@@ -434,6 +435,19 @@ SENIORITY (mandatory): You IMPLEMENT or BLOCK. You do NOT author audit-trail ent
 ```
 
 This block reinforces REQ-CR-008 (Seniority Model in `_shared/common-rules.md`) and `sdd-apply` Step 3g at delegation time. Empirical pattern: apply correctly cites the rules in its SKILL.md but historically violates them when buried mid-prompt -- the literal block keeps the seniority axis visible. Pre-verify auditing of compliance is enforced by Check 6 in Post-Apply Independent Audit.
+
+**Always append to sdd-apply delegation prompts (Tests-created honesty, mandatory):**
+
+```
+TESTS_CREATED (mandatory): You IMPLEMENT, you EXECUTE, you REPORT. Lint passing is not proof of test passing.
+- At each group boundary, RUN every test file created by tasks in this group via the runner from `config.yaml`.
+- Populate `execution_evidence.tests_created[]` with one entry per file: `{path, command, exit_code, passed, failed}`.
+- Empty `tests_created[]` while tasks declared CREATE on test files = `status: warning`, NEVER `status: ok`.
+- Any entry with `failed > 0` or `exit_code != 0` → the test-creating task stays `partial` (not `done`), envelope `status: warning`.
+- This is ORTHOGONAL to typecheck/lint. Running typecheck+lint honestly does NOT cover this rule.
+```
+
+This block reinforces `sdd-apply` Step 3e.1 and the Decision Gate "Tests created by tasks in the current group are red at group boundary" at delegation time. Empirical pattern (2026-05-19 zod-pipe-saneamiento retro): apply ran typecheck+lint honestly after the analogous SENIORITY block was added but silently skipped executing newly-created test files; ~20/22 of verify Run 1 regressions traced to sentinels and helpers apply wrote but never ran. The literal block keeps tests-created honesty visible. Pre-verify completeness check is enforced by Check 5b in Post-Apply Independent Audit.
 
 ### Context Resolution Feedback
 
