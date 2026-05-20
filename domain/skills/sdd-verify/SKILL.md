@@ -19,6 +19,7 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
 - Bash is available — see "Tool Availability by Phase: verify" in `_shared/sdd-orchestrator-protocol.md`. Step 5 (test execution) is non-skippable: if unable to execute, return `status: needs_input` listing the required commands — never declare COMPLIANT without test execution evidence.
 - Spec Compliance Matrix per group: every scenario gets exactly one of {COMPLIANT | FAILING | UNTESTED | PARTIAL}. The matrix is per logical group (REQ-VERIFY-006) when tasks.md has >1 group. -- see Step 9 and Step 11.
 - `failure_class` in envelope: emit exactly one of {implementation | test_contract | spec_gap} per failed group (null on PASS). Priority: spec_gap > test_contract > implementation. -- see Step 15 (envelope composition).
+- `failure_class` breakdown in `executive_summary` (REQUIRED on FAIL): first line MUST be a scenario-fail count + failed-groups breakdown by class. Format: `{N} scenario fails across {M} failed groups — {k1} test_contract / {k2} implementation / {k3} spec_gap.` Burying the breakdown in findings forces the orchestrator to read the full report before re-engage routing. Empirical pattern (2026-05-19 zod-pipe-saneamiento retro): "27 fails" with no class breakdown read as apocalyptic; the truthful "27 fails, 5/6 groups test_contract → pipeline artifact, not production bugs" reframes the decision in one line. -- see Step 16 (envelope composition).
 - Absorbed scope/coverage checks (Check 1-4): diff vs declared scope, resolution coverage, audit-trail completeness, test discovery sanity. -- see Step 3b inserted between Step 3 and Step 4.
 
 ## Decision Gates
@@ -75,11 +76,11 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
     - `null` — no failures in this group (PASS)
 14. Overall verdict: FAIL if any CRITICAL. PASS WITH WARNINGS if warnings only. PASS if zero findings.
 15. Write `verification-report.md` per [references/report-format.md](references/report-format.md). Include: Spec Compliance Matrix (per-group), Re-engage Routing Hint (failure_class + failed_groups + rationale), Absorbed Checks Summary, Drift Summary.
-16. Update `state.yaml`: `phases.verify.status → done`, `phases.verify.completed → ISO 8601`, `phases.verify.agent → sdd-verify`, `current_phase → verify`, `updated → now`. Return envelope per [references/envelope-examples.md](references/envelope-examples.md).
+16. Update `state.yaml`: `phases.verify.status → done`, `phases.verify.completed → ISO 8601`, `phases.verify.agent → sdd-verify`, `current_phase → verify`, `updated → now`. Compose `executive_summary` — when overall verdict is FAIL, the **first line MUST be** `{N} scenario fails across {M} failed groups — {k1} test_contract / {k2} implementation / {k3} spec_gap.` where N = sum of FAILING + UNTESTED-MUST scenarios across all failed groups, M = count of failed groups, and k1/k2/k3 = counts of failed groups bucketed by their assigned `failure_class` from Step 13. Non-FAIL verdicts omit this line. Return envelope per [references/envelope-examples.md](references/envelope-examples.md).
 
 ## Output Contract
 
-Write `.ai-team/changes/{change}/verification-report.md`. Update `state.yaml`. Return a result envelope with `status`, `executive_summary`, `artifacts`, `failure_class` (null or one of {implementation | test_contract | spec_gap}), `failed_groups` (list of group IDs), `next_recommended`, `risks` (if any), `model_used`, `context_resolution`.
+Write `.ai-team/changes/{change}/verification-report.md`. Update `state.yaml`. Return a result envelope with `status`, `executive_summary` (on FAIL the first line MUST be `{N} scenario fails across {M} failed groups — {k1} test_contract / {k2} implementation / {k3} spec_gap.` — see Step 16; non-FAIL verdicts omit), `artifacts`, `failure_class` (null or one of {implementation | test_contract | spec_gap}), `failed_groups` (list of group IDs), `next_recommended`, `risks` (if any), `model_used`, `context_resolution`.
 
 ## References
 
