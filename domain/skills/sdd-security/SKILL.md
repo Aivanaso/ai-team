@@ -13,10 +13,10 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Security artifacts write only to `.ai-team/changes/{change}/` (threat-model.md or audit-report.md). No other paths.
-- Every finding cites `file:line` per Evidence Protocol Rule 1. No citation = suppress and tally.
-- Confidence threshold > 80%. Suppress uncertain findings; tally every suppression. False positives are worse than missed low-confidence findings.
+- Every finding cites `file:line` per Evidence Protocol Rule 1. No citation = suppress and tally. -- because uncited findings are unverifiable and slow down triage; the orchestrator cannot route a fix without knowing exactly where the vulnerability is.
+- Confidence threshold > 80%. Suppress uncertain findings; tally every suppression. False positives are worse than missed low-confidence findings. -- because false positives erode user trust and cause override fatigue, reducing the gate's effectiveness on real threats.
 - Severity vocabulary: `CRITICAL` / `WARNING` / `SUGGESTION` only. Never use HIGH / MEDIUM / LOW.
-- Report findings; never fix them. The orchestrator owns the override decision.
+- Report findings with file:line citations; leave remediation to the orchestrator's override decision (the orchestrator owns the security override authority per the seniority model). -- because uncited findings are unverifiable and slow down triage; the orchestrator cannot route a fix without knowing exactly where the vulnerability is.
 - `security_requirements:` block is populated only for `threat-model` mode. For `code-audit`: `security_requirements: []`.
 
 ## Decision Gates

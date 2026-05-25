@@ -39,8 +39,8 @@ With context loaded, execute your specific task as defined in your instructions.
 
 | Rule | Description |
 |------|-------------|
-| **Minimal context** | NEVER load more than what the orchestrator explicitly references |
-| **No exploration** | Do not scan the `.ai-team/` directory for "interesting" files |
+| **Minimal context** | Load only what the orchestrator explicitly references in the delegation prompt. |
+| **No exploration** | Read only artifacts listed in the delegation prompt; skip the `.ai-team/` directory unless explicitly referenced. |
 | **No orchestrator state** | You have NO access to the orchestrator's conversation history |
 | **No skill search** | Your instructions and protocols are already in your prompt — do NOT search for SKILL.md files |
 | **Fail fast** | If a referenced artifact doesn't exist, return `status: blocked` immediately |

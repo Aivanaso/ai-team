@@ -1,7 +1,7 @@
 # Block-and-Re-engage Examples — sdd-apply
 
 > Worked examples of `deviation_report` blocks. Load when you need to compose a
-> `deviation_report` in a blocked envelope. Do NOT author audit-trail entries.
+> `deviation_report` in a blocked envelope. Surface deviations via the `deviation_report` block; the orchestrator authors audit-trail entries.
 
 These examples illustrate the three deviation triggers: out-of-plan, design-pivot, and
 test-orphan. Each shows the `deviation_report` block in the apply envelope.

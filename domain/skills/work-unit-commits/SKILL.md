@@ -12,8 +12,8 @@ Run when the orchestrator invokes after sdd-verify returns GREEN (PASS or PASS W
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Activate only on orchestrator invocation after verify GREEN (REQ-WUC-001).
-- Stage declared files only — NEVER `git add .` or `git add -A`. Each declared file is staged individually with `git add {file}` (REQ-WUC-006).
+- Activate only on orchestrator invocation after verify GREEN (REQ-WUC-001). -- because premature commits before sdd-verify runs break the pipeline's validation order; uncommitted state is required for verify's diff scope.
+- Stage each declared file individually with `git add {file}` (REQ-WUC-006). Staging by glob (`git add .` or `git add -A`) may include debug artifacts, `.env`, or files from other branches.
 - Resolve mode from `.ai-team/config.yaml.commit_strategy`; if missing, default auto and surface a WARNING (REQ-WUC-002).
 - Skill-first commit message resolution: before applying REQ-WUC-005 defaults, check `{project_root}/.claude/skills/commit/SKILL.md` (project) then `~/.claude/skills/commit/SKILL.md` (user); if found, apply its rules; REQ-WUC-005 is the floor (REQ-WUC-008).
 - Conventional Commits format. Subject ≤ 72 chars: `{type}({change-name}/G{N}): {description}`. Body: `Covers: REQ-X, REQ-Y`. No `Co-Authored-By` footer (project convention) (REQ-WUC-005).
@@ -29,7 +29,7 @@ Run when the orchestrator invokes after sdd-verify returns GREEN (PASS or PASS W
 | `commit_strategy` missing or unrecognised | Default to `auto`; emit WARNING in envelope |
 | auto mode AND `git commit` fails | `status: failed`; do not retry; preserve git output in `risks` |
 | Project or user commit skill found | Override REQ-WUC-005 defaults for fields the skill addresses (REQ-WUC-008) |
-| Undeclared file in working tree (in diff but not in any task `Files:` block) | Do not stage; emit WARNING (REQ-WUC-006) |
+| Undeclared file in working tree (in diff but not in any task `Files:` block) | Stage only the declared files; emit WARNING for the undeclared file (REQ-WUC-006) |
 
 ## Execution Steps
 
@@ -41,7 +41,7 @@ Run when the orchestrator invokes after sdd-verify returns GREEN (PASS or PASS W
 6. Dispatch to mode per Step 7.
 7. **Mode dispatch:**
    - **7a (auto):** Stage each declared file: `git add {file}` (individually). Then `git commit -m "{message}"`. On failure: return `status: failed`, git output in `risks`. On success: capture SHA.
-   - **7b (manual):** Compose `manual_commit` object: `{ message: "{message}", files: [...], commands: ["git add {f1}", "git add {f2}", "git commit -m '{message}'"] }`. Do NOT execute. Emit WARNING that user must run commands.
+   - **7b (manual):** Compose `manual_commit` object: `{ message: "{message}", files: [...], commands: ["git add {f1}", "git add {f2}", "git commit -m '{message}'"] }`. Compose the command list and emit WARNING — the user must run these commands manually.
 8. Update `state.yaml.phases.apply.commits[{group_id}]` — SHA string (auto) or `"manual-pending"` (manual). See [references/envelope-examples.md](references/envelope-examples.md) for state.yaml update examples.
 9. Backfill SHA: for each `decisions[]` entry with `commits: []` where `task_ref` maps to a task in this group, set `commits: ["{sha}"]` (auto) or leave as `[]` (manual — user has not yet committed).
 10. Return envelope per [references/envelope-examples.md](references/envelope-examples.md).

@@ -21,7 +21,7 @@ Any statement about how a framework, library, or runtime behaves in this project
 **Good (project-specific evidence):**
 > "messenger.yaml:75 routes AsyncCommand → async_commands transport. BUT command.bus at messenger.yaml:22 overrides `middleware:` and removes `SendMessageMiddleware` → dispatch via CommandBus runs sync. Async dispatch requires AsyncBusInterface (see `RecalculateServiceBillingProposalController:45`)."
 
-If evidence cannot be gathered (unfamiliar config, no existing caller), **mark the claim as an assumption to validate** and surface it as a risk in the envelope. Do NOT silently propagate a guess.
+If evidence cannot be gathered (unfamiliar config, no existing caller), mark the claim as an assumption to validate and surface it as a risk in the envelope (silent guesses compound into cascading failures).
 
 **Applies to:** routing, serialization, caching, transactions, events, middleware, dependency injection, autowiring, type coercion, ORM lifecycle.
 
@@ -50,7 +50,7 @@ Rationale: mocking a framework boundary (e.g., `MessageBusInterface` as a spy) m
 
 **Scope:** only the integration tests the phase itself created or modified — not the full suite. They are few and fast.
 
-**Exception:** if the project's test infrastructure genuinely cannot run an integration test locally (e.g., requires external services not available in the sandbox), report it as a risk in the envelope rather than silently skipping.
+**Exception:** if the project's test infrastructure genuinely cannot run an integration test locally (e.g., requires external services not available in the sandbox), report it as a risk in the envelope rather than silently skipping (the orchestrator decides whether to defer or override).
 
 ## Rule 4 — Validate Assumed Invariants in Propose Phase
 
@@ -62,7 +62,7 @@ When a proposal depends on a **codebase-wide invariant** (a naming convention, a
 - "all", "every", "always", "never", "consistent", "uniform"
 - A regex or pattern stated as currently true (e.g., "all `messageName()` return `<context>.<event>`")
 
-If none of these appear, do NOT run extra greps — propose stays as-is.
+If none of these appear, stay within the exploration budget declared in the delegation prompt (extra greps inflate context without improving accuracy) — propose stays as-is.
 
 **When triggered**:
 
@@ -93,7 +93,7 @@ Rule 1 covers framework behavior in the current repo. This rule covers the gap: 
 - A path that crosses repos (e.g., `../{other-repo}/...`, `~/Proyectos/{other-repo}/...`)
 - An evidence citation pointing outside the current `change_dir` / project root
 
-If none of these appear, do NOT run the check — the proposal/design/tasks stays as-is.
+If none of these appear, the proposal/design/tasks stays as-is (skip the check — running it outside this trigger inflates context without benefit).
 
 **When triggered**, the agent MUST:
 

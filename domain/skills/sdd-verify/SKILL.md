@@ -12,10 +12,10 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Verify against specs, not opinion. If the code does what the spec says, it passes.
-- Evidence required. Every verdict needs a command output, file:line reference, or test name:result. "Looks correct" is not evidence.
-- Run real commands. Compile, lint, test. Do not guess whether the build passes.
-- Tests are behavioral proof. A spec scenario is only COMPLIANT when a test that covers it has PASSED. Code existing in the codebase is structural evidence (Step 7), not behavioral proof (Step 9).
+- Verify against specs, not opinion. If the code does what the spec says, it passes. -- because opinion-based verdicts produce false positives that erode orchestrator trust and cause unnecessary re-engage cycles.
+- Evidence required. Every verdict needs a command output, file:line reference, or test name:result. "Looks correct" is not evidence. -- ECO-944 showed that framework assumptions without evidence produced 4 cascading bugs that required individual re-engage cycles.
+- Run real commands. Compile, lint, test. Run compile, lint, and test commands — report actual exit codes. -- guessing build status caused 3 false-PASS verdicts in early SDDs.
+- Tests are behavioral proof. A spec scenario is only COMPLIANT when a test that covers it has PASSED. Code existing in the codebase is structural evidence (Step 7), not behavioral proof (Step 9). -- structural evidence (file existence, line presence) confirms existence but not correctness; only test execution proves behavior.
 - Bash is available — see "Tool Availability by Phase: verify" in `_shared/sdd-orchestrator-protocol.md`. Step 5 (test execution) is non-skippable: if unable to execute, return `status: needs_input` listing the required commands — never declare COMPLIANT without test execution evidence.
 - Spec Compliance Matrix per group: every scenario gets exactly one of {COMPLIANT | FAILING | UNTESTED | PARTIAL}. The matrix is per logical group (REQ-VERIFY-006) when tasks.md has >1 group. -- see Step 9 and Step 11.
 - `failure_class` in envelope: emit exactly one of {implementation | test_contract | spec_gap} per failed group (null on PASS). Priority: spec_gap > test_contract > implementation. -- see Step 15 (envelope composition).
@@ -30,7 +30,7 @@ Run when the orchestrator launches the verify phase for an SDD change after appl
 | CRITICAL finding (broken build, failing test, MUST req missing) | Block archive. List in Issues/CRITICAL. Overall verdict: FAIL. |
 | WARNING finding (SHOULD gap, scope creep, design deviation) | Flag and continue. Overall verdict: PASS WITH WARNINGS. |
 | SUGGESTION only | Record. No gate action. Verdict not downgraded. |
-| Failure in `baseline.md` | Not a regression -- pre-existing. Do not report as CRITICAL. |
+| Failure in `baseline.md` | Not a regression -- pre-existing. Report as pre-existing (baseline.md match) — exclude from the CRITICAL count. |
 | Design drift that has a `state.yaml.decisions:` entry with `task_ref` | Approved drift. Carry verbatim into Drift Summary table. Not scope creep. |
 | Missing test infrastructure (no runner, no tests) | Execute Manual Review Checklist rows as Bash; map to COMPLIANT/FAILING/UNTESTED per row. |
 | `baseline_path` not injected but `baseline.md` exists on disk | Recover from disk. Report `context_resolution: fallback`. |

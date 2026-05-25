@@ -8,7 +8,7 @@ Handling for non-happy-path scenarios per mode.
 
 **Condition:** `.ai-team/config.yaml` exists when bootstrap mode runs.
 
-**Action:** Do NOT overwrite. Return `status: blocked` with message:
+**Action:** Return `status: blocked` with message that an existing config.yaml was found. The orchestrator decides whether to re-run with --force.
 > "config.yaml already exists at `.ai-team/config.yaml`. Delete it manually if you want to regenerate, or use explore mode to investigate the current stack."
 
 **Rationale:** Overwriting a user-edited config silently would destroy conventions and architecture decisions the team made.

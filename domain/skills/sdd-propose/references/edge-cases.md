@@ -8,12 +8,11 @@ Handling for non-standard inputs. One case per section.
 
 If the user request is too vague to produce concrete, testable acceptance criteria:
 
-- Do NOT produce the proposal.md. Stop and ask the user for clarification.
-- Return `status: needs_input` in the result envelope with specific questions about what is unclear.
-- The goal is to never pass vague ACs downstream — the spec agent depends on concrete ACs to generate requirements.
+- Return `status: needs_input` with clarifying questions. Stop and wait for user input before generating proposal.md.
+- The goal is to produce only concrete ACs downstream — the spec agent depends on concrete ACs to generate requirements.
 
 What counts as "too vague":
-- The request cannot be decomposed into at least 2 observable, testable acceptance criteria.
+- When the request cannot be decomposed into at least 2 observable, testable acceptance criteria, return `status: needs_input`.
 - Key nouns are undefined (e.g., "improve search" — improve what metric? for which users?).
 - The request is a wish, not a goal (e.g., "make it better" vs "reduce search latency below 200ms").
 
@@ -24,7 +23,7 @@ What counts as "too vague":
 If the user's request contradicts existing specs or code behavior:
 
 - Document the conflict explicitly in the Risks section.
-- Do NOT silently resolve it — surface it for user decision.
+- Surface it for user decision via `status: needs_input` with the specific conflict described.
 - Set result envelope status to `warning`.
 - In Open Questions, offer two resolution paths with a grounded recommendation.
 
@@ -54,7 +53,7 @@ If no `.ai-team/specs/` directory exists or it is empty:
 
 If a new feature's user journey passes through an existing flow (login, register, onboarding) that has assumptions incompatible with the new context:
 
-- Do NOT mark that domain as "no changes" — it needs changes.
+- Mark that domain as needing changes (even if changes are indirect).
 - Add the domain to Affected Domains with the specific modifications needed.
 - Add ACs that cover the flow adaptation (e.g., "registration supports account creation without shop creation when redirected from claim flow").
 - Add the redirect chain as a testable AC (e.g., "after login/register, user is redirected back to the claim page, not to dashboard").

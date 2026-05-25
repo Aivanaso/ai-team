@@ -33,7 +33,7 @@ If a file that should be created already exists (possible partial prior run):
 
 - Read the existing file to assess whether it was from a previous apply run.
 - If it matches the expected implementation → mark as done, skip writing.
-- If it is different (pre-existing code, not from apply) → return `status: warning` with details. Do not overwrite without logging a decision entry.
+- If it is different (pre-existing code, not from apply) → return `status: warning` with details; the orchestrator decides whether to overwrite (in-place overwrites require a `decisions[]` entry).
 
 ## Missing File for MODIFY
 
@@ -49,7 +49,7 @@ If implementing task A requires code from task B that has not been written yet (
 
 - Check if task B is earlier in the execution order (ordering bug in `tasks.md`).
 - If so → implement B first, then A.
-- If the dependency is truly circular → flag both tasks as `blocked` in the result envelope. Do not attempt implementation.
+- If the dependency is truly circular → flag both tasks as `blocked` in the result envelope and return `status: blocked`.
 
 ## No Verify Commands Configured
 
@@ -66,4 +66,4 @@ When the orchestrator passes a `scope` parameter with specific task IDs:
 - Only process the listed tasks.
 - Still verify their dependencies are met (either `done` in `state.yaml` or `done` from this run).
 - If a dependency is not met and not in scope → return `status: blocked`.
-- Update `state.yaml` only for tasks in scope. Do not touch progress entries for out-of-scope tasks.
+- Update `state.yaml` only for tasks in scope.

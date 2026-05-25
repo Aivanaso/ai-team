@@ -65,7 +65,7 @@ decisions: []          # Mid-flight decision log (see below)
 
 ### `decisions:` — Mid-Flight Decision Log
 
-When the SDD pipeline records a deviation from the approved plan (a fix outside `tasks.md`, a design pivot, a new dependency, a structural change, a security override, or an approved drift surfaced by Post-Apply Audit), the **orchestrator** appends an entry to `state.yaml.decisions:`. Sub-agents that detect a deviation MUST signal it via the result envelope (apply via `deviation_report`; verify via `failure_class` + Drift Summary); they MUST NOT author `decisions[]` entries. The orchestrator is the exclusive sub-agent-side writer.
+When the SDD pipeline records a deviation from the approved plan (a fix outside `tasks.md`, a design pivot, a new dependency, a structural change, a security override, or an approved drift surfaced by Post-Apply Audit), the **orchestrator** appends an entry to `state.yaml.decisions:`. Sub-agents that detect a deviation signal it via the result envelope (apply via `deviation_report`; verify via `failure_class` + Drift Summary); they signal deviations via the result envelope — the orchestrator exclusively authors `decisions[]` entries. The orchestrator is the exclusive sub-agent-side writer.
 
 **Schema** (each entry is a list item):
 
@@ -108,7 +108,7 @@ decisions:
 | **Orchestrator** (in-session, per Post-Apply Audit and re-engage protocols) | (a) Post-Apply Audit Check 1/2/3/4 discrepancy (Rule 6); (b) apply returns blocked with `deviation_report.kind: out-of-plan` and orchestrator approves drift; (c) apply returns blocked with `deviation_report.kind: design-pivot` and orchestrator re-engages design; (d) apply returns blocked with `deviation_report.kind: test-orphan` and orchestrator re-engages tasks; (e) Post-Apply Audit Check 5 failure → re-engage apply | `post-apply-audit-gap`, `out-of-plan`, `design-pivot`, `test-orphan-re-engage` |
 | **User** (via orchestrator at approval gates) | (a) Security gate "Accept and proceed" override on CRITICAL finding; (b) skip-spec confirmation logged in `phases.spec.skip_reason`, NOT decisions[]; (c) Drift acceptance during a verify warning | `security-override` |
 
-**Sub-agents MUST NOT write decisions[] directly.** Apply signals deviations via the envelope's `deviation_report` block (REQ-APPLY-023 reformulated). Verify signals drift via the Drift Summary table and via the envelope's `failure_class`. work-unit-commits BACKFILLS commit SHA into existing entries (REQ-WUC-003 step 5) but does NOT create entries.
+**The orchestrator is the exclusive `decisions[]` writer.** Apply signals deviations via the envelope's `deviation_report` block (REQ-APPLY-023 reformulated). Verify signals drift via the Drift Summary table and via the envelope's `failure_class`. work-unit-commits backfills commit SHA into existing entries (REQ-WUC-003 step 5) without creating new entries.
 
 **When to write a decision entry:**
 
@@ -119,7 +119,7 @@ decisions:
 
 **When NOT to write a decision entry:**
 
-- Sub-agents (propose, spec, design, tasks, apply, verify, work-unit-commits, sdd-security executions) MUST NOT write decisions[] entries directly. apply surfaces blocks via `deviation_report`; verify surfaces drift via the Drift Summary table; the orchestrator translates these into `decisions[]` entries.
+- Sub-agents (propose, spec, design, tasks, apply, verify, work-unit-commits, sdd-security executions) signal deviations via the result envelope; the orchestrator exclusively writes `decisions[]` entries. apply surfaces blocks via `deviation_report`; verify surfaces drift via the Drift Summary table; the orchestrator translates these into `decisions[]` entries.
 - Trivial typo fixes inside the scope of an existing task.
 - Test-only adjustments that don't change production behavior.
 - Refactoring the agent does within a single task to keep code readable.
@@ -146,7 +146,7 @@ decisions:
 |------|-------------|
 | **Atomic writes** | Write complete files, not partial updates |
 | **state.yaml is truth** | Always update `state.yaml` AFTER writing artifacts, not before |
-| **Timestamps** | Use the `current_iso_utc` value injected by the orchestrator (Injected Context block) for all `completed:`, `started:`, `updated:` and `decisions[].date` fields. Format is ISO 8601 (`YYYY-MM-DDTHH:MM:SSZ`). Sub-agents MUST NOT generate timestamps from their own sense of "now" — that drifts (observed in me-profile retro 2026-05-09: `2026-05-09T23:25:00Z` written when real date was `2026-05-08`). If the Injected Context block lacks `current_iso_utc`, surface as a `risk:` and use `date -u +%Y-%m-%dT%H:%M:%SZ` from Bash; do NOT fabricate. |
+| **Timestamps** | Sub-agents MUST use the `current_iso_utc` value injected by the orchestrator for all timestamp fields. Generating timestamps from the sub-agent's own sense of "now" produces drift (observed in me-profile retro 2026-05-09: `2026-05-09T23:25:00Z` written when real date was `2026-05-08`). Format is ISO 8601 (`YYYY-MM-DDTHH:MM:SSZ`). If the Injected Context block lacks `current_iso_utc`, surface as a `risk:` and use `date -u +%Y-%m-%dT%H:%M:%SZ` from Bash. |
 | **No orphan artifacts** | Every artifact MUST be tracked in `state.yaml` |
 | **UTF-8 only** | All files MUST be UTF-8 encoded |
 
@@ -189,4 +189,4 @@ The following fields were added in sdd-redesign-v2 without breaking older state.
 
 Old runs that wrote state.yaml without these fields continue to be readable by sdd-verify, sdd-archive, and the orchestrator. No migration is required.
 
-As of sdd-redesign apply-junior, `decisions[].task_ref` value `"test-orphan-re-engage"` (orchestrator-authored per REQ-ORCHESTRATOR-008) is recognised. Legacy `phase: apply` entries (date < this SDD's `state.yaml.created`) are tolerated; new SDDs MUST NOT produce them (sdd-verify Step 10 flags WARNING — see REQ-VERIFY-001 extension).
+As of sdd-redesign apply-junior, `decisions[].task_ref` value `"test-orphan-re-engage"` (orchestrator-authored per REQ-ORCHESTRATOR-008) is recognised. Legacy `phase: apply` entries (date < this SDD's `state.yaml.created`) are tolerated; new SDDs use only orchestrator-authored entries (sdd-verify Step 10 flags WARNING for apply-authored entries).

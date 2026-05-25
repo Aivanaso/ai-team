@@ -24,7 +24,7 @@ Before executing any SDD command (`/ai-team new`, `/ai-team ff`, `/ai-team conti
    c. Wait for the scout to finish and verify `config.yaml` was created
    d. Then proceed with the originally requested command
 
-Do NOT ask the user to run init — handle it transparently.
+Handle init transparently (the user expects it to happen automatically).
 
 ### Directory structure (create inline)
 
@@ -112,7 +112,7 @@ Before the **spec phase**, check if a base spec exists for each domain affected 
 At each gate:
 1. Present a concise summary of the completed phase
 2. Ask the user: approve, request changes, or cancel
-3. Do NOT proceed until explicitly approved
+3. Wait for explicit approval before proceeding.
 
 ### Proposal approval — infra-only short path
 
@@ -133,7 +133,7 @@ When the user picks skip-spec:
 - Delegate `sdd-design` only; tasks phase reads design without spec
 - Verify and archive proceed normally; verify's traceability matrix maps ACs from proposal directly to tests (no requirement IDs)
 
-When `change_type` is `feature` or `mixed`, do NOT offer the skip option — run spec normally.
+When `change_type` is `feature` or `mixed`, run spec normally (skip option is not offered).
 
 ### Security gates
 
@@ -168,7 +168,7 @@ When `change_type` is `feature` or `mixed`, do NOT offer the skip option — run
 When the user picks "Cancel the change":
 1. Write `state.yaml.blocked: true`.
 2. Write `state.yaml.blocked_reason: "Security gate: user cancelled on finding(s) {finding-id-list}"`.
-3. Stop. Do NOT delete the change directory. Do NOT continue to spec/verify.
+3. Stop. Preserve the change directory for user review. Stop and wait for user guidance.
 
 #### Override write rule (accept-and-proceed)
 
@@ -299,13 +299,13 @@ After sdd-apply completes, run the four structural greps from REQ-VERIFY-004:
 - Check 2: grep decisions[].decision tokens against diff (zero hits → WARNING)
 - Check 3: count decisions[] apply entries vs fix: commits (fix-commits > entries → WARNING)
 - Check 4: count new test files vs test count delta in the baseline (discrepancy → WARNING)
-- **Check 5 — Compilability sanity (BLOCKING):** Read `config.yaml` verify commands (typecheck, lint, test) and run them, scoping the test invocation to files in `git diff --name-only HEAD` from the apply session. Capture exit codes. **Blocking semantics:** any verify command with `exit_code != 0`, OR any entry in apply's reported `execution_evidence.tests_created[]` with `exit_code != 0`, → re-engage `sdd-apply` with the specific failures inlined in the re-engage prompt. Do NOT delegate `sdd-verify` until Check 5 is clean. Log a `decisions[]` entry with `task_ref: post-apply-audit-gap` listing what failed. If `execution_evidence` is absent or empty in the apply envelope → treat as Check 5 failure and re-engage apply.
-- **Check 5b — Tests-created completeness (BLOCKING):** Parse `tasks.md` `Files:` blocks for CREATE entries on test paths (heuristic: paths matching `*.test.*`, `*.spec.*`, `*_test.*`, `*_spec.*`, or under `tests/`, `__tests__/`, `test/`, `e2e/`, `spec/`). Build the expected set. Compare against the `path` field of each entry in apply's `execution_evidence.tests_created[]`. **Blocking semantics:** any expected test path missing from `tests_created[]` → re-engage `sdd-apply` with the missing paths inlined in the re-engage prompt; apply silently skipped running them (SKILL Step 3e.1 + the TESTS_CREATED delegation block require execution). Log a `decisions[]` entry with `task_ref: post-apply-audit-gap` listing the missing test files. Do NOT delegate `sdd-verify` until Check 5b is clean. Empirical pattern (2026-05-19 zod-pipe-saneamiento retro): ~20/22 of verify Run 1 regressions traced to test files apply created but never executed.
+- **Check 5 — Compilability sanity (BLOCKING):** Read `config.yaml` verify commands (typecheck, lint, test) and run them, scoping the test invocation to files in `git diff --name-only HEAD` from the apply session. Capture exit codes. **Blocking semantics:** any verify command with `exit_code != 0`, OR any entry in apply's reported `execution_evidence.tests_created[]` with `exit_code != 0`, → re-engage `sdd-apply` with the specific failures inlined in the re-engage prompt. Resolve all Check 5 failures before delegating sdd-verify. Log a `decisions[]` entry with `task_ref: post-apply-audit-gap` listing what failed. If `execution_evidence` is absent or empty in the apply envelope → treat as Check 5 failure and re-engage apply.
+- **Check 5b — Tests-created completeness (BLOCKING):** Parse `tasks.md` `Files:` blocks for CREATE entries on test paths (heuristic: paths matching `*.test.*`, `*.spec.*`, `*_test.*`, `*_spec.*`, or under `tests/`, `__tests__/`, `test/`, `e2e/`, `spec/`). Build the expected set. Compare against the `path` field of each entry in apply's `execution_evidence.tests_created[]`. **Blocking semantics:** any expected test path missing from `tests_created[]` → re-engage `sdd-apply` with the missing paths inlined in the re-engage prompt; apply silently skipped running them (SKILL Step 3e.1 + the TESTS_CREATED delegation block require execution). Log a `decisions[]` entry with `task_ref: post-apply-audit-gap` listing the missing test files. Resolve all Check 5b failures before delegating sdd-verify. Empirical pattern (2026-05-19 zod-pipe-saneamiento retro): ~20/22 of verify Run 1 regressions traced to test files apply created but never executed.
 - **Check 6 — Seniority sanity (WARNING):** Scan `state.yaml.decisions[]` for any entry with `phase: apply`. Such entries are Seniority Model violations (REQ-CR-008): apply MUST return `status: blocked` + `deviation_report`, not author audit-trail entries itself. **Action on hit:** author one orchestrator-ack entry per violation with `task_ref: "apply-seniority-violation-ack"`, `decision: "post-hoc orchestrator acknowledgement of apply-authored entry at decisions[{index}] — content kept for audit, authority reattributed"`, and surface the count in the pre-verify summary to user. Does NOT block verify delegation (informational); historical violations may persist across re-engage cycles, the ack is what closes the audit trail.
 
 On agreement with sdd-apply's envelope (Checks 1-4, 6): delegate sdd-verify normally.
 On any Check 1-4 or 6 discrepancy: present WARNING to user ("Pre-verify audit found: {finding}. sdd-verify will rule authoritatively."). Then delegate sdd-verify regardless — it provides the authoritative ruling.
-On Check 5 or 5b failure: re-engage sdd-apply (blocking). Do NOT delegate sdd-verify until both are clean.
+On Check 5 or 5b failure: re-engage sdd-apply (blocking). Delegate sdd-verify only after both checks pass.
 
 Checks 1-4 and 6 do not block verify delegation (informational WARNINGs surfaced to user, sdd-verify runs authoritatively). Checks 5 and 5b DO block — re-engage apply until clean before delegating verify.
 
@@ -338,7 +338,7 @@ Before delegating to `sdd-propose` on `/ai-team new`, establish a test-suite bas
    - Capture: exit code, pass/fail counts (parse the test runner output), last 20 lines of stderr
    - Capture: `git rev-parse HEAD` for the commit reference
    - Write `.ai-team/changes/{change-name}/baseline.md`
-3. If `test_commands` is missing: skip the health check, note it as a risk in the proposal delegation prompt, and proceed. Do NOT block on missing config — this is a best-effort safety net, not a hard requirement.
+3. If `test_commands` is missing: Proceed without health check; note it as a risk in the proposal delegation prompt (this is a best-effort safety net, not a hard requirement).
 
 **Baseline file format:** `# Baseline — {change-name}` → `**Date/Git HEAD/Branch**` → `## Test Runs` with one subsection per command (command + exit code + summary + top failures if any). Include a `## Notes` section for pre-existing failures. sdd-verify reads this to exclude pre-existing failures from regression counts.
 
@@ -384,20 +384,20 @@ Check `.ai-team/config.yaml` for `model_overrides` -- project-level overrides ta
 
 ## Sub-Agent Delegation
 
-IMPORTANT: Always use `subagent_type: "general-purpose"`. Do NOT invent custom subagent types like "sdd-propose" — they don't exist and will error.
+IMPORTANT: Always use `subagent_type: "general-purpose"` (the only valid type; custom types like "sdd-propose" do not exist and will error).
 
 **Delegation pattern (applies to every SDD phase):**
-1. Read `skills/sdd-{phase}/SKILL.md` yourself (the orchestrator reads it; sub-agents do NOT search for skill files).
+1. Read `skills/sdd-{phase}/SKILL.md` yourself (the orchestrator reads it; skill files are injected into the prompt — sub-agents receive instructions inline and do not need to search for them).
 2. Read the shared protocols yourself.
 3. Inject both as text into the `Agent()` prompt. Sub-agents receive instructions inline.
-4. Inject `references_dir: skills/sdd-{phase}/references/` — the sub-agent reads reference files on demand; the orchestrator does NOT paste them inline.
+4. Inject `references_dir: skills/sdd-{phase}/references/` — the sub-agent reads reference files on demand from this directory (reference files are not pasted inline by the orchestrator).
 5. If `strict_tdd: true` and the phase is `apply` or `verify`, append: "STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. Follow red → green → triangulate → refactor."
 
-**Prompt structure:** `You are the sdd-{phase} executor. Do this phase's work yourself. Do NOT delegate.` → `## Injected Context` (per Critical Context Forwarding table) → `## Instructions` (SKILL.md contents) → `## Shared Protocols` (context-protocol, persistence-contract, result-envelope, spec-convention, evidence-protocol) → `## Task` (what to do) → `## Project Root` (absolute path) → `## Expected Output` (result envelope with `model_used` and `context_resolution`).
+**Prompt structure:** `You are the sdd-{phase} executor. Do this phase's work yourself. Execute all steps directly (no further sub-delegation).` → `## Injected Context` (per Critical Context Forwarding table) → `## Instructions` (SKILL.md contents) → `## Shared Protocols` (context-protocol, persistence-contract, result-envelope, spec-convention, evidence-protocol) → `## Task` (what to do) → `## Project Root` (absolute path) → `## Expected Output` (result envelope with `model_used` and `context_resolution`).
 
 ### Critical Context Forwarding
 
-Sub-agents are born with **no memory** of prior phases. The orchestrator is the only component that holds session state, so it MUST inject every piece of context the next phase needs — directly into the delegation prompt. Do NOT rely on the sub-agent to discover flags by grepping or by reading state files; discovery is flakey and silently degrades.
+Sub-agents are born with **no memory** of prior phases. The orchestrator is the only component that holds session state, so it MUST inject every piece of context the next phase needs — directly into the delegation prompt. Inject every piece of context the next phase needs directly into the delegation prompt (sub-agents have no memory of prior phases; discovery via grep or state files is unreliable).
 
 Resolve these flags **once per session**, cache them, and inject them into every relevant delegation:
 
@@ -428,9 +428,9 @@ When `strict_tdd: true`, append to apply/verify prompts: "STRICT TDD MODE IS ACT
 
 ```
 SENIORITY (mandatory): You IMPLEMENT or BLOCK. You do NOT author audit-trail entries.
-- NEVER write to `decisions[]` -- orchestrator owns that surface.
-- On any deviation (out-of-plan, design-pivot, test-orphan, new runtime dep): return `status: blocked` with a structured `deviation_report` block (schema in `_shared/result-envelope.md`). Stop. Do not "fix" inline.
-- Test references a missing symbol/file/route/command? FIRST hypothesis is `test-orphan` -- block, do not invent the entity.
+- The orchestrator exclusively authors `decisions[]` entries. Signal deviations via the envelope's `deviation_report` block instead.
+- On any deviation (out-of-plan, design-pivot, test-orphan, new runtime dep): return `status: blocked` with a structured `deviation_report` block (schema in `_shared/result-envelope.md`). Stop. Surface deviations as a structured `deviation_report` in the envelope (in-line fixes are outside SDD scope).
+- Test references a missing symbol/file/route/command? FIRST hypothesis is `test-orphan` -- return `status: blocked` with `deviation_report.kind: test-orphan`. The orchestrator decides whether to add the entity per REQ or to re-engage sdd-tasks.
 - Lint/typecheck/test output you cite MUST be from a re-run inside this same Step (no stale snapshots from before autofix).
 ```
 
@@ -442,7 +442,7 @@ This block reinforces REQ-CR-008 (Seniority Model in `_shared/common-rules.md`) 
 TESTS_CREATED (mandatory): You IMPLEMENT, you EXECUTE, you REPORT. Lint passing is not proof of test passing.
 - At each group boundary, RUN every test file created by tasks in this group via the runner from `config.yaml`.
 - Populate `execution_evidence.tests_created[]` with one entry per file: `{path, command, exit_code, passed, failed}`.
-- Empty `tests_created[]` while tasks declared CREATE on test files = `status: warning`, NEVER `status: ok`.
+- Empty `tests_created[]` while tasks declared CREATE on test files = `status: warning` (returning `status: ok` without test evidence corrupts the apply audit trail).
 - Any entry with `failed > 0` or `exit_code != 0` → the test-creating task stays `partial` (not `done`), envelope `status: warning`.
 - This is ORTHOGONAL to typecheck/lint. Running typecheck+lint honestly does NOT cover this rule.
 ```
@@ -480,10 +480,10 @@ base_branch: {merge-base-sha}   # MUST be git merge-base main {branch}, NOT "mai
 
 Sub-agents inherit Bash from the parent session — they CAN run commands. The harness does not message the model when Bash would be denied; auto-restriction is a model behavior, not a permission gate. Each phase prompt MUST make availability explicit.
 
-The orchestrator forwards the relevant block below as Injected Context when delegating to each phase. Sub-agents reading this contract MUST NOT return `needs_input` on the assumption that Bash is unavailable — they MUST attempt the command first and only escalate on real failure (non-zero exit captured in output).
+The orchestrator forwards the relevant block below as Injected Context when delegating to each phase. Sub-agents reading this contract MUST attempt commands first and escalate only on real failure (non-zero exit captured in output) — Bash availability is confirmed by the harness, not by assumption.
 
 ### apply
-- Bash: AVAILABLE. Run the verify commands declared in `config.yaml` (typecheck, lint, test, build) and the read-only git commands `git status` and `git diff --name-only` freely. NEVER invoke `git commit`, `git add`, `git push`, `git stash`, `git reset`, or `git rm` — work-unit-commits owns commits (REQ-APPLY-021).
+- Bash: AVAILABLE. Run the verify commands declared in `config.yaml` (typecheck, lint, test, build) and the read-only git commands `git status` and `git diff --name-only` freely. Use only read-only git commands (`git status`, `git diff --name-only`). State-changing commands (commit, add, push, stash, reset, rm) are exclusively owned by work-unit-commits (REQ-APPLY-021).
 - Destructive: not expected at this phase. If a task requires `rm -rf` or `cp -r` outside the working tree, return `needs_input` listing the exact command and reason.
 
 ### verify
@@ -510,7 +510,7 @@ For each candidate:
 
 If `memory_candidates: []` (empty), no action — proceed to wrap up the SDD run.
 
-This handoff is the cheapest place in the pipeline to capture knowledge. Do NOT skip it because the run "felt routine" — the candidates list is precisely the agent's judgment about what was non-routine.
+This handoff is the cheapest place in the pipeline to capture knowledge. Always compose memory candidates, even for routine runs — the candidates list captures the agent's judgment about what was non-routine.
 
 ## Error Handling
 
@@ -522,4 +522,4 @@ This handoff is the cheapest place in the pipeline to capture knowledge. Do NOT 
 | Sub-agent returns `warning` | Show risks, ask if user wants to proceed |
 | Missing artifact | Check if previous phase completed; if not, run it first |
 | `apply` returns `ok` but `state.yaml.decisions:` is empty AND `git diff` shows files outside `tasks.md` | Apply skipped the mid-flight log. Ask the user whether to retroactively populate decisions before proceeding to verify, or accept the drift as un-logged (verify will flag it). |
-| `apply` returns `blocked` with `deviation_report` | Ingest per **Deviation Report Ingestion** subsection above. Author a `decisions[]` entry mapping `deviation_report.kind` → `task_ref`. Take action per `deviation_report.suggested_action`. Do NOT proceed to verify. |
+| `apply` returns `blocked` with `deviation_report` | Ingest per **Deviation Report Ingestion** subsection above. Author a `decisions[]` entry mapping `deviation_report.kind` → `task_ref`. Take action per `deviation_report.suggested_action`. Stop and ingest the deviation report per the Deviation Report Ingestion subsection above. Proceed to verify only after orchestrator action. |

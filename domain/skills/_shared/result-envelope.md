@@ -146,8 +146,7 @@ benefit.
 - Apply MUST populate `deviation_report` whenever it returns `status: blocked` with a structured
   deviation. Absent or empty `deviation_report` on a `status: blocked` apply envelope is a
   contract violation (orchestrator falls back to "escalate-user").
-- Apply MUST NOT populate `deviation_report` when returning `status: ok`, `status: warning`,
-  or `status: failed`. The field is for the structured-block path only.
+- Populate `deviation_report` only when returning `status: blocked` with a structured deviation (the field is for the blocked path only; omit it on status: ok, warning, or failed).
 - Other phases MAY include `deviation_report` if they have a structured block to surface, but
   this is not currently triggered by any phase other than apply.
 - The orchestrator translates `deviation_report` into a `decisions[]` entry per the Deviation
@@ -166,10 +165,10 @@ benefit.
 ## Rules
 
 1. **Always return an envelope** — even on failure
-2. **Summary over detail** — the orchestrator doesn't need full context, just the outcome
+2. **Summary over detail** — provide enough context for the orchestrator to act without reading the full detail section
 3. **Paths are relative** — always relative to the target project root
-4. **No code in envelope** — never include code snippets in the summary
-5. **Honest status** — don't report `ok` if there are unresolved issues; use `warning`
+4. **No code in envelope** — include outcome, counts, and key risks — reserve code snippets for the detail sections
+5. **Honest status** — report `status: warning` or `status: blocked` (return `status: ok` only when all checks pass)
 
 ## Examples
 

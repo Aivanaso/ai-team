@@ -12,7 +12,7 @@ Each SKILL.md Hard Rules section MUST contain exactly one reference line as the 
 
     - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 
-Skill-specific rules follow this bullet. Verbatim reproduction of the three consolidated principles below is forbidden (REQ-CR-007).
+Skill-specific rules follow this bullet. Verbatim reproduction of the three consolidated principles below is a REQ-CR-007 violation.
 
 ## Principle 1 — Read-only on application code (REQ-CR-002)
 
@@ -30,7 +30,7 @@ Write only to `.ai-team/` (and declared application files for sdd-apply). No SDD
 
 ### Exception: work-unit-commits
 
-`work-unit-commits` writes to the working tree via `git add` + `git commit` in auto mode (per REQ-WUC-003). This is a deliberate exception — work-unit-commits is the exclusive owner of commit creation. Apply MUST NOT invoke `git commit` (REQ-APPLY-021).
+`work-unit-commits` writes to the working tree via `git add` + `git commit` in auto mode (per REQ-WUC-003). This is a deliberate exception — work-unit-commits is the exclusive owner of commit creation. Apply uses only read-only git commands; `git commit` is exclusively owned by work-unit-commits (REQ-APPLY-021).
 
 ### Exception: orchestrator metric memory
 
@@ -42,17 +42,15 @@ Every skill execution returns a result envelope. No skill exits silently. Even w
 
 ## Principle 4 — Seniority Model (REQ-CR-008)
 
-Each SDD pipeline role has a single authority and a single product. Roles MUST NOT cross
-authorities; doing so creates separation-of-duties failures (an executor cannot also be its
-own auditor; an auditor cannot also be its own decision-maker).
+Each SDD pipeline role has a single authority and a single product. Each role operates within its single authority boundary — crossing authorities creates separation-of-duties failures (an executor cannot also be its own auditor; an auditor cannot also be its own decision-maker).
 
-| Role | Authority | Product | Forbidden |
-|------|-----------|---------|-----------|
-| **Deciding skills** (`sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`) | Decide their domain (scope, requirements, interfaces, task plan) | Domain artifacts (`proposal.md`, delta specs, `design.md`, `tasks.md`) | MUST NOT author `decisions[]` entries — decisions are recorded against an approved plan, which is what these phases produce. |
-| **Diagnosing skill** (`sdd-verify`) | Diagnose factual deviations from spec/design/tasks (run tests, build, lint; compute `failure_class`; emit Drift Summary) | `verification-report.md` + envelope `failure_class` | MUST NOT author `decisions[]` entries — verify reports drift; orchestrator records it. |
-| **Coordinating skill** (the orchestrator, in `_shared/sdd-orchestrator-protocol.md`) | Coordinate phase delegation, run Post-Apply Audit, write `decisions[]` for any approved drift surfaced by sub-agents | `decisions[]` entries in `state.yaml`; phase delegation prompts | MUST NOT execute code, write artifacts, or run tests itself (delegates to skills). |
-| **Implementing skill** (`sdd-apply`) | Implement `tasks.md` exactly; verify compilability; populate `execution_evidence`; OR return `status: blocked` with a structured `deviation_report` | Application source files; `state.yaml.phases.apply.*` (status, progress) | MUST NOT author `decisions[]` entries; MUST NOT modify SDD artifacts (`tasks.md`, `design.md`, specs, proposal); MUST NOT invoke git state-changing commands (work-unit-commits owns commits). |
-| **Mechanical skill** (`work-unit-commits`) | Stage declared files + create commit per group (auto/manual); backfill commit SHA into existing `decisions[]` entries | Commits in the working tree; `state.yaml.phases.apply.commits[group_id]`; commit SHA backfill into existing decisions[] entries | MUST NOT create `decisions[]` entries (only updates `commits[]` field of orchestrator-authored entries). |
+| Role | Authority | Product | Boundary |
+|------|-----------|---------|----------|
+| **Deciding skills** (`sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`) | Decide their domain (scope, requirements, interfaces, task plan) | Domain artifacts (`proposal.md`, delta specs, `design.md`, `tasks.md`) | The orchestrator exclusively authors `decisions[]` entries (recorded against the approved plan these phases produce). |
+| **Diagnosing skill** (`sdd-verify`) | Diagnose factual deviations from spec/design/tasks (run tests, build, lint; compute `failure_class`; emit Drift Summary) | `verification-report.md` + envelope `failure_class` | The orchestrator authors `decisions[]` entries. Verify reports drift via Drift Summary; orchestrator records it. |
+| **Coordinating skill** (the orchestrator, in `_shared/sdd-orchestrator-protocol.md`) | Coordinate phase delegation, run Post-Apply Audit, write `decisions[]` for any approved drift surfaced by sub-agents | `decisions[]` entries in `state.yaml`; phase delegation prompts | Delegates all code execution, artifact writing, and test runs to skills. |
+| **Implementing skill** (`sdd-apply`) | Implement `tasks.md` exactly; verify compilability; populate `execution_evidence`; OR return `status: blocked` with a structured `deviation_report` | Application source files; `state.yaml.phases.apply.*` (status, progress) | The orchestrator exclusively authors `decisions[]` entries; Reads SDD artifacts (`tasks.md`, `design.md`, specs, proposal) without modifying them; Uses only read-only git commands; state-changing commands (commit, add, push, stash, reset, rm) are exclusively owned by work-unit-commits. |
+| **Mechanical skill** (`work-unit-commits`) | Stage declared files + create commit per group (auto/manual); backfill commit SHA into existing `decisions[]` entries | Commits in the working tree; `state.yaml.phases.apply.commits[group_id]`; commit SHA backfill into existing decisions[] entries | Updates the `commits[]` field of orchestrator-authored `decisions[]` entries (does not create new entries). |
 
 ### Why this exists
 

@@ -43,7 +43,7 @@ Process files within a task in this dependency order:
 1. Read the task's Implementation Notes for this file (signatures, patterns, key logic).
 2. Write the complete file following: Implementation Notes (WHAT) + skill conventions (HOW — naming, imports, patterns) + project conventions from `config.yaml`.
 3. Include all necessary imports.
-4. Add JSDoc/PHPDoc only where logic is non-obvious. Do not over-document.
+4. Add JSDoc/PHPDoc only where logic is non-obvious.
 
 **For MODIFY files:**
 1. Read the current file in full.
@@ -57,7 +57,7 @@ Process files within a task in this dependency order:
 
 ## Step 3d — Compilation Verification
 
-After all files in the task are written, run the verify commands declared in `config.yaml` (typecheck, lint, or equivalent). Do NOT invent commands — read them verbatim from the project's `config.yaml`. Capture the full stdout and exit code. Store the captured output in a per-task buffer; at group boundary, aggregate these buffers into `execution_evidence` in the result envelope.
+After all files in the task are written, run the verify commands declared in `config.yaml` (typecheck, lint, or equivalent). Read verify commands verbatim from `config.yaml` (invented commands may reference tools not installed in the project). Capture the full stdout and exit code. Store the captured output in a per-task buffer; at group boundary, aggregate these buffers into `execution_evidence` in the result envelope.
 
 **On pass (exit_code == 0):** mark task as `done` in `state.yaml`. Move to next task.
 
@@ -74,9 +74,9 @@ After all files in the task are written, run the verify commands declared in `co
 ## Step 3e — Group boundary detection and hand-off
 
 1. Detect last-task-in-group per `_shared/common-rules.md` "Logical group" rule: if the next row in tasks.md Execution Order table belongs to a different group, this task is the last in the current group.
-2. (3e.1) Run the test files created by tasks in this group using the test runner declared in `config.yaml` (do not assume a specific runner — read it from config). For each created test file: capture command, exit code, passed count, and failed count into `execution_evidence.tests_created[]`. If any test file has `exit_code != 0` OR `failed > 0`: mark the corresponding task(s) `partial` in `state.yaml` (NOT `done`). sdd-verify remains the authoritative judge of full-suite compliance, but apply MUST NOT mark a test-creating task `done` while the tests it created are red.
+2. (3e.1) Run the test files created by tasks in this group using the test runner declared in `config.yaml` (read the runner from config, not from assumption). For each created test file: capture command, exit code, passed count, and failed count into `execution_evidence.tests_created[]`. If any test file has `exit_code != 0` OR `failed > 0`: mark the task `partial` (not `done`) while the tests it created are red — sdd-verify is the authoritative judge.
 3. (3e.2) Update state.yaml: set `phases.apply.progress[{group_id}] = done`. The group_id is the literal string "G1", "G2", etc. from the Execution Order table.
-4. (3e.3) Return control to the orchestrator. NEVER run `git commit`. The orchestrator will invoke `work-unit-commits` per REQ-ORCHESTRATOR-010.
+4. (3e.3) Return control to the orchestrator; it will invoke `work-unit-commits` per REQ-ORCHESTRATOR-010. State-changing git commands are outside apply's scope.
 5. Watchdog-resilience: the `progress[group_id] = done` marker is durable; a resumed run reads it and skips re-execution.
 
 ## Step 3f — Progress Update

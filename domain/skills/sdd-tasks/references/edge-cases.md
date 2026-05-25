@@ -42,7 +42,7 @@ If Step 2 reveals that files have changed since the design:
 
 If the design omits a Test Strategy section:
 
-- Do NOT invent a test strategy.
+- Return `status: blocked` with a question asking the orchestrator to provide the testing approach (invented strategies produce scaffolds that apply cannot execute).
 - Each task gets "Files compile without errors" as the minimum verification criterion.
 - Add a risk to the result envelope: "Design has no test strategy — tasks lack test guidance."
 

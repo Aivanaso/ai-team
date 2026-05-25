@@ -9,7 +9,7 @@ If `state.yaml` shows some tasks as `failed` or `skipped` in apply progress:
 1. Verify only the tasks marked `done` -- skip failed/skipped tasks.
 2. Note skipped tasks in the report: "Tasks {IDs} were not applied (status: {failed/skipped}) -- excluded from verification."
 3. For spec compliance: requirements that depend only on failed tasks get verdict SKIP, not CRITICAL.
-4. Overall verdict: max PASS WITH WARNINGS (cannot be clean PASS if tasks were skipped).
+4. Overall verdict: max PASS WITH WARNINGS (when tasks were skipped, the maximum verdict is PASS WITH WARNINGS, not clean PASS).
 
 ## No Tests in Project
 
@@ -30,7 +30,7 @@ If specs were skipped (proposal went straight to design):
 
 ## Large Codebase (50+ Changed Files)
 
-Budget your reads. Do NOT read every file.
+Budget reads — scan broadly first, then read only the files where Phase A found discrepancies.
 
 | Priority | Read | Why |
 |----------|------|-----|

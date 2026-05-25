@@ -60,7 +60,7 @@ NOT: "Create OAuthService class that implements AuthStrategy interface"}
 
 ## Acceptance Criteria
 
-Each criterion MUST be observable and testable. If you cannot write it as a concrete check, the input is too vague — stop and ask the user.
+Each criterion MUST be observable and testable. If an AC cannot be written as a concrete, observable check, return `status: needs_input` with a clarifying question (vague ACs cannot be verified by sdd-verify).
 
 - [ ] {Criterion 1 — observable, testable}
 - [ ] {Criterion 2}

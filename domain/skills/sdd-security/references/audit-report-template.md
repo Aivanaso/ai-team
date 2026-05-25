@@ -64,4 +64,4 @@ Each finding MUST include all seven fields:
 
 ## base_branch Semantics
 
-`base_branch` MUST be the merge-base of the change branch relative to main, NOT simply "main". The orchestrator computes this with `git merge-base main {change_branch}` and injects the resulting SHA. Injecting "main" directly would read the entire history since the branch diverged and inflate the diff scope. Do not recompute — use the injected value.
+`base_branch` MUST be the merge-base of the change branch relative to main, NOT simply "main". The orchestrator computes this with `git merge-base main {change_branch}` and injects the resulting SHA. Use the `base_branch` SHA injected by the orchestrator (recomputing it would expand the diff scope to the full branch history).

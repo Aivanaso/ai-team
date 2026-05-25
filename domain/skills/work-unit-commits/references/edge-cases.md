@@ -7,10 +7,8 @@
 **Scenario:** `git commit` fails because a pre-commit hook (e.g., eslint, prettier, husky) rejects the staged files.
 
 **Behaviour:**
-- Return `status: failed` immediately.
-- Include the full git/hook output in `risks:`.
-- Do NOT retry (REQ-WUC-003 hard rule).
-- Do NOT suggest `--no-verify` — that bypasses safety checks and is forbidden by project convention.
+- Return `status: failed` with the git output in `risks:` (the orchestrator handles retry decisions, per REQ-WUC-003).
+- Propose re-running after the hook issue is resolved. The `--no-verify` flag bypasses safety checks and is prohibited by project convention.
 
 **Resolution:** The orchestrator surfaces the failure to the user, who fixes the issue and triggers a fresh work-unit-commits invocation.
 
@@ -31,16 +29,14 @@
 **Scenario:** `git commit` fails due to a merge conflict (unresolved markers in staged files).
 
 **Behaviour:**
-- Return `status: failed`.
-- Include git output in `risks:`.
-- Do NOT attempt to resolve conflicts — that requires human judgment or sdd-apply re-engagement.
+- Return `status: blocked` with the conflict details; the orchestrator decides whether to re-engage sdd-apply or request human resolution.
 
 ## Edge Case 4 — Undeclared file in working tree
 
 **Scenario:** `git diff --name-only HEAD` shows a modified file that is NOT in any task's `Files:` block for this group.
 
 **Behaviour:**
-- Do NOT stage the undeclared file (REQ-WUC-006).
+- Stage only the declared files; emit WARNING for the undeclared file with its path (REQ-WUC-006).
 - Emit WARNING: `"Undeclared file {path} in working tree diff — not staged. Likely a side effect from a previous group or a scope creep indicator."`.
 - Proceed with committing only declared files.
 - Orchestrator should note this for Post-Apply Audit (REQ-ORCHESTRATOR-009 Check 1).

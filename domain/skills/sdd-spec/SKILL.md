@@ -12,12 +12,12 @@ Run when the orchestrator launches the spec phase for an SDD change after the pr
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- One delta spec per affected domain — no cross-domain blending.
+- One delta spec per affected domain — no cross-domain blending. -- ensures the merge algorithm in sdd-archive can apply changes per-domain without cross-contamination.
 - Every requirement MUST trace to a proposal AC via `**Source:** AC-{N}`. No orphans.
 - Use RFC 2119 keywords (`MUST`, `SHOULD`, `MAY`, `MUST NOT`) for priority fields — no synonyms.
 - REQ-ID format: `REQ-{DOMAIN}-{NNN}` — uppercase domain slug, zero-padded three-digit counter. Continue from the highest existing ID in the base spec; never reuse removed IDs.
-- Specs are behavioral: describe WHAT the system does, not HOW. No class names, method signatures, or DB column names in requirement text.
-- Every constraint with a quantitative threshold (max/min/range), a qualitative pattern (regex/format/enum), or a refined invariant MUST have at least one Given/When/Then scenario explicitly testing the rejection case at the threshold (e.g., "When value = max + 1, Then reject"). A constraint declared without a boundary scenario is incomplete: downstream phases may implement enforcement that silently no-ops, and the test gap will not surface until a hostile input lands in production.
+- Specs are behavioral: describe WHAT the system does, not HOW. No class names, method signatures, or DB column names in requirement text. -- because implementation details in specs couple the spec to a specific design, preventing reuse across alternative designs.
+- Every constraint with a quantitative threshold (max/min/range), a qualitative pattern (regex/format/enum), or a refined invariant MUST have at least one Given/When/Then scenario explicitly testing the rejection case at the threshold (e.g., "When value = max + 1, Then reject"). A constraint declared without a boundary scenario is incomplete: downstream phases may implement enforcement that silently no-ops, and the test gap will not surface until a hostile input lands in production. -- ZodPipe bug retro showed that validation took 6 SDDs to surface because boundary rejection scenarios were missing from specs.
 
 ## Decision Gates
 

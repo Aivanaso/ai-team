@@ -4,7 +4,7 @@
 
 If an affected domain has existing code but no base spec:
 
-- Do NOT generate a delta for that domain.
+- Skip that domain — generate delta specs only for domains with changes.
 - Generate deltas for all other domains that are ready.
 - Return `status: warning` (not `blocked`) with the domains needing baselines listed in `risks`.
 - The orchestrator will trigger baseline generation and re-run the spec phase for the remaining domains.
@@ -33,7 +33,7 @@ If a single acceptance criterion requires changes in 3+ domains:
 If two acceptance criteria contradict each other:
 
 - Document the conflict as a risk in the result envelope.
-- Do NOT resolve it — surface it for the user to decide.
+- Surface it via `status: needs_input` with the specific conflict described; the user decides.
 - Generate specs for the non-conflicting ACs normally.
 
 ## Vague or Unverifiable AC
@@ -65,5 +65,5 @@ If `change_type` is missing from the injected context:
 If the orchestrator sends `skip_spec: true` (infra short path):
 
 - Return immediately with `status: ok` and `executive_summary: "spec skipped — infra change"`.
-- Do NOT write any spec artifacts.
-- Do NOT update `state.yaml` spec phase status.
+- Leave `state.yaml` spec phase status unchanged (spec was skipped, not completed).
+- Skip writing spec artifacts.

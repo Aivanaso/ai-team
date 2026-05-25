@@ -12,12 +12,12 @@ Run when the orchestrator launches the tasks phase for an SDD change. Produces `
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Decompose, don't redesign. Flag disagreements as risks; do NOT alter interfaces or add components beyond what design.md specifies.
-- Every task must leave the codebase compilable (or in the meta-project case: leave the framework files in a valid SKILL.md structure).
-- Embed enough context in each task that sdd-apply does not need to re-read the full design.
+- Decompose, don't redesign. Flag disagreements as risks in the result envelope; interface alterations require re-engaging sdd-design (the approved design is the contract for apply). -- because redesigning at the task level invalidates all upstream artifacts (spec, design) and forces re-approval cycles.
+- Every task must leave the codebase compilable (or in the meta-project case: leave the framework files in a valid SKILL.md structure). -- because a non-compiling intermediate state prevents apply from running the tests in subsequent tasks.
+- Embed enough context in each task that sdd-apply does not need to re-read the full design. -- because apply runs with a fresh context window and no access to design.md; missing context forces apply to guess, which produces semantic drift.
 - Evidence > Assumption: cross-repo pattern transplants embed the Rule 5 precondition block per evidence-protocol.
-- Declare a test scaffold file per AC in the delta spec, listed in the relevant task's `Files:` block. Emit the AC↔Test Traceability table in tasks.md per REQ-TASKS-019. Meta-project exception (`config.yaml.stack.testing: []`): emit a Manual Review Checklist instead — see Step 7b.
-- Number groups sequentially starting at G1 with no gaps. A task belongs to exactly one group. The Execution Order table is the canonical source — see `_shared/common-rules.md` "Logical group" section (REQ-CR-006, REQ-TASKS-021).
+- Declare a test scaffold file per AC in the delta spec, listed in the relevant task's `Files:` block. Emit the AC↔Test Traceability table in tasks.md per REQ-TASKS-019. Meta-project exception (`config.yaml.stack.testing: []`): emit a Manual Review Checklist instead — see Step 7b. -- because without scaffolds declared in Files:, apply invents test structure that may not match the project's patterns or runner discovery paths.
+- Number groups sequentially starting at G1 with no gaps. A task belongs to exactly one group. The Execution Order table is the canonical source — see `_shared/common-rules.md` "Logical group" section (REQ-CR-006, REQ-TASKS-021). -- because the Execution Order table is the canonical sequence; gaps cause the orchestrator's task-tracking to miscount progress.
 
 ## Decision Gates
 

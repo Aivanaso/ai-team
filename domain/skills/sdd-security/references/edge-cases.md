@@ -25,43 +25,43 @@ Rationale: false positives train reviewers to ignore findings. A clean report wi
 
 **Behavior:** Return `status: ok`, `verdict: no-findings`, `findings: []`. Note in executive summary: "diff is empty between {base_branch} and {change_branch} — no files to audit".
 
-Do NOT treat as an error. An empty diff is a valid state (e.g., the change was reverted, or the branch is identical to base).
+Treat an empty diff as a valid state (e.g., reverted change or identical branch). Return `status: ok` with an empty findings list.
 
 ## Edge Case 4: Invalid Mode Value
 
 **Condition:** `mode` is neither `threat-model` nor `code-audit`.
 
-**Behavior:** Return `status: blocked`. Include the invalid value in the executive summary: "Invalid mode: '{value}'. Expected threat-model or code-audit." Do not proceed with any audit steps.
+**Behavior:** Return `status: blocked` with the invalid value in the executive summary: "Invalid mode: '{value}'. Expected threat-model or code-audit." Wait for the orchestrator to correct the mode before proceeding.
 
 ## Edge Case 5: mode Missing from Injected Context
 
-**Condition:** `mode` key is absent from the injected context block and cannot be recovered from `state.yaml`.
+**Condition:** `mode` key is absent from the injected context block and not recoverable from `state.yaml`.
 
-**Behavior:** Return `status: blocked`. Report `context_resolution: fallback` with `risks: ["mode: missing from injected context"]`. This is the one field that cannot be safely inferred — wrong mode would produce a meaningless audit.
+**Behavior:** Return `status: blocked`. Report `context_resolution: fallback` with `risks: ["mode: missing from injected context"]`. If `mode` is absent and not recoverable from `state.yaml`, return `status: blocked`. `mode` is the one field that requires explicit injection — an inferred mode would produce a meaningless audit.
 
 ## Edge Case 6: git Unavailable (code-audit mode)
 
 **Condition:** `git` command is not available in the execution environment.
 
-**Behavior:** Return `status: blocked`, message "git is not available; cannot compute diff scope for code-audit mode".
+**Behavior:** Return `status: blocked` with message "git is unavailable; diff scope for code-audit mode requires git."
 
 ## Edge Case 7: config.yaml Missing
 
 **Condition:** `.ai-team/config.yaml` is not found at the expected path.
 
-**Behavior:** Return `status: blocked`, message "config.yaml not found at expected path; cannot read project configuration".
+**Behavior:** Return `status: blocked` with message "config.yaml not found at expected path; project configuration is required."
 
 ## Edge Case 8: Re-audit (Gate Fired Twice)
 
 **Condition:** `threat-model.md` or `audit-report.md` already exists from a prior run of this mode.
 
-**Behavior:** Overwrite the previous report. The archive phase does not need historical audit versions — the override `decisions:` entry in `state.yaml` preserves the audit trail. Do NOT return `status: blocked` because a prior report exists.
+**Behavior:** Overwrite the previous report. The archive phase preserves audit history via the override `decisions:` entry in `state.yaml`.
 
 ## Edge Case 9: Dependency Auditor Not Configured (code-audit)
 
 **Condition:** `test_commands.security` is absent from `config.yaml`.
 
-**Behavior:** Silent no-op. Log "Dependency auditor: not configured (skipped)" in the `## Dependency Auditor` section of `audit-report.md`. Do not treat as a warning or error.
+**Behavior:** Log "Dependency auditor: not configured (skipped)" in the `## Dependency Auditor` section of `audit-report.md`. Continue normally.
 
 ## Edge Case 10: Test Infrastructure Ran but No Diff
 

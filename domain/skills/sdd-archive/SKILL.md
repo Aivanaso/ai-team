@@ -13,12 +13,12 @@ Run when the orchestrator launches the archive phase for an SDD change whose ver
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Run only after verify reports `done` with verdict PASS or PASS WITH WARNINGS; otherwise return `status: blocked`.
-- Apply the merge algorithm exactly: ADDED appends, MODIFIED replaces, REMOVED deletes. No creative interpretation.
+- Apply the merge algorithm exactly: ADDED appends, MODIFIED replaces, REMOVED deletes. No creative interpretation. -- because creative interpretation during merge creates spec drift that accumulates across SDDs; spec artifacts are the shared language of the pipeline.
 - Copy to archive BEFORE deleting the active change directory. If copy fails, abort.
 - Always include `memory_candidates:` in the envelope (possibly empty). The orchestrator depends on this field.
-- `memory_candidates:` MUST be populated BEFORE any destructive step (`cp -r`, `rm -rf`). If destructive steps fail (e.g., Bash denied), return `status: warning` with the populated `memory_candidates:` — never return without them. Memory is the only output that cannot be reconstructed from disk; specs/copies are recoverable by re-running the failed step.
+- `memory_candidates:` MUST be populated BEFORE any destructive step (`cp -r`, `rm -rf`). If destructive steps fail (e.g., Bash denied), return `status: warning` with the populated `memory_candidates:`. Always return with memory_candidates populated — memory is the only output that cannot be reconstructed from disk; specs/copies are recoverable by re-running the failed step.
 - Bash is available — see "Tool Availability by Phase: archive" in `_shared/sdd-orchestrator-protocol.md`. Run `cp -r` and `rm -rf` per Steps freely; the `memory_candidates`-first rule above remains the safety net for any failure.
-- No git state-changing commands: NEVER invoke `git commit`, `git add`, `git push`, `git stash`, `git reset`, `git rm`. Only `git log` (read-only) is permitted in Step 1 memory pass for SHA verification. Grep contract: `grep -E 'git (commit|add|push|stash|reset|rm)' domain/skills/sdd-archive/SKILL.md` returns zero matches.
+- Use only `git log` (read-only) for SHA verification in Step 1. State-changing git commands (commit, add, push, stash, reset, rm) are exclusively owned by work-unit-commits. Grep contract: `grep -E 'git (commit|add|push|stash|reset|rm)' domain/skills/sdd-archive/SKILL.md` returns zero matches.
 
 ## Decision Gates
 

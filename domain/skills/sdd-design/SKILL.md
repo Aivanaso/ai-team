@@ -12,8 +12,8 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Follow existing project patterns — if the project uses repository pattern, use it. Don't introduce paradigms the proposal doesn't call for.
-- Name actual files, classes, interfaces, and methods. Abstract descriptions are not accepted.
+- Follow existing project patterns — if the project uses repository pattern, use it. Introduce only paradigms the proposal explicitly calls for. -- because novel paradigms introduced at design level create scope creep during apply and inconsistencies that sdd-verify cannot distinguish from bugs.
+- Name actual files, classes, interfaces, and methods. Abstract descriptions are not accepted. -- because abstract descriptions ("a service", "some module") force apply to make design decisions it lacks authority for, creating undocumented scope decisions.
 - Evidence > Assumption: every framework or project-behavior claim MUST cite a config line or existing caller. See `_shared/evidence-protocol.md`.
 - If any design decision cites a sibling repo as the pattern source, apply Evidence Protocol Rule 5 before finalizing — verify all 5 axes (build topology, dependency layout, framework version, runtime topology, environment scope).
 
@@ -24,7 +24,7 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 | `skip_spec: true` (infra short path) | Design from proposal ACs directly; see [references/edge-cases.md](references/edge-cases.md) "No Delta Specs Available". |
 | Delta specs not yet written (parallel execution) | Same as above; note in design.md "Designed from proposal ACs". |
 | Change is trivial (single field, rename) | Produce minimal design; omit inapplicable sections; note "Minimal design" in envelope. |
-| Codebase has conflicting patterns | Follow most recent/common; document inconsistency as a design decision; do NOT fix it. |
+| Codebase has conflicting patterns | Follow most recent/common; document inconsistency as a design decision. Surface the inconsistency as a risk in the result envelope; the orchestrator decides whether to scope a separate refactoring change. |
 | Stack missing a required capability | Include new dependencies; list as risk; see [references/edge-cases.md](references/edge-cases.md) "Stack Mismatch". |
 
 ## Execution Steps

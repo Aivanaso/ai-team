@@ -23,7 +23,7 @@ If the codebase has inconsistent patterns (e.g., some modules use repository pat
 
 - Follow the most recent or most common pattern.
 - Document the inconsistency as a design decision: "Followed pattern X because {reason}, but noted pattern Y also exists."
-- Do NOT try to resolve the inconsistency — that's a separate refactoring change.
+- Surface it as a risk in the result envelope; the orchestrator decides whether to scope a separate refactoring change.
 
 ## Stack Mismatch
 

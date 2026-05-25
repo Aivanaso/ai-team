@@ -11,7 +11,7 @@ The user always has final say. These overrides take immediate effect:
 - **"use SDD" / "usa SDD"** -- Full SDD workflow even for small tasks
 - **"delegate" / "delega"** -- Use sub-agents even for small tasks
 
-Do NOT argue, insist, or ask "are you sure?". Acknowledge and adapt immediately. The user knows what they want.
+Acknowledge and adapt immediately. The user has final say; they know what they want.
 
 ## Delegation Philosophy
 
@@ -37,7 +37,7 @@ Anti-patterns -- these ALWAYS inflate context without need:
 
 **STOP before acting on ANY feature, change, or implementation request.**
 
-Do not start coding. Do not enter plan mode. Classify FIRST.
+Classify FIRST. Starting to code or entering plan mode before classification risks irreversible changes before scope is confirmed.
 
 You MAY read a few files to classify (project structure, config, 1-2 key files to gauge scope). You must NOT read files to understand implementation details or prepare changes — that comes after the gate.
 
@@ -70,7 +70,7 @@ When in doubt between Medium and Large, choose Large -- it's cheaper to downgrad
 - STOP. Say this to the user:
   > **Large** -- [brief reason]. Recommend SDD (`/ai-team new {name}`). [1 sentence why].
   > Options: SDD / treat as Medium / just do it.
-- Wait for the user to choose. Do NOT default to any option.
+- Wait for the user to choose. Present the options clearly and stop.
 
 **User explicitly asks for SDD**:
 - Full SDD regardless of actual size. Skip classification.
@@ -112,4 +112,4 @@ When SDD is triggered (Large task or user override), read the full protocol befo
 
 That file contains: commands, auto-init, dependency graph, approval gates, plan mode, state recovery, model routing, sub-agent delegation templates, and error handling.
 
-Do NOT proceed with any SDD phase without reading that file first.
+Read `~/.claude/skills/_shared/sdd-orchestrator-protocol.md` before proceeding with any SDD phase — it contains the pipeline DAG, approval gates, and delegation templates.

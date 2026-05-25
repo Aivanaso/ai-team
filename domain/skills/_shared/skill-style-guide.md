@@ -13,11 +13,11 @@ Every SKILL.md must contain exactly these six `##` sections, in this order:
 1. **Activation Contract** — when the orchestrator invokes this skill (trigger conditions, never-run conditions). One paragraph or a short bulleted list. Decides whether to run at all.
 2. **Hard Rules** — numbered, absolute constraints the agent must never violate. No prose. If a rule needs explanation, the explanation goes in `references/`.
 3. **Decision Gates** — blocking checks before execution begins. Format: `IF <condition> THEN <action>`. Explicit exit conditions only.
-4. **Execution Steps** — ordered numbered list. Imperative voice. One step = one action. Sub-steps allowed; nested prose forbidden.
+4. **Execution Steps** — ordered numbered list. Imperative voice. One step = one action. Sub-steps allowed. Nest with sub-steps (a., b., c.) for multi-action steps; prose paragraphs within steps reduce scannability and belong in references/.
 5. **Output Contract** — what the envelope looks like, required fields, mandatory grep-contracts. No envelope examples inline (those go to `references/envelope-examples.md`).
 6. **References** — list of `references/` files with a one-line "load when" annotation each. Empty section is fine if no references exist yet.
 
-Do not add sections outside this list. Do not reorder.
+The six sections above are the complete and fixed structure. Additional sections go in `references/` files; reordering breaks the structural grep contracts in sdd-verify.
 
 ---
 
@@ -97,17 +97,17 @@ Rules:
 
 ---
 
-## Prohibitions
+## Content belongs in references/
 
-NEVER include in a SKILL.md:
+Extract this content to `references/` files instead:
 
-- Historical notes ("This was added in May 2026 because…")
-- Motivation prose ("The reason we do X is…")
-- `## Background` or `## Context` sections
-- Multi-paragraph rule explanations (one sentence per rule; rest in `references/`)
-- Code examples longer than 5 lines (move to `references/`)
-- Commented-out sections
-- "TODO" or "FIXME" annotations
+- Historical notes → extract to `references/` with context about when and why
+- Motivation prose → capture as a single WHY clause on the rule (`-- because {failure mode}`)
+- `## Background` or `## Context` sections → extract to `references/`
+- Multi-paragraph rule explanations → one sentence per rule inline; rest in `references/`
+- Code examples longer than 5 lines → move to `references/`
+- Commented-out sections → remove or extract to `references/`
+- "TODO" or "FIXME" annotations → track in tasks.md, not inline
 
 ---
 
@@ -140,7 +140,7 @@ When refactoring an existing SKILL.md to the LLM-first shape:
 
 1. **Audit sections** — list every `##` section. Identify which match the 6 mandatory sections and which are extras.
 2. **Classify content** — for each paragraph/block: is it runtime-critical (stays inline) or reference material (moves to `references/`)?
-3. **Extract reference material** — create `references/` files, copy content verbatim. Do not rewrite during extraction.
+3. **Extract reference material** — create `references/` files, copy content verbatim during extraction; rewrite only after the extracted file exists.
 4. **Rewrite steps in imperative voice** — edit Execution Steps to imperative, one-action-per-step format.
 5. **Add frontmatter** — add the 4-key YAML block at the top.
 6. **Add `## References` section** — list every extracted file with its "load when" annotation.

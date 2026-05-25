@@ -1,31 +1,31 @@
 ---
 name: sdd-apply
-description: "Trigger: orchestrator launches apply after tasks approval. Implement task plan, write application source files. Never commit (work-unit-commits owns commits). When a deviation is required, return status: blocked with a structured deviation_report — never author audit-trail entries."
+description: "Trigger: orchestrator launches apply after tasks approval. Implement task plan, write application source files. Commits owned by work-unit-commits. Return status: blocked with deviation_report on deviations; the orchestrator authors audit-trail entries."
 disable-model-invocation: true
 user-invocable: false
 ---
 
 ## Activation Contract
 
-Run when the orchestrator launches the apply phase for an SDD change after tasks are approved. Produce: application source files (created, modified, removed) exactly as specified by `tasks.md`. Never write test files (work-unit-commits and tasks own tests). Never invoke git state-changing commands (REQ-APPLY-021). Update `state.yaml`. Never produce specs, design, proposal, or tests.
+Run when the orchestrator launches the apply phase for an SDD change after tasks are approved. Produce: application source files (created, modified, removed) exactly as specified by `tasks.md`. Update `state.yaml`. Commits are exclusively owned by work-unit-commits (REQ-APPLY-021).
 
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Writes application source files (exception to read-only principle — apply's primary responsibility). -- see Step 3c.
-- Write code per `tasks.md` exactly. No redesign, no extra files, no bonus refactors. -- see Step 3c.
-- Touch only files listed in tasks. If a task lists 3 files, touch exactly 3 files. -- see Step 3c.
-- Every task leaves the codebase compilable (or for meta-project: leaves framework files in valid Markdown structure). -- see Step 3d.
-- Never modify SDD artifacts (`tasks.md`, `design.md`, specs, proposal). The only `.ai-team/` file you update is `state.yaml` (`phases.apply.*`: status, progress, commits). Never author audit-trail entries. -- see Step 3c.
-- Skill-first: load project skills before writing code. Skills define naming, imports, patterns, test structure. Code that ignores skills is wrong even if it compiles. -- see Step 2.
-- Read before modifying: always read a file in full before applying changes. -- see Step 3c.
+- Write code per `tasks.md` exactly. No redesign, no extra files, no bonus refactors. -- because downstream sdd-verify can only validate against the approved plan; deviation without a `deviation_report` creates undetectable scope drift. -- see Step 3c.
+- Touch only files listed in tasks. If a task lists 3 files, touch exactly 3 files. -- because scope drift to unlisted files breaks the Post-Apply Audit's deliverables check (Step 7). -- see Step 3c.
+- Every task leaves the codebase compilable (or for meta-project: leaves framework files in valid Markdown structure). -- because a non-compiling intermediate state blocks all subsequent tasks in the group from executing. -- see Step 3d.
+- Read SDD artifacts (`tasks.md`, `design.md`, specs, proposal) without modifying them. The only `.ai-team/` file to update is `state.yaml` (`phases.apply.*`: status, progress, commits). The orchestrator exclusively authors audit-trail entries. -- see Step 3c.
+- Skill-first: load project skills before writing code. Skills define naming, imports, patterns, test structure. Code that ignores skills is wrong even if it compiles. -- because skills encode project conventions that override generic framework defaults; missing them introduces inconsistency that verification cannot catch. -- see Step 2.
+- Read before modifying: always read a file in full before applying changes. -- because blind writes risk overwriting changes from earlier tasks in the same group. -- see Step 3c.
 - Before composing the result envelope, verify every CREATE/MODIFY/REMOVE listed in `tasks.md` actually happened on disk. Self-reporting "X/X tasks done" without on-disk verification is a contract violation. -- see Step 7.
-- Group boundary hand-off: when the last task in a group completes, update `state.yaml.phases.apply.progress[group_id] → done` and return control to the orchestrator. NEVER run `git commit` — work-unit-commits owns commits. -- see Step 3e.
-- NEVER invoke `git commit`, `git add`, `git push`, `git stash`, `git reset`, `git rm`, or any other state-changing git command. The only permitted git invocation is `git diff --name-only` (or `git status --porcelain`) used during the deliverables audit. -- see Step 7. Grep contract enforced by verify.
-- Do not invent entities (test-orphan): if a test references a symbol, file, route, command, or interface not in the system under test, the FIRST hypothesis is test-orphan (wrong contract). Classify as `test-with-AC-trace` (justified by a REQ in tasks.md) or `test-orphan` (no REQ anchor). For test-orphan: return `status: blocked` with `deviation_report.kind: test-orphan`, failed test name + missing-entity grep result in `evidence`. Never add the entity; never author audit-trail entries. -- see Step 3g-replacement.
-- Seniority: apply implements or blocks; it does NOT author audit-trail entries. Per Seniority Model (REQ-CR-008 in `_shared/common-rules.md`): detect any deviation trigger (out-of-plan, design-pivot, test-orphan, new runtime dependency), compose the `deviation_report` block (schema in `_shared/result-envelope.md`), return `status: blocked`. Do NOT touch the audit trail. -- see Step 3g.
+- Group boundary hand-off: when the last task in a group completes, update `state.yaml.phases.apply.progress[group_id] → done` and return control to the orchestrator. Leave commits to work-unit-commits (the exclusive commit owner, per REQ-APPLY-021). -- see Step 3e.
+- Use only read-only git commands (`git diff --name-only` or `git status --porcelain`) during the deliverables audit. State-changing git commands (commit, add, push, stash, reset, rm) are exclusively owned by work-unit-commits. -- see Step 7. Grep contract enforced by verify.
+- Respect entity boundaries (test-orphan): if a test references a symbol, file, route, command, or interface not in the system under test, the FIRST hypothesis is test-orphan (wrong contract). Classify as `test-with-AC-trace` (justified by a REQ in tasks.md) or `test-orphan` (no REQ anchor). For test-orphan: return `status: blocked` with `deviation_report.kind: test-orphan`. The orchestrator decides whether to add the entity per REQ or to re-engage sdd-tasks. -- see Step 3g-replacement.
+- Seniority: apply implements or blocks. Per Seniority Model (REQ-CR-008 in `_shared/common-rules.md`): detect any deviation trigger (out-of-plan, design-pivot, test-orphan, new runtime dependency), compose the `deviation_report` block (schema in `_shared/result-envelope.md`), return `status: blocked`. Surface the deviation via the `deviation_report` block in the envelope (the orchestrator translates this into a `decisions[]` entry). -- see Step 3g.
 - Evidence Protocol Rule 3: if a task generates integration tests, execute them before marking `status: ok`. (Meta-project: Manual Review Checklist criteria substitute.) -- see Step 3d–3e.
-- Bash is available — see `_shared/sdd-orchestrator-protocol.md` "Tool Availability by Phase: apply". Honesty: the envelope MUST include `execution_evidence` populated with the literal stdout of every verify command declared in `config.yaml` (typecheck, lint) and of each test file created during this phase. An absent or empty `execution_evidence` is a contract violation — never declare `status: ok` without it. If a verify command cannot be run (Bash denied, missing dependency), set `status: blocked` listing the exact command and reason. NEVER `status: ok` with a note "pending". -- see Step 7.
+- Bash is available — see `_shared/sdd-orchestrator-protocol.md` "Tool Availability by Phase: apply". Honesty: the envelope MUST include `execution_evidence` populated with the literal stdout of every verify command declared in `config.yaml` (typecheck, lint) and of each test file created during this phase. An absent or empty `execution_evidence` is a contract violation. If a verify command cannot be run (Bash denied, missing dependency), set `status: blocked` listing the exact command and reason. -- see Step 7.
 
 ## Decision Gates
 
@@ -59,16 +59,16 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    **3d — Verify compilation** using `config.yaml` verify commands. Fix up to 2 attempts. Mark `done` or `failed`.
 
    **3e — Group boundary detection and hand-off:** when the last task in a group completes:
-   1. (3e.1) Run the test files created by tasks in this group using the test runner from `config.yaml`. Capture command, exit code, passed/failed counts into `execution_evidence.tests_created[]`. If any test file has `exit_code != 0` OR `failed > 0`: mark the corresponding task(s) `partial` (NOT `done`). sdd-verify is the authoritative judge of the full suite, but apply MUST NOT mark a task `done` while the tests it created are red.
+   1. (3e.1) Run the test files created by tasks in this group using the test runner from `config.yaml`. Capture command, exit code, passed/failed counts into `execution_evidence.tests_created[]`. If any test file has `exit_code != 0` OR `failed > 0`: mark the corresponding task(s) `partial` (NOT `done`) — sdd-verify is the authoritative judge of full-suite compliance. Mark the task `partial` (not `done`) while the tests it created are red.
    2. (3e.2) Update `state.yaml`: set `phases.apply.progress[{group_id}] = done`. The group_id is the literal string "G1", "G2", etc. from the Execution Order table.
-   3. (3e.3) Return control to the orchestrator. NEVER run `git commit`. The orchestrator will invoke `work-unit-commits` per REQ-ORCHESTRATOR-010.
+   3. (3e.3) Return control to the orchestrator; it will invoke `work-unit-commits` per REQ-ORCHESTRATOR-010. State-changing git commands are outside apply's scope.
 
    **3f — Update progress** in `state.yaml` (`done` / `failed` / `skipped`).
 
    **3g — On any deviation: compose deviation_report and block (MANDATORY):**
 
    When any of these triggers fire, compose a `deviation_report` block and return
-   `status: blocked` immediately. Do NOT touch the audit trail.
+   `status: blocked` immediately. Compose and return the `deviation_report` block in the envelope; stop task execution.
 
    Triggers:
    - About to write a fix not in any task in `tasks.md` (out-of-plan).
@@ -94,7 +94,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    ```
 
    Return `status: blocked`. Populate `tasks_status.skipped` with all tasks not yet attempted.
-   Do NOT continue task execution after the first deviation trigger.
+   Stop at the first deviation trigger and return `status: blocked`.
 
    **Cost gate:** trivial typos, lint fixes, or whitespace corrections within a single task
    do NOT trigger a block — handle inline without an envelope change.
@@ -112,7 +112,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    If any task is `partial` or `skipped`:
    - Set envelope `status: warning` (NOT `ok`).
    - Surface each missing deliverable in `risks:` with task ID + path.
-   - Do NOT report "X/X tasks done" in `executive_summary` — report `completed/partial/skipped` counts truthfully.
+   - Report `completed/partial/skipped` counts truthfully in `executive_summary`.
 
    **7b — Self-check (informational):** Run: `grep -E 'git (commit|add|push|stash|reset|rm)' domain/skills/sdd-apply/SKILL.md`. Expect 0 matches (git state-changing commands must not appear in apply's own SKILL.md as instructions). Record output in envelope if non-zero.
 
@@ -125,7 +125,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    - Confirm `execution_evidence.typecheck.exit_code == 0` (if config declares a typecheck command). Non-zero → envelope `status: warning`.
    - Confirm `execution_evidence.lint.exit_code == 0` (if config declares a lint command). Non-zero → envelope `status: warning`.
    - Confirm every entry in `execution_evidence.tests_created[]` has `exit_code == 0` AND `failed == 0`. Any failure → the corresponding task(s) are `partial` (not `done`), envelope `status: warning`.
-   - If a verify command could not run at all (Bash denied, missing tool) → envelope `status: blocked`. NEVER `status: ok` in this case.
+   - If a verify command could not run at all (Bash denied, missing tool) → return `status: blocked` in this case — `status: ok` without execution evidence corrupts the apply audit trail.
    - Record each check result (pass / fail / skipped-no-config) in `executive_summary`.
 
 8. Return the envelope per [references/envelope-examples.md](references/envelope-examples.md).

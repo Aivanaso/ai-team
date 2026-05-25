@@ -12,10 +12,10 @@ Run when the orchestrator launches the propose phase for a new SDD change. Produ
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Proposal is strategic, not technical: no file names, no class designs, no schemas in the Approach section.
+- Proposal is strategic, not technical: no file names, no class designs, no schemas in the Approach section. -- because technical details at proposal level lock the design before exploration begins; this forces design into a predetermined solution rather than finding the best one.
 - Ground every claim in user input or code analysis. No hallucinated features.
 - Surface conflicts, never silently resolve them. For open questions, always include a grounded recommendation.
-- Bounded exploration: Phase A free (glob/grep), Phase B budgeted (20-40 file reads by complexity).
+- Bounded exploration: Phase A free (glob/grep), Phase B budgeted (20-40 file reads by complexity). -- because unbounded reads inflate the sub-agent's context window and risk hitting token limits before the proposal is complete.
 
 ## Decision Gates
 
