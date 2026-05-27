@@ -21,7 +21,7 @@ User ↔ Claude Code (orchestrator)          User ↔ OpenCode (sdd-orchestrator
 - **Classification gate** -- Every task is classified (Small/Medium/Large) before execution
 - **Specs as source of truth** -- Committed to git, living documentation
 - **Filesystem-only persistence** -- Human-readable, version-controllable, no external services
-- **Fresh context per delegation** -- Sub-agents start clean, receive instructions inline
+- **Named agent types** -- Sub-agents use dedicated agent files with tool restrictions; instructions read from disk (JIT)
 - **Tool-agnostic skills** -- Skills in `domain/skills/` are adapter-independent
 
 ## Project Structure
@@ -44,12 +44,15 @@ ai-team/
 │       ├── sdd-tasks/
 │       ├── sdd-apply/
 │       ├── sdd-verify/
-│       └── sdd-archive/
+│       ├── sdd-archive/
+│       ├── sdd-security/
+│       └── work-unit-commits/
 ├── adapters/
 │   ├── claude-code/                  # Claude Code adapter
 │   │   ├── install.sh
 │   │   ├── templates/
-│   │   │   └── CLAUDE.md             # Injected into ~/.claude/CLAUDE.md
+│   │   │   ├── CLAUDE.md             # Stub injected into ~/.claude/CLAUDE.md
+│   │   │   └── agents/              # Agent files → ~/.claude/agents/sdd-*.md
 │   │   └── README.md
 │   └── opencode/                     # OpenCode adapter
 │       ├── install.sh
@@ -72,7 +75,7 @@ ai-team/
 ./scripts/install.sh --adapter=claude-code
 ```
 
-Copies skills to `~/.claude/skills/` and injects the orchestrator into `~/.claude/CLAUDE.md` between `<!-- ai-team:orchestrator -->` markers.
+Copies skills to `~/.claude/skills/`, agent files to `~/.claude/agents/`, and injects a lightweight orchestrator stub into `~/.claude/CLAUDE.md` between `<!-- ai-team:orchestrator -->` markers.
 
 ### OpenCode
 
@@ -138,9 +141,10 @@ propose → spec ──→ tasks → apply → verify → archive
 | tasks | sdd-tasks | sonnet | Design → ordered, grouped implementation plan |
 | apply | sdd-apply | sonnet | Tasks → actual code, one task at a time |
 | verify | sdd-verify | sonnet | Two-layer validation: static + behavioral |
-| archive | sdd-archive | haiku | Merge delta specs into base, archive artifacts |
+| archive | sdd-archive | sonnet | Merge delta specs into base, archive artifacts |
+| security | sdd-security | opus | Threat-model (shift-left) and code-audit (post-apply) |
 
-Approval gates pause after **propose** and before **apply**. Additional security gates (threat-model and code-audit) fire when the change touches sensitive surfaces.
+Approval gates pause after **propose** and before **apply**. Security gates (threat-model and code-audit) fire when the change touches sensitive surfaces.
 
 ### Fast-Forward
 
@@ -220,6 +224,8 @@ All SDD pipeline phases are implemented:
 | sdd-apply | Done |
 | sdd-verify | Done |
 | sdd-archive | Done |
+| sdd-security | Done |
+| work-unit-commits | Done |
 
 ## License
 
