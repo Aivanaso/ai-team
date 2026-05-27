@@ -12,8 +12,9 @@
 #
 # What it does:
 #   1. Copies SDD skills to ~/.claude/skills/
-#   2. Rewrites skill paths in sdd-orchestrator-protocol.md (idempotency-safe)
-#   3. Injects orchestrator content inline into ~/.claude/CLAUDE.md
+#   2. Copies SDD agent files to ~/.claude/agents/
+#   3. Rewrites skill paths in sdd-orchestrator-protocol.md (idempotency-safe)
+#   4. Injects orchestrator stub into ~/.claude/CLAUDE.md
 #      between <!-- ai-team:orchestrator --> markers
 #
 # Re-run to update after pulling new changes from the repo.
@@ -102,13 +103,26 @@ else
   info "  -> Skill paths already rewritten (idempotent re-run)"
 fi
 
-# --- 2. Prepare orchestrator content ---
+# --- 2. Agents ---
+
+info "Installing agents..."
+mkdir -p "$CLAUDE_DIR/agents"
+
+for agent_file in "$REPO_ROOT/adapters/claude-code/templates/agents/"*.md; do
+  name=$(basename "$agent_file")
+  cp "$agent_file" "$CLAUDE_DIR/agents/$name"
+done
+
+agent_count=$(ls "$REPO_ROOT/adapters/claude-code/templates/agents/"*.md 2>/dev/null | wc -l)
+info "  -> ~/.claude/agents/ ($agent_count agent files)"
+
+# --- 3. Prepare orchestrator content ---
 
 info "Preparing orchestrator content..."
 
 ORCHESTRATOR_CONTENT=$(cat "$REPO_ROOT/adapters/claude-code/templates/CLAUDE.md")
 
-# --- 3. Resolve CLAUDE.md (handle symlinks) ---
+# --- 4. Resolve CLAUDE.md (handle symlinks) ---
 
 CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
 
@@ -128,7 +142,7 @@ fi
 
 EXISTING=$(cat "$WRITE_TARGET")
 
-# --- 4. Clean up legacy @reference (if present) ---
+# --- 5. Clean up legacy @reference (if present) ---
 
 if grep -qF "$LEGACY_REFERENCE" <<< "$EXISTING"; then
   warn "Removing legacy ${LEGACY_REFERENCE}..."
@@ -141,7 +155,7 @@ if [[ -f "$CLAUDE_DIR/ai-team-orchestrator.md" ]]; then
   warn "Removed legacy ~/.claude/ai-team-orchestrator.md"
 fi
 
-# --- 5. Inject between markers ---
+# --- 6. Inject between markers ---
 
 # Build the new section
 SECTION="${MARKER_OPEN}
@@ -172,7 +186,7 @@ ${SECTION}"
   fi
 fi
 
-# --- 6. Write back ---
+# --- 7. Write back ---
 
 # Write atomically: temp file + move
 TMPFILE=$(mktemp "${WRITE_TARGET}.XXXXXX")
@@ -187,8 +201,9 @@ echo ""
 info "Installation complete! (Claude Code adapter)"
 echo ""
 echo "  Skills:       ~/.claude/skills/sdd-*/"
+echo "  Agents:       ~/.claude/agents/sdd-*.md"
 echo "  Protocols:    ~/.claude/skills/_shared/"
-echo "  Orchestrator: inline in CLAUDE.md (between markers)"
+echo "  Orchestrator: stub in CLAUDE.md (between markers)"
 echo ""
 echo "  Slash commands: /ai-team new <change>, /ai-team continue, etc."
 echo "  Re-run this script to update after pulling new changes."
