@@ -498,6 +498,8 @@ IMPORTANT: Use `subagent_type: "sdd-{phase}"` for SDD sub-agents (e.g., `"sdd-ap
 
 **Why disk-read over inline:** Inlining SKILL.md (~150 lines) + 6 shared protocols (~950 lines) added ~1100 lines to the initial prompt. For write-heavy phases (apply, verify, tasks), this consumed context budget needed for source files and left protocols stale by the time the agent needed them (lost-in-the-middle effect after 200+ tool calls). JIT loading keeps each protocol fresh when the agent reaches the step that needs it. Pattern validated by gentle-ai (`skill-resolver.md`).
 
+**Agent description format:** `"SDD {phase} {change-name} [{model}]"` — e.g., `"SDD apply my-feature [sonnet]"`. The model tag makes routing visible in the UI.
+
 **Prompt structure:** `You are the sdd-{phase} executor...` → `FIRST ACTION: Read your instructions from the skill path below...` → `## Skill and Protocol Paths` (skill + shared protocol paths + references_dir) → `## Injected Context` (per Critical Context Forwarding table) → `## Task` (scope, verify commands, constraints) → `## Output Contract` (summary of expected envelope fields) → phase-specific mandatory blocks (Seniority + Tests for apply only).
 
 Omit shared protocol paths the phase does not reference in its SKILL.md References section (e.g., apply does not need `spec_convention`; archive does not need `evidence_protocol`). The sub-agent reads only what its SKILL.md References declare.
