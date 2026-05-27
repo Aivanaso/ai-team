@@ -61,6 +61,7 @@ Write `.ai-team/changes/{change-name}/design.md`. Update `state.yaml` (`phases.d
 - [references/edge-cases.md](references/edge-cases.md) — No Delta Specs Available, Trivial Change, Conflicting Patterns, Stack Mismatch; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load at Step 1.
 - `../_shared/persistence-contract.md` — write rules; load at Step 1.
+- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — envelope schema; load at Step 14.
 - `../_shared/evidence-protocol.md` — Rules 1–5 (Rule 5 governs cross-repo transplant; design is the phase most prone to "let's do it like {sibling-repo}").
 - `../_shared/spec-convention.md` — when reading delta specs.

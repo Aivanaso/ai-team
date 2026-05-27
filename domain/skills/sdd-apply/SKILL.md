@@ -143,5 +143,6 @@ Write application source files per `tasks.md`. Update `state.yaml` (`phases.appl
 - [references/edge-cases.md](references/edge-cases.md) — Resumed Execution, Compilation Failure, File Already Exists, Missing File for MODIFY, Circular Dependency, No Verify Commands, Scope Limiting; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
 - `../_shared/persistence-contract.md` — write rules, audit-trail schema; load at Step 1.
+- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — envelope schema; load at Step 8.
 - `../_shared/evidence-protocol.md` — Rules 1-6 (Rule 3 governs integration test execution before status:ok; Rule 6 governs orchestrator post-apply audit).

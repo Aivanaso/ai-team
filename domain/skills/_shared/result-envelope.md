@@ -80,7 +80,8 @@ Each SKILL.md declares an "Expected Context (injected by orchestrator)" list. At
 
 | Value | Meaning | What it tells the orchestrator |
 |-------|---------|-------------------------------|
-| `injected` | All expected context inputs were present in the prompt | Healthy — Critical Context Forwarding worked |
+| `self-loaded` | Injected Context YAML received; SKILL.md and shared protocols read from disk per References section | Healthy — disk-read delegation worked correctly |
+| `injected` | All expected context inputs were present in the prompt (legacy — when orchestrator inlined SKILL.md + protocols) | Healthy — backward-compatible with inline delegation |
 | `fallback` | One or more expected inputs were missing; the sub-agent recovered them by reading `.ai-team/changes/{change}/` directly | Cache miss — orchestrator likely lost state (compaction). Re-read state and re-inject in subsequent delegations |
 | `none` | No expected inputs declared for this phase, or the sub-agent had nothing to verify | No signal — phase is context-light (e.g., scout bootstrap) |
 

@@ -52,5 +52,6 @@ Write `.ai-team/changes/archive/YYYY-MM-DD-{change-name}/` (full copy of artifac
 - [references/edge-cases.md](references/edge-cases.md) — REQ-ID not found, REMOVED still referenced, multiple domains, verify with warnings; load when an unexpected merge condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
 - `../_shared/persistence-contract.md` — archive copy rules; load at Step 5.
+- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — envelope schema; load at Step 7.
 - `../_shared/spec-convention.md` — merge algorithm; load at Step 4.

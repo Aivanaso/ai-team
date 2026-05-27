@@ -387,17 +387,25 @@ Check `.ai-team/config.yaml` for `model_overrides` -- project-level overrides ta
 IMPORTANT: Always use `subagent_type: "general-purpose"` (the only valid type; custom types like "sdd-propose" do not exist and will error).
 
 **Delegation pattern (applies to every SDD phase):**
-1. Read `skills/sdd-{phase}/SKILL.md` yourself (the orchestrator reads it; skill files are injected into the prompt — sub-agents receive instructions inline and do not need to search for them).
-2. Read the shared protocols yourself.
-3. Inject both as text into the `Agent()` prompt. Sub-agents receive instructions inline.
-4. Inject `references_dir: skills/sdd-{phase}/references/` — the sub-agent reads reference files on demand from this directory (reference files are not pasted inline by the orchestrator).
+1. Pass the path to `skills/sdd-{phase}/SKILL.md` in the delegation prompt. The sub-agent reads it as its first action (the orchestrator passes paths, not content).
+2. Pass paths to required shared protocols under `## Skill and Protocol Paths`. The sub-agent reads each protocol JIT per its SKILL.md References section — each protocol is fresh in context when the agent reaches the step that needs it.
+3. Inject the `## Injected Context` YAML block directly into the prompt — session state the sub-agent cannot derive from disk.
+4. Include `references_dir` in the paths block — the sub-agent reads reference files on demand from this directory.
 5. If `strict_tdd: true` and the phase is `apply` or `verify`, append: "STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. Follow red → green → triangulate → refactor."
 
-**Prompt structure:** `You are the sdd-{phase} executor. Do this phase's work yourself. Execute all steps directly (no further sub-delegation).` → `## Injected Context` (per Critical Context Forwarding table) → `## Instructions` (SKILL.md contents) → `## Shared Protocols` (context-protocol, persistence-contract, result-envelope, spec-convention, evidence-protocol) → `## Task` (what to do) → `## Project Root` (absolute path) → `## Expected Output` (result envelope with `model_used` and `context_resolution`).
+**Why disk-read over inline:** Inlining SKILL.md (~150 lines) + 6 shared protocols (~950 lines) added ~1100 lines to the initial prompt. For write-heavy phases (apply, verify, tasks), this consumed context budget needed for source files and left protocols stale by the time the agent needed them (lost-in-the-middle effect after 200+ tool calls). JIT loading keeps each protocol fresh when the agent reaches the step that needs it. Pattern validated by gentle-ai (`skill-resolver.md`).
+
+**Prompt structure:** `You are the sdd-{phase} executor...` → `FIRST ACTION: Read your instructions from the skill path below...` → `## Skill and Protocol Paths` (skill + shared protocol paths + references_dir) → `## Injected Context` (per Critical Context Forwarding table) → `## Task` (scope, verify commands, constraints) → `## Output Contract` (summary of expected envelope fields) → phase-specific mandatory blocks (Seniority + Tests for apply only).
+
+Omit shared protocol paths the phase does not reference in its SKILL.md References section (e.g., apply does not need `spec_convention`; archive does not need `evidence_protocol`). The sub-agent reads only what its SKILL.md References declare.
+
+**`install_dir`**: Resolve once per session. For Claude Code: `~/.claude/skills`. For other adapters: per `adapters/{adapter}/install.sh` destination.
+
+**Sub-agent fallback chain:** If the skill path does not exist, the sub-agent returns `status: blocked` with `risks: ["SKILL.md not found at {path}"]` — it cannot proceed without primary instructions. If a shared protocol path does not exist, the sub-agent: (1) continues with loaded instructions; (2) reports `context_resolution: fallback`; (3) lists the missing protocol in `risks`. The orchestrator checks `install_dir` correctness and re-engages if needed.
 
 ### Critical Context Forwarding
 
-Sub-agents are born with **no memory** of prior phases. The orchestrator is the only component that holds session state, so it MUST inject every piece of context the next phase needs — directly into the delegation prompt. Inject every piece of context the next phase needs directly into the delegation prompt (sub-agents have no memory of prior phases; discovery via grep or state files is unreliable).
+Sub-agents are born with **no memory** of prior phases. The orchestrator provides two things: (1) `## Injected Context` YAML block — inline, because it contains session-specific flags the sub-agent cannot derive from disk; (2) `## Skill and Protocol Paths` — disk paths the sub-agent reads itself (JIT per its References section). The Injected Context block is the ONLY content the orchestrator writes inline; SKILL.md and shared protocols are on disk.
 
 Resolve these flags **once per session**, cache them, and inject them into every relevant delegation:
 
@@ -451,7 +459,16 @@ This block reinforces `sdd-apply` Step 3e.1 and the Decision Gate "Tests created
 
 ### Context Resolution Feedback
 
-Every result envelope includes `context_resolution: injected | fallback | none`. On `fallback`: re-read `state.yaml` and prior phase envelopes, rebuild the flag cache from the Critical Context Forwarding table, and inject the rebuilt block in all subsequent delegations. Surface one warning: `"Detected cache miss in {phase} — reloaded session state."` Never ignore `fallback` — silent degradation is exactly what this loop prevents.
+Every result envelope includes `context_resolution: self-loaded | injected | fallback | none`. Orchestrator verification after every delegation return:
+
+| Value | Orchestrator action |
+|-------|-------------------|
+| `self-loaded` | Healthy — proceed to next phase |
+| `injected` | Accepted (legacy inline delegation) — proceed |
+| `fallback` | Re-read `state.yaml` and prior phase envelopes, rebuild the flag cache, inject the rebuilt block in all subsequent delegations. Verify `install_dir` path is correct (`ls {install_dir}/skills/sdd-{phase}/SKILL.md`). Surface warning: `"Detected cache miss in {phase} — reloaded session state."` |
+| `none` | If the phase has a SKILL.md: agent skipped loading instructions — verify `install_dir`, re-engage with corrected paths or run `scripts/install.sh`. If context-light phase (e.g., health check): no action |
+
+Never ignore `fallback` or unexpected `none` — silent degradation is exactly what this loop prevents.
 
 ### Non-SDD Delegation
 

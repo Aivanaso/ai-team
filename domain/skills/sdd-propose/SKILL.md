@@ -73,6 +73,7 @@ Write `.ai-team/changes/{change-name}/proposal.md`. Update `state.yaml` (status 
 - [references/edge-cases.md](references/edge-cases.md) — load when a Decision Gate triggers (vague/conflicting/massive/no-specs/incompatible-flow/duplicate).
 - `../_shared/context-protocol.md` — startup sequence.
 - `../_shared/persistence-contract.md` — write rules and state.yaml schema.
+- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — envelope schema and canary fields.
 - `../_shared/evidence-protocol.md` — Rule 4 (invariant greps) and Rule 5 (cross-repo transplant check) full procedures.
 - `../_shared/spec-convention.md` — load when reading existing specs to cross-reference REQ-IDs.

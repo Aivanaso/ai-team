@@ -68,6 +68,7 @@ Run when the orchestrator launches scout at the start of a new SDD change or on 
 - [references/edge-cases.md](references/edge-cases.md) — monorepo multi-stack, ambiguous architecture, config.yaml exists, no language detected; load when encountering non-happy-path conditions.
 - `../_shared/context-protocol.md` — startup sequence.
 - `../_shared/persistence-contract.md` — write rules.
+- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — envelope schema.
 - `../_shared/evidence-protocol.md` — Rules 1-5.
 - `../_shared/spec-convention.md` — spec format (baseline mode).

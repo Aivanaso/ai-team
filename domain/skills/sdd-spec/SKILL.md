@@ -61,6 +61,7 @@ Write `.ai-team/changes/{change}/specs/{domain}/spec.md` for each ready domain. 
 - [references/edge-cases.md](references/edge-cases.md) — missing baseline, greenfield, multi-domain ACs, conflicting ACs, unverifiable scenarios; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
 - `../_shared/persistence-contract.md` — write rules.
+- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — envelope schema.
 - `../_shared/evidence-protocol.md` — Rules 1-5.
 - `../_shared/spec-convention.md` — spec format (delta merge algorithm, REQ-ID conventions).

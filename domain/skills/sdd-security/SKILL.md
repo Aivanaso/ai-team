@@ -86,5 +86,6 @@ Write `.ai-team/changes/{change}/threat-model.md` (threat-model mode) or `.ai-te
 - [references/edge-cases.md](references/edge-cases.md) — no touchpoints, all-suppressed, empty diff, invalid mode, re-audit; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
 - `../_shared/persistence-contract.md` — write rules, `decisions:` full schema; load at Step 1.
+- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — envelope schema; load when returning the result.
 - `../_shared/evidence-protocol.md` — Rule 1 (file:line citation mandatory for every finding).

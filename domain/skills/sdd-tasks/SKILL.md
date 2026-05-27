@@ -118,6 +118,7 @@ review_workload:
 - [references/edge-cases.md](references/edge-cases.md) — trivial change, massive change, no delta specs, drift, no test strategy, circular deps; load when a gate fires.
 - `../_shared/context-protocol.md` — startup sequence.
 - `../_shared/persistence-contract.md` — write rules.
+- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — envelope schema.
 - `../_shared/evidence-protocol.md` — Rules 1-5 (interface changes + cross-repo transplants).
 - `../_shared/spec-convention.md` — REQ-ID format and delta spec structure.
