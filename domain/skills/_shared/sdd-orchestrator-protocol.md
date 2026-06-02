@@ -152,14 +152,14 @@ The `.gitignore` should ignore active changes and explorations but keep specs an
 Standard path (`change_type: feature` or `mixed`):
 
 ```
-proposal --> [security:tm if sensitive] --> specs ---> tasks --> apply --> [orchestrator-audit] --> [security:ca if sensitive] --> verify --> archive
+proposal --> [security:tm if sensitive] --> specs ---> tasks --> apply --> [orchestrator-audit] --> [security:ca if sensitive] --> verify --> review --> archive
                                          -> design -/
 ```
 
 Infra-only short path (`change_type: infra`, user approved skip-spec):
 
 ```
-proposal --> [security:tm if sensitive] --> design --> tasks --> apply --> [orchestrator-audit] --> [security:ca if sensitive] --> verify --> archive
+proposal --> [security:tm if sensitive] --> design --> tasks --> apply --> [orchestrator-audit] --> [security:ca if sensitive] --> verify --> review --> archive
 ```
 
 Convention: bracketed phases are conditional. Readers infer the condition from the Approval Gates table (the `Conditional on` column).
@@ -175,6 +175,7 @@ Convention: bracketed phases are conditional. Readers infer the condition from t
 | archive | sdd-archive | verify | verify | merged specs (no-op if no specs) |
 | security-threat-model | sdd-security (mode: threat-model) | proposal-approval | proposal-approval | `threat-model.md` |
 | security-code-audit   | sdd-security (mode: code-audit)   | apply            | apply            | `audit-report.md` |
+| review | sdd-reviewer | verify | verify | `review-report.md` |
 
 Utility: **sdd-scout** (bootstrap, explore, baseline) -- invoked by the orchestrator, not part of the DAG.
 
@@ -211,6 +212,7 @@ Before the **spec phase**, check if a base spec exists for each domain affected 
 | **Security: threat-model** | proposal-approval | spec, design | `security_touchpoints` non-empty |
 | **Apply approval** | tasks | apply | always |
 | **Security: code-audit** | apply | verify | `security_touchpoints` non-empty |
+| **Code review** | verify | work-unit-commits | always |
 
 At each gate:
 1. Present a concise summary of the completed phase
@@ -306,6 +308,43 @@ When `change_type: infra` AND `security_touchpoints` non-empty:
 - Route `security_requirements` into the design phase delegation prompt (not spec, which is skipped).
 - Design incorporates them as constraint sections; tasks reads them from design.md.
 
+### Code-review gate
+
+After `sdd-verify` returns GREEN (PASS or PASS WITH WARNINGS) for a logical group and before `work-unit-commits` is invoked for that group, the orchestrator invokes `sdd-reviewer` (model: opus), passing `group_id`, `group_files` (the `tasks.md` `Files:` list for the group), and `change_name`. The reviewer gate is **always-on** — it applies regardless of `change_type`, `security_touchpoints`, or any other conditional flag.
+
+After the reviewer returns its verdict:
+
+| Verdict | Orchestrator action |
+|---------|---------------------|
+| `review-clear` | Proceed to invoke `work-unit-commits` for the group. |
+| `review-blocked` | Present the 3-option override prompt; do NOT invoke `work-unit-commits` until resolved. |
+
+**3-option override prompt** (shown verbatim to the user when `review-blocked`):
+
+> Code-correctness review found CRITICAL finding(s) in group {group_id}.
+> See `.ai-team/changes/{change}/review-report.md` for finding IDs and citations.
+>
+> Choose an action:
+> 1. **Override** — accept the findings and proceed to commit (you will be asked for a justification; the orchestrator logs a `decisions[]` entry referencing the finding ID(s)).
+> 2. **Re-engage apply** — route back to `sdd-apply` to fix the defects (counts against the 3-retries-per-group budget; see REQ-ORCHESTRATOR-008).
+> 3. **Cancel** — stop the pipeline; no commit for this group.
+
+**Override write rule:** When the user selects **Override**, the orchestrator MUST write a `decisions[]` entry to `state.yaml` BEFORE invoking `work-unit-commits`:
+
+```yaml
+- date: <current_iso_utc from injected context>
+  phase: code-review
+  task_ref: "review-override"
+  decision: "Override review-blocked verdict for group {group_id}"
+  reason: "<user-supplied justification>"
+  evidence: "<comma-separated CRITICAL finding IDs from review-report.md>"
+  commits: []
+```
+
+The orchestrator is the ONLY writer of this entry. The reviewer does NOT write to `decisions[]`.
+
+**Cancel write rule:** When the user selects **Cancel**, set `state.yaml.blocked: true`, `blocked_reason: "Code review: user cancelled on finding(s) {finding-id-list}"`. Stop the pipeline; preserve the change dir.
+
 ## Re-engage Routing on failure_class
 
 When sdd-verify returns a non-null `failure_class`, route as follows:
@@ -319,6 +358,8 @@ When sdd-verify returns a non-null `failure_class`, route as follows:
 **Max retries:** 3 per logical group. After 3 failed verify attempts on the same group (any failure_class), escalate to user presenting full failure history. Counter resets if the group's verdict changes to PASS.
 
 A "re-engage attempt" = each delegation of sdd-apply or sdd-tasks for the same group after verify FAIL.
+
+A reviewer-driven re-engage (user selects option 2 of the code-review override prompt, REQ-ORCHESTRATOR-013) also counts as one attempt for the group, against the same 3-per-group budget. The counter increments by 1 each time the orchestrator routes to `sdd-apply` for a group, whether triggered by verify `failure_class: implementation` or a reviewer `review-blocked` verdict.
 
 ### Apply-Blocked Re-engage Routing on `deviation_report.kind`
 
@@ -356,13 +397,13 @@ attempt for the group.
 
 ## work-unit-commits Invocation
 
-After sdd-verify returns GREEN (PASS or PASS WITH WARNINGS) for a logical group, invoke work-unit-commits:
+After `sdd-verify` returns GREEN (PASS or PASS WITH WARNINGS) for a logical group **AND `sdd-reviewer` returns `review-clear` for that group (or the user overrides a `review-blocked` verdict per the Code-review gate)**, invoke work-unit-commits:
 
 ```
 Inject: group_id={G_id}, mode={config.commit_strategy default auto if absent}, change_name={change_name}
 ```
 
-- Invoke ONLY after verify GREEN; never after FAIL.
+- Invoke ONLY after verify GREEN **and review-clear (or overridden review-blocked)**; never after FAIL and never before the reviewer gate resolves.
 - Read `commit_strategy` from `.ai-team/config.yaml`; default `auto` if field absent.
 - `tasks_in_group` is derived by work-unit-commits from tasks.md; do NOT inject it.
 - Model: sonnet.
@@ -479,6 +520,7 @@ Read this table at session start, cache it, and pass the model in every `Agent()
 | sdd-security (threat-model) | opus   | Architectural reasoning across the proposal surface |
 | sdd-security (code-audit)   | sonnet | Pattern matching over the diff |
 | work-unit-commits | sonnet | — |
+| sdd-reviewer | opus | Full correctness reasoning over a diff is substantive cross-cutting work |
 | default | sonnet | Non-SDD general delegation |
 
 ### Project Override
