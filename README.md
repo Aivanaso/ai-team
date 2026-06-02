@@ -129,7 +129,7 @@ The orchestrator classifies every feature/change request before acting:
 For large changes, the full Spec-Driven Development pipeline:
 
 ```
-propose → spec ──→ tasks → apply → verify → archive
+propose → spec ──→ tasks → apply → verify → review → archive
         → design ↗
 ```
 
@@ -143,6 +143,7 @@ propose → spec ──→ tasks → apply → verify → archive
 | verify | sdd-verify | sonnet | Two-layer validation: static + behavioral |
 | archive | sdd-archive | sonnet | Merge delta specs into base, archive artifacts |
 | security | sdd-security | opus | Threat-model (shift-left) and code-audit (post-apply) |
+| review | sdd-reviewer | opus | Code-correctness gate: reviews the group's changed files, blocking verdict |
 
 Approval gates pause after **propose** and before **apply**. Security gates (threat-model and code-audit) fire when the change touches sensitive surfaces.
 
@@ -226,6 +227,7 @@ All SDD pipeline phases are implemented:
 | sdd-archive | Done |
 | sdd-security | Done |
 | work-unit-commits | Done |
+| sdd-reviewer | Done |
 
 ## License
 
