@@ -153,6 +153,25 @@ benefit.
 - The orchestrator translates `deviation_report` into a `decisions[]` entry per the Deviation
   Report Ingestion subsection in `sdd-orchestrator-protocol.md`. Apply does NOT touch `decisions:`.
 
+**Roots-violation case (forwarded `allowed_edit_roots` guard).** When `sdd-apply` is about to
+write an application-source file whose target path falls outside the forwarded
+`allowed_edit_roots` (REQ-APPLY-024), it emits a `deviation_report` for this case using the
+existing `out-of-plan` kind (a roots violation is a subset of an out-of-plan write — no new
+kind token). It is distinguished from a generic out-of-plan fix by its `evidence`:
+- `kind: out-of-plan`
+- `evidence.file`: the attempted target path that fell outside the roots.
+- `evidence.output`: the literal note
+  `out-of-roots: target '<path>' not within allowed_edit_roots [<root>, <root>, ...]` — so
+  both the attempted path and the violated roots set are recoverable from the envelope alone.
+- `suggested_action`: `re-engage-apply-refined` (orchestrator widens roots and re-engages) or
+  `escalate-user` (orchestrator treats it as scope creep). The orchestrator's widen-or-stop
+  decision (REQ-ORCHESTRATOR-017) selects which is acted on.
+
+**Backward-compatibility:** this case adds **no new `kind` token** — the three pre-existing
+kinds (`out-of-plan`, `design-pivot`, `test-orphan`) and their `evidence`/`suggested_action`
+shapes are unchanged. A parser recognising only those three handles a roots violation
+identically to any other `out-of-plan` report.
+
 ### `change_type` (OPTIONAL — propose phase only)
 
 - Classifies the change for orchestrator routing decisions

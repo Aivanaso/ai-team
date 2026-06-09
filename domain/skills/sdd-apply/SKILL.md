@@ -15,6 +15,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 - Writes application source files (exception to read-only principle — apply's primary responsibility). -- see Step 3c.
 - Write code per `tasks.md` exactly. No redesign, no extra files, no bonus refactors. -- because downstream sdd-verify can only validate against the approved plan; deviation without a `deviation_report` creates undetectable scope drift. -- see Step 3c.
 - Touch only files listed in tasks. If a task lists 3 files, touch exactly 3 files. -- because scope drift to unlisted files breaks the Post-Apply Audit's deliverables check (Step 7). -- see Step 3c.
+- Forwarded scope guard (`allowed_edit_roots`): before writing any application-source file, verify the target path is within the injected `allowed_edit_roots` (segment-prefix per the orchestrator's Roots Computation rule). A write outside every forwarded root is a blocking deviation — return `status: blocked` with a `deviation_report` instead of writing (`kind: out-of-plan`, `out-of-roots:` evidence note). If no `allowed_edit_roots` flag is injected (or it is empty), the guard is inactive and the inner exact-file discipline governs. -- because a forwarded mechanical prefix gate is structurally harder to drift past than a buried in-scope judgment (the rationale behind the SENIORITY/TESTS_CREATED reinforcement). -- see Step 3c.
 - Every task leaves the codebase compilable (or for meta-project: leaves framework files in valid Markdown structure). -- because a non-compiling intermediate state blocks all subsequent tasks in the group from executing. -- see Step 3d.
 - Read SDD artifacts (`tasks.md`, `design.md`, specs, proposal) without modifying them. The only `.ai-team/` file to update is `state.yaml` (`phases.apply.*`: status, progress, commits). The orchestrator exclusively authors audit-trail entries. -- see Step 3c.
 - Skill-first: load project skills before writing code. Skills define naming, imports, patterns, test structure. Code that ignores skills is wrong even if it compiles. -- because skills encode project conventions that override generic framework defaults; missing them introduces inconsistency that verification cannot catch. -- see Step 2.
@@ -41,6 +42,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 | `strict_tdd: true` in injected context | Follow strict-tdd module: red → green → triangulate → refactor. |
 | `phases.apply.status` already `done` | Return immediately. Nothing to do. |
 | Tests created by tasks in the current group are red at group boundary | Mark the test-creating task(s) `partial` (not `done`) in `state.yaml`. Set envelope `status: warning`. Record the test stdout in `execution_evidence.tests_created[]`. |
+| Target application-source path falls outside the forwarded `allowed_edit_roots` | Leave the file unwritten. Return `status: blocked` with `deviation_report.kind: out-of-plan`, `evidence.file` = attempted path, `evidence.output` = `out-of-roots: target '<path>' not within allowed_edit_roots [...]`, `suggested_action: re-engage-apply-refined`. Halts further task execution (subsequent tasks skipped, same as the existing out-of-plan block). If no `allowed_edit_roots` injected/empty → guard inactive, proceed under inner exact-file discipline. |
 
 ## Execution Steps
 
@@ -55,6 +57,25 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    **3b — Set task `active`** in `state.yaml` before touching any file.
 
    **3c — Implement files** in dependency order (types → entities → DTOs → services → controllers → modules → pages). For new test entities: classify as `test-with-AC-trace` (REQ in tasks.md justifies it) or `test-orphan` (no REQ anchor — do NOT add, return `status: blocked` with `deviation_report.kind: test-orphan` per Step 3g). See [references/task-execution-loop.md](references/task-execution-loop.md) for CREATE / MODIFY / REMOVE per-action prose.
+
+   **Pre-write roots guard (REQ-APPLY-024).** If an `allowed_edit_roots` flag was injected and
+   is non-empty: before each application-source CREATE/MODIFY/REMOVE write, evaluate whether the
+   target path is within the forwarded roots, using the within-roots formula from the
+   orchestrator's Roots Computation rule (normalize: strip leading `./`, strip trailing `/`;
+   target `T` is within root `R` iff `T == R` OR `T` begins with `R + "/"`; partial-name
+   siblings like `src/foobar` under `src/foo` stay outside the root). The check runs for **every**
+   application-source write, not only suspicious ones.
+   - **Within roots:** proceed with the write normally.
+   - **Outside all roots:** leave the file unwritten and immediately compose a `deviation_report`
+     (`kind: out-of-plan`; `task_ref` = current task; `evidence.file` = attempted target path;
+     `evidence.output` = `out-of-roots: target '<attempted-path>' not within
+     allowed_edit_roots [<root>, <root>, ...]`; `suggested_action: re-engage-apply-refined`) and
+     return `status: blocked`. This is the same block-and-escalate path as the existing
+     out-of-plan deviation (Step 3g) — populate `tasks_status.skipped` with all not-yet-attempted
+     tasks; stop.
+   - **No flag injected / empty flag (REQ-APPLY-025):** the guard is inactive. Proceed using only
+     the inner exact-file discipline (touch exactly the files declared in `tasks.md`); no blocking
+     occurs on account of an absent roots flag; behavior matches the pre-guard baseline.
 
    **3d — Verify compilation** using `config.yaml` verify commands. Fix up to 2 attempts. Mark `done` or `failed`.
 

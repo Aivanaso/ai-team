@@ -368,7 +368,7 @@ Two trigger sources feed re-engage: verify's `failure_class` (post-verify) and a
 
 | `deviation_report.kind` | Re-engage target | Action |
 |--------------------------|------------------|--------|
-| `out-of-plan` | `sdd-apply` (refined scope) OR user (escalate) | Orchestrator inspects evidence; if drift is mechanical and scoped, approve, write `decisions[]` (`task_ref: "out-of-plan"`), re-engage apply with the approved drift inlined. If scope creep is ambiguous, escalate to user with the evidence block. |
+| `out-of-plan` | `sdd-apply` (refined scope) OR user (escalate) | Orchestrator inspects evidence; if drift is mechanical and scoped, approve, write `decisions[]` (`task_ref: "out-of-plan"`), re-engage apply with the approved drift inlined. If scope creep is ambiguous, escalate to user with the evidence block. Subsumes the **roots-violation** flavor: when `deviation_report.evidence.output` begins with `out-of-roots:` (apply hit the forwarded `allowed_edit_roots` guard, REQ-APPLY-024), present the user a **widen-or-stop** decision (REQ-ORCHESTRATOR-017): (a) **widen** — approve the attempted path; add its **containing directory** to `allowed_edit_roots`; re-engage apply with the wider roots set re-injected; or (b) **stop** — treat the write as scope creep: record the rejection and keep the current roots. Either way the orchestrator authors the `decisions[]` entry; root widening stays the orchestrator's authority. |
 | `design-pivot` | `sdd-design` | Re-engage design with the failed assumption inlined (file:line from `deviation_report.evidence`). Design re-emits `design.md`; downstream tasks/apply rerun. Write `decisions[]` (`task_ref: "design-pivot"`) capturing the orchestrator's pivot decision. |
 | `test-orphan` | `sdd-tasks` | Re-engage tasks with the failed test name + missing-entity grep result inlined (extracted from `deviation_report.evidence`). Tasks re-emits the scaffold OR expands scope to add the entity (justified by a REQ). Write `decisions[]` (`task_ref: "test-orphan-re-engage"`) capturing the orchestrator's route decision. |
 
@@ -435,6 +435,28 @@ When apply returns `status: blocked` with `deviation_report` populated, the orch
      additional scope
    - `escalate-user` → present `deviation_report.evidence` to user; user picks action
 5. Update `state.yaml.updated: {current_iso_utc}`.
+
+**Roots-violation sub-case (`out-of-plan` + `out-of-roots:` evidence note):** when the
+ingested `deviation_report` is `kind: out-of-plan` AND `evidence.output` begins with
+`out-of-roots:`, the `decisions[]` entry's `evidence` field MUST carry the attempted target
+path and the forwarded roots set (both are present in `deviation_report.evidence.file` and
+`.output`). The action is the widen-or-stop decision from the Apply-Blocked Re-engage Routing
+`out-of-plan` row: `re-engage-apply-refined` ⇒ widen `allowed_edit_roots` by the approved
+path's containing directory and re-inject; `escalate-user` ⇒ present and stop. `task_ref`
+stays `"out-of-plan"` (the reused kind maps to the existing `task_ref` per the Ingestion map
+at step 3 above).
+
+The `decisions[]` entry shape for a widen-approval:
+
+```yaml
+- date: <current_iso_utc>
+  phase: orchestrator
+  task_ref: "out-of-plan"
+  decision: "Orchestrator widened allowed_edit_roots after apply roots-violation block"
+  reason: "User approved the attempted path; containing directory added to roots and re-injected"
+  evidence: "apply attempted <target-path>; roots were [<root>, <root>]; user approved widening to add <containing-dir>"
+  commits: []
+```
 
 ## Post-Apply Independent Audit (Thin Red-Network)
 
@@ -568,12 +590,47 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `design_path` | `.ai-team/changes/{change_name}/design.md` | tasks, apply, verify | once design has run |
 | `spec_paths` | `.ai-team/changes/{change_name}/specs/*/spec.md` (list) | tasks, apply, verify, archive | once spec has run; pass empty list on infra short path |
 | `tasks_path` | `.ai-team/changes/{change_name}/tasks.md` | apply, verify | once tasks has run |
+| `allowed_edit_roots` | `tasks.md` (per-task `**Files:**` path tables — union of containing directories; see Roots Computation Rule below) | apply | once tasks has run; **omit the field entirely if the computed union is empty** (see Roots Computation Rule fallback) |
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
 | `security_touchpoints` | `sdd-propose` envelope (list of touchpoint slugs; empty list = not sensitive) | every phase after propose | once propose has run |
 | `references_dir` | `skills/sdd-{phase}/references/` (literal — not project-relative) | every phase | always |
 | `current_iso_utc` | `date -u +%Y-%m-%dT%H:%M:%SZ` (orchestrator at delegation time) | every phase that writes `state.yaml` | always |
 | `group_id` | tasks.md (the just-passed group) | work-unit-commits | always when invoking work-unit-commits |
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
+
+### Roots Computation (`allowed_edit_roots`)
+
+**When:** once, after `sdd-tasks` returns and before delegating `sdd-apply` (the same point
+`tasks_path` becomes available). Resolved once per session like every other Critical Context
+Forwarding flag.
+
+**Algorithm:** read `tasks.md`. For every per-task `**Files:**` `Action | Path` table (the
+tables under each `### Task N.N` header — NOT the Execution Order table's `Files` *count*
+column), collect every declared `Path`. **All action types contribute** — CREATE, MODIFY, and
+REMOVE paths each contribute their **containing directory** (the path with its last
+`/`-segment removed). `allowed_edit_roots` is the **union** (de-duplicated set) of those
+containing directories.
+
+**Top-level files (no directory component):** a declared path with no `/` has the repo root as
+its containing directory; represent it as the sentinel `.`. A root of `.` contains every relative
+target, so for that change the gate **degrades to inactive** — the same no-regression behavior as
+an empty roots set (inner exact-file discipline + Post-Apply Audit still govern). This keeps a
+top-level declared path permitted by its own change, rather than collapsing to an empty-string
+root that would match nothing and false-block the declaring write.
+
+**Within-roots definition (segment-prefix, normalized):** normalize each root and the
+candidate target path by (1) stripping a single leading `./`, (2) stripping any trailing `/`.
+A target `T` is **within** a root `R` iff `T == R` OR `T` begins with the literal string
+`R + "/"`. Requiring that `/` separator after the root keeps a partial-name sibling outside:
+`src/foobar` stays outside root `src/foo`, and `sdd-apply-junior` outside `sdd-apply` — the
+match looks for the segment boundary, not a bare byte-level `startsWith(R)`. `T` is within the
+set if it is within at least one root.
+
+**Empty-roots fallback:** if the union is empty (e.g., `tasks.md` has no per-task
+`**Files:**` tables, or is pure-checklist-shaped), **omit the `allowed_edit_roots` field
+entirely** from the apply delegation, rather than forwarding `allowed_edit_roots: []`. Apply then
+runs with the guard inactive (inner exact-file discipline + Post-Apply Audit only); behavior
+is identical to the pre-guard baseline. No error is raised.
 
 Inject all fields from the table above as a `## Injected Context (from orchestrator)` block at the top of the delegation prompt. The sub-agent treats this block as the source of truth for paths and flags — it does NOT re-derive them from disk.
 

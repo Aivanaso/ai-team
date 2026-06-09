@@ -28,6 +28,8 @@ Read application code, never modify it. Source files are read only to verify des
 
 Write only to `.ai-team/` (and declared application files for sdd-apply). No SDD skill writes to paths outside `.ai-team/` except sdd-apply (which writes to the paths declared in `tasks.md` for the current change). Shared protocols, SKILL.md files, project config files, and CI/CD pipelines are ALL read-only for SDD skills; they are modified only via the SDD pipeline itself running on the meta-project.
 
+**Enforcement for sdd-apply:** sdd-apply's application-code write surface is bounded by the forwarded `allowed_edit_roots` set. Before writing any application-source file, apply checks the target path against the forwarded roots (segment-prefix per the orchestrator's Roots Computation rule). A write whose target path falls outside all forwarded roots is a blocking deviation — apply returns `status: blocked` with a `deviation_report` instead of performing the write. When `allowed_edit_roots` is not forwarded (uncomputable/empty roots), apply falls back to the existing inner exact-file discipline with no outer gate active.
+
 ### Exception: work-unit-commits
 
 `work-unit-commits` writes to the working tree via `git add` + `git commit` in auto mode (per REQ-WUC-003). This is a deliberate exception — work-unit-commits is the exclusive owner of commit creation. Apply uses only read-only git commands; `git commit` is exclusively owned by work-unit-commits (REQ-APPLY-021).
