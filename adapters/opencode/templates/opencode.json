@@ -16,7 +16,8 @@
           "sdd-verify": "allow",
           "sdd-archive": "allow",
           "sdd-security": "allow",
-          "sdd-reviewer": "allow"
+          "sdd-reviewer": "allow",
+          "work-unit-commits": "allow"
         },
         "edit": "allow",
         "bash": "allow",
@@ -155,6 +156,19 @@
       "description": "Code-correctness review gate — runs after verify GREEN, before commit",
       "model": "opus",
       "prompt": "You are an SDD executor for the code-review phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/sdd-reviewer/SKILL.md and follow it exactly.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "work-unit-commits": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Atomic commits per logical group",
+      "model": "sonnet",
+      "prompt": "You are an SDD executor for the work-unit-commits phase, not the orchestrator. Do this phase's work yourself. Do NOT delegate, do NOT call task/delegate, and do NOT launch sub-agents. Read your skill file at ~/.config/opencode/skills/work-unit-commits/SKILL.md and follow it exactly.",
       "tools": {
         "read": true,
         "write": true,
