@@ -538,7 +538,7 @@ Read this table at session start, cache it, and pass the model in every `Agent()
 | sdd-tasks | sonnet | Mechanical breakdown from clear design |
 | sdd-apply | sonnet | Code generation from specs |
 | sdd-verify | sonnet | Validation against spec |
-| sdd-archive | sonnet | Memory capture + destructive Bash (cp/rm); haiku auto-restricts on cleanup, see [[haiku-bash-auto-restrict]] |
+| sdd-archive | haiku | Trial 2026-06-09 (was sonnet). Memory capture + destructive Bash (cp/rm); agent-file now grants Bash explicitly + memory-first net (sdd-archive/SKILL.md:19) contains the [[haiku-bash-auto-restrict]] failure class. REVERT to sonnet if archive returns `status:warning` on cleanup. |
 | sdd-security (threat-model) | opus   | Architectural reasoning across the proposal surface |
 | sdd-security (code-audit)   | sonnet | Pattern matching over the diff |
 | work-unit-commits | sonnet | — |
