@@ -6,11 +6,10 @@ agent: sdd-orchestrator
 Follow the SDD orchestrator workflow for `/sdd-new`:
 
 WORKFLOW:
-1. Read `.ai-team/config.yaml` in the current project to understand stack and conventions
-2. Run the health-check baseline: delegate `sdd-scout` in baseline mode to document current state
-3. Classify the change scope against the classification signals (Small/Medium/Large)
-4. Delegate `sdd-propose` to create a structured proposal with acceptance criteria and risks
-5. Present the proposal summary to the user and await approval before proceeding to design/spec
+1. Auto-init if needed: when `.ai-team/config.yaml` is missing, delegate `sdd-scout` in bootstrap mode first (protocol "Auto-Init"); then read config.yaml for stack and conventions
+2. Health-check baseline (protocol "Health Check"): run the `test_commands` from config.yaml and write `.ai-team/changes/{change}/baseline.md` (exit codes, pass/fail counts, pre-existing failures). In OpenCode run this inline — generic sub-agents are denied by permission.task. This is the test baseline sdd-verify diffs against; it is NOT scout baseline mode (that produces a domain spec)
+3. Delegate `sdd-propose` to create a structured proposal with acceptance criteria and risks (an explicit /sdd-new skips the classification gate — the user already chose SDD)
+4. Present the proposal summary to the user and await approval before proceeding to design/spec
 
 CONTEXT:
 - Working directory: !`echo -n "$(pwd)"`

@@ -7,7 +7,7 @@ Follow the SDD orchestrator workflow for `/sdd-baseline`:
 
 WORKFLOW:
 1. Delegate `sdd-scout` in baseline mode to read and document the existing code in the given domain
-2. Write the output to `.ai-team/changes/{domain}/baseline.md` in the current project
+2. The scout writes the base spec to `.ai-team/specs/{domain}/spec.md` (baseline-mode output — not the health-check `baseline.md`)
 3. Present a summary of what was documented
 
 CONTEXT:

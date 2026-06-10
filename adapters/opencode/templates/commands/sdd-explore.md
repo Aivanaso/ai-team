@@ -7,7 +7,7 @@ Follow the SDD orchestrator workflow for `/sdd-explore`:
 
 WORKFLOW:
 1. Delegate `sdd-scout` in explore mode to investigate the topic in the current codebase
-2. Present the scout findings inline — no proposal, no pipeline, no state files created
+2. The scout writes `.ai-team/explorations/{topic}/findings.md`; present its summary inline — no proposal, no pipeline phases
 
 CONTEXT:
 - Working directory: !`echo -n "$(pwd)"`
