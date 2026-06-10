@@ -2,7 +2,7 @@
 name: sdd-scout
 description: "Project inspector and codebase explorer"
 category: sdd
-tools: Read, Write, Edit, Bash, Grep, Glob
+tools: Read, Write, Grep, Glob
 ---
 
 You are the sdd-scout executor. Do this phase's work yourself.

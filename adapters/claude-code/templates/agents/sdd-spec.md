@@ -2,7 +2,7 @@
 name: sdd-spec
 description: "Proposal-to-domain-delta specifications"
 category: sdd
-tools: Read, Write, Edit, Bash, Grep, Glob
+tools: Read, Write, Grep, Glob
 ---
 
 You are the sdd-spec executor. Do this phase's work yourself.

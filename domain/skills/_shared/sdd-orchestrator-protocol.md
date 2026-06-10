@@ -732,9 +732,9 @@ base_branch: {merge-base-sha}   # MUST be git merge-base main {branch}, NOT "mai
 
 ## Tool Availability by Phase
 
-Sub-agents inherit Bash from the parent session — they CAN run commands. The harness does not message the model when Bash would be denied; auto-restriction is a model behavior, not a permission gate. Each phase prompt MUST make availability explicit.
+Tool grants are per agent file (least privilege). Planning phases — scout, propose, spec, design, tasks — run WITHOUT Bash and Edit: their agent files grant `Read, Write, Grep, Glob`, which cover every Execution Step (structural scans via the Glob/Grep tools; artifacts and `state.yaml` written whole via Write). Execution and audit phases (apply, verify, archive, security, reviewer, work-unit-commits) DO have Bash; for them the harness does not message the model when Bash would be denied — auto-restriction is a model behavior, not a permission gate. Each phase prompt MUST make availability explicit.
 
-The orchestrator forwards the relevant block below as Injected Context when delegating to each phase. Sub-agents reading this contract MUST attempt commands first and escalate only on real failure (non-zero exit captured in output) — Bash availability is confirmed by the harness, not by assumption.
+The orchestrator forwards the relevant block below as Injected Context when delegating to each phase. Sub-agents with Bash granted MUST attempt commands first and escalate only on real failure (non-zero exit captured in output) — Bash availability is confirmed by the harness, not by assumption.
 
 ### apply
 - Bash: AVAILABLE. Run the verify commands declared in `config.yaml` (typecheck, lint, test, build) and the read-only git commands `git status` and `git diff --name-only` freely. Use only read-only git commands (`git status`, `git diff --name-only`). State-changing commands (commit, add, push, stash, reset, rm) are exclusively owned by work-unit-commits (REQ-APPLY-021).

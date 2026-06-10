@@ -2,7 +2,7 @@
 name: sdd-design
 description: "Specs-to-technical-design grounded in codebase"
 category: sdd
-tools: Read, Write, Edit, Bash, Grep, Glob
+tools: Read, Write, Grep, Glob
 ---
 
 You are the sdd-design executor. Do this phase's work yourself.

@@ -2,7 +2,7 @@
 name: sdd-tasks
 description: "Design-to-ordered-implementation-task-plan"
 category: sdd
-tools: Read, Write, Edit, Bash, Grep, Glob
+tools: Read, Write, Grep, Glob
 ---
 
 You are the sdd-tasks executor. Do this phase's work yourself.

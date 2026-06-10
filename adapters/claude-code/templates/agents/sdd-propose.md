@@ -2,7 +2,7 @@
 name: sdd-propose
 description: "Feature-to-proposal with acceptance criteria and risks"
 category: sdd
-tools: Read, Write, Edit, Bash, Grep, Glob
+tools: Read, Write, Grep, Glob
 ---
 
 You are the sdd-propose executor. Do this phase's work yourself.

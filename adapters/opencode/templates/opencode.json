@@ -42,8 +42,8 @@
       "tools": {
         "read": true,
         "write": true,
-        "edit": true,
-        "bash": true
+        "edit": false,
+        "bash": false
       }
     },
     "sdd-propose": {
@@ -55,8 +55,8 @@
       "tools": {
         "read": true,
         "write": true,
-        "edit": true,
-        "bash": true
+        "edit": false,
+        "bash": false
       }
     },
     "sdd-spec": {
@@ -68,8 +68,8 @@
       "tools": {
         "read": true,
         "write": true,
-        "edit": true,
-        "bash": true
+        "edit": false,
+        "bash": false
       }
     },
     "sdd-design": {
@@ -81,8 +81,8 @@
       "tools": {
         "read": true,
         "write": true,
-        "edit": true,
-        "bash": true
+        "edit": false,
+        "bash": false
       }
     },
     "sdd-tasks": {
@@ -94,8 +94,8 @@
       "tools": {
         "read": true,
         "write": true,
-        "edit": true,
-        "bash": true
+        "edit": false,
+        "bash": false
       }
     },
     "sdd-apply": {
