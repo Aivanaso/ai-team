@@ -480,8 +480,10 @@ Checks 1-4 and 6 do not block verify delegation (informational WARNINGs surfaced
 After sdd-verify returns, re-run the citation check independently — the envelope and the report's own Citation Audit section are declarations, not proof (Rule 6):
 
 ```
-bash {install_dir}/skills/_shared/scripts/check-verify-citations.sh .ai-team/changes/{change}/verification-report.md .
+bash skills/_shared/scripts/check-verify-citations.sh .ai-team/changes/{change}/verification-report.md .
 ```
+
+(The installer rewrites `skills/_shared/` to the adapter's absolute install path.)
 
 - Exit 0 → accept the verify verdict; proceed (reviewer / re-engage routing as usual).
 - Any `UNRESOLVED` line, or envelope `citations_unresolved > 0` on a non-FAIL verdict → re-engage sdd-verify once with the `UNRESOLVED` lines inlined: "downgrade these scenarios to UNTESTED or cite resolvable tests". Still unresolved after re-engage → escalate to user; treat the affected scenarios as UNTESTED MUST (CRITICAL) for gating.
