@@ -483,7 +483,7 @@ After sdd-verify returns, re-run the citation check independently — the envelo
 bash skills/_shared/scripts/check-verify-citations.sh .ai-team/changes/{change}/verification-report.md .
 ```
 
-(The installer rewrites `skills/_shared/` to the adapter's absolute install path.)
+(The installer rewrites `skills/_shared/` to the adapter's absolute install path. The script derives `tasks.md` and `test-output.log` defaults from the report's directory: checklist IDs must exist in tasks.md, and when the execution log exists each cited test must appear in it — existence on disk AND execution evidence.)
 
 - Exit 0 → accept the verify verdict; proceed (reviewer / re-engage routing as usual).
 - Any `UNRESOLVED` line, or envelope `citations_unresolved > 0` on a non-FAIL verdict → re-engage sdd-verify once with the `UNRESOLVED` lines inlined: "downgrade these scenarios to UNTESTED or cite resolvable tests". Still unresolved after re-engage → escalate to user; treat the affected scenarios as UNTESTED MUST (CRITICAL) for gating.
