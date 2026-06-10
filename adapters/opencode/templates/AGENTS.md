@@ -119,42 +119,17 @@ The orchestrator does NOT do phase work inline. It coordinates only.
 
 ## Critical Context Forwarding
 
-When delegating to a sub-agent, always forward:
-
-| Field | Source | Required |
-|-------|--------|---------|
-| `change_name` | state.yaml or user input | Always |
-| `change_dir` | `.ai-team/changes/{change_name}` | Always |
-| `project_root` | `pwd` at session start | Always |
-| `model_alias` | see Model Routing below | Always |
-| `tasks_path` | `{change_dir}/tasks.md` | For apply |
-| `design_path` | `{change_dir}/design.md` | For design/apply/verify |
-| `spec_paths` | list from state.yaml | For spec/apply/verify |
-| `baseline_path` | `{change_dir}/baseline.md` | For apply/verify (if exists) |
-| `strict_tdd` | from config or baseline | For apply/verify |
-| `scope` | task group list | For apply continuation |
-| `change_type` | from state.yaml | For propose/apply |
-| `skip_spec` | from state.yaml | For infra changes |
+When delegating to a sub-agent, forward the flags from the protocol's **Critical Context Forwarding** table (`~/.config/opencode/skills/_shared/sdd-orchestrator-protocol.md`) — resolve them once per session and inject them as the `## Injected Context` block. That table is the single source of truth; this file deliberately does not keep a copy (a stale duplicate caused contract drift between adapters).
 
 ## Model Routing
 
-Read model assignments from `~/.config/opencode/opencode.json` at session start. Use the `model` field from each agent's entry.
-
-| Phase | Agent | Default model |
-|-------|-------|---------------|
-| orchestrator | sdd-orchestrator | opus |
-| scout | sdd-scout | sonnet |
-| propose | sdd-propose | opus |
-| spec | sdd-spec | sonnet |
-| design | sdd-design | opus |
-| tasks | sdd-tasks | sonnet |
-| apply | sdd-apply | sonnet |
-| verify | sdd-verify | sonnet |
-| archive | sdd-archive | haiku |
-| security | sdd-security | opus (covers both modes) |
+Read each agent's `model` from `~/.config/opencode/opencode.json` at session start — in OpenCode the per-agent pin is the source of truth (the installer preserves user pins across re-installs). Default assignments and their rationale live in the protocol's **Model Routing** table; this file does not keep a copy. Note: `sdd-security` is a single agent entry, so both modes (threat-model and code-audit) run on its pinned model.
 
 ## Context Resolution Feedback
 
-After every delegation that returns a result, check the `context_resolution` field:
-- `injected` -- all good
-- `fallback-registry`, `fallback-path`, or `none` -- context was incomplete; verify the forwarded fields and re-inject in subsequent delegations
+After every delegation that returns a result, check the `context_resolution` field (vocabulary per `_shared/result-envelope.md`):
+- `self-loaded` or `injected` -- healthy
+- `fallback` -- context was incomplete; rebuild the flag cache from `state.yaml` and re-inject in subsequent delegations
+- `none` -- context-light phase (e.g., scout bootstrap); if the phase has a SKILL.md, verify the skill path and re-engage
+
+Full action table: protocol's **Context Resolution Feedback** section.
