@@ -598,6 +598,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 |------|---------------|--------------------|----------------|
 | `change_name` | user command | every phase | always |
 | `change_dir` | `.ai-team/changes/{change_name}` | every phase | always |
+| `project_root` | `pwd` at session start (target project root) | every phase | always |
 | `model_alias` | Model Routing table | every phase | always |
 | `change_type` | `sdd-propose` envelope (`infra` / `feature` / `mixed`) | design, tasks, apply, verify, archive | once propose has run |
 | `skip_spec` | proposal approval gate (true if user picked skip-spec on infra) | design, tasks, apply, verify, archive | once gate has resolved |
@@ -610,8 +611,10 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
 | `security_touchpoints` | `sdd-propose` envelope (list of touchpoint slugs; empty list = not sensitive) | every phase after propose | once propose has run |
 | `references_dir` | `skills/sdd-{phase}/references/` (literal — not project-relative) | every phase | always |
+| `install_dir` | adapter install path, resolved once per session (see Sub-Agent Delegation) | verify (citation script); any phase loading `_shared/scripts/` | always |
 | `current_iso_utc` | `date -u +%Y-%m-%dT%H:%M:%SZ` (orchestrator at delegation time) | every phase that writes `state.yaml` | always |
-| `group_id` | tasks.md (the just-passed group) | work-unit-commits | always when invoking work-unit-commits |
+| `group_id` | tasks.md (the just-passed group) | work-unit-commits, review | always when invoking work-unit-commits or sdd-reviewer |
+| `group_files` | union of the group's `Files:` block paths in tasks.md | review | always when invoking sdd-reviewer |
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
 
 ### Roots Computation (`allowed_edit_roots`)
