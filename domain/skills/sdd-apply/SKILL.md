@@ -63,7 +63,9 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
    target path is within the forwarded roots, using the within-roots formula from the
    orchestrator's Roots Computation rule (normalize: strip leading `./`, strip trailing `/`;
    target `T` is within root `R` iff `T == R` OR `T` begins with `R + "/"`; partial-name
-   siblings like `src/foobar` under `src/foo` stay outside the root). The check runs for **every**
+   siblings like `src/foobar` under `src/foo` stay outside the root). A target containing any
+   `..` segment, or an absolute path (leading `/`), is outside all roots by definition — reject
+   without prefix comparison (never resolve `..`; `root/../../x` blocks). The check runs for **every**
    application-source write, not only suspicious ones.
    - **Within roots:** proceed with the write normally.
    - **Outside all roots:** leave the file unwritten and immediately compose a `deviation_report`

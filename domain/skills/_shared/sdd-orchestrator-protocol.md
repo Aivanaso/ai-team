@@ -640,7 +640,10 @@ A target `T` is **within** a root `R` iff `T == R` OR `T` begins with the litera
 `R + "/"`. Requiring that `/` separator after the root keeps a partial-name sibling outside:
 `src/foobar` stays outside root `src/foo`, and `sdd-apply-junior` outside `sdd-apply` — the
 match looks for the segment boundary, not a bare byte-level `startsWith(R)`. `T` is within the
-set if it is within at least one root.
+set if it is within at least one root. A target containing any `..` path segment, or an
+absolute path (leading `/`), is **outside all roots by definition** — reject it without prefix
+comparison. The guard never resolves `..`; it rejects it, which closes textual-prefix bypasses
+like `src/foo/../../etc`.
 
 **Empty-roots fallback:** if the union is empty (e.g., `tasks.md` has no per-task
 `**Files:**` tables, or is pure-checklist-shaped), **omit the `allowed_edit_roots` field
