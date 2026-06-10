@@ -20,6 +20,7 @@
 | Static correctness | {verdict} | {N}/{total} requirements structurally verified |
 | Design coherence | {verdict} | {N}/{total} decisions followed |
 | Behavioral compliance | {verdict} | {N}/{total} scenarios compliant |
+| Citation audit | {verdict} | {N} refs checked, {M} unresolved |
 | Drift summary | {verdict} | {N} approved decisions, {M} unaccounted files |
 | AC coverage | {verdict} | {covered}/{total} ACs |
 
@@ -91,9 +92,11 @@
 
 | Scenario | Test | Result |
 |----------|------|--------|
-| Given X, When Y, Then Z | `test-file.spec.ts > test name` | COMPLIANT |
+| Given X, When Y, Then Z | `path/to/test-file.spec.ts::test name` | COMPLIANT |
 | Given A, When B, Then C | (none found) | UNTESTED |
-| Given D, When E, Then F | `test-file.spec.ts > test name` | FAILING |
+| Given D, When E, Then F | `path/to/test-file.spec.ts::test name` | FAILING |
+
+> Citation token contract: COMPLIANT and FAILING rows cite `` `path::test_name` `` — path relative to repo root, test_name a verbatim string in that file (innermost test name, not the runner's composed "suite > test" path). Meta-project rows cite `` `checklist:C-{N}` ``. Step 15b verifies every token resolves on disk.
 
 **Compliance summary**: {N}/{total} scenarios compliant, {N} partial, {N} untested, {N} failing
 
@@ -105,8 +108,8 @@
 
 | REQ-ID | Scenario | State | Evidence |
 |--------|----------|-------|---------|
-| REQ-FOO-001 | Given … When … Then … | COMPLIANT | "describe > it" PASS |
-| REQ-FOO-002 | Given … When … Then … | FAILING | "describe > it" FAIL |
+| REQ-FOO-001 | Given … When … Then … | COMPLIANT | `path/to/foo.spec.ts::renders empty state` PASS |
+| REQ-FOO-002 | Given … When … Then … | FAILING | `path/to/foo.spec.ts::persists on retry` FAIL |
 | REQ-BAR-001 | Given … When … Then … | UNTESTED | no test found |
 
 ## Drift Summary
@@ -131,6 +134,14 @@
 | Check 2 — Resolution coverage | PASS / WARNING | {count} unresolved decision keywords or "clean" |
 | Check 3 — Audit-trail completeness | PASS / CRITICAL | {count} fix commits vs decisions[] entries or "clean" |
 | Check 4 — Test discovery sanity | PASS / WARNING / SKIPPED | {note} |
+
+## Citation Audit
+
+> Step 15b. Verbatim output of `check-verify-citations.sh` against this report. UNRESOLVED rows were downgraded to UNTESTED before the verdict; the final run must show 0 unresolved.
+
+```
+{script output, e.g. "citation-audit: 14 test refs checked, 2 checklist refs skipped, 0 unresolved"}
+```
 
 ## AC Coverage
 

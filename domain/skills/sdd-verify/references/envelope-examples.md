@@ -7,6 +7,7 @@
 ```yaml
 status: ok
 executive_summary: "Verification passed for {change-name}. {N} files verified, build clean, {test-count} tests pass, {scenario-count}/{total} scenarios behaviorally compliant. Ready for archive."
+citations_unresolved: 0
 artifacts:
   - name: "verification-report"
     path: ".ai-team/changes/{change-name}/verification-report.md"
@@ -23,6 +24,7 @@ context_resolution: "injected"
 ```yaml
 status: warning
 executive_summary: "Verification completed for {change-name} with {N} warnings. {summary of warnings}. No critical failures."
+citations_unresolved: 0
 artifacts:
   - name: "verification-report"
     path: ".ai-team/changes/{change-name}/verification-report.md"
@@ -42,6 +44,7 @@ context_resolution: "injected"
 ```yaml
 status: failed
 executive_summary: "Verification failed for {change-name}. {N} critical issues: {brief list}. See verification report for details."
+citations_unresolved: {N from Step 15b — non-zero only here: rows the agent could not honestly downgrade}
 artifacts:
   - name: "verification-report"
     path: ".ai-team/changes/{change-name}/verification-report.md"

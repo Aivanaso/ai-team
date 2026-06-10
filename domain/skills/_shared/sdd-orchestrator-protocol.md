@@ -475,6 +475,20 @@ On Check 5 or 5b failure: re-engage sdd-apply (blocking). Delegate sdd-verify on
 
 Checks 1-4 and 6 do not block verify delegation (informational WARNINGs surfaced to user, sdd-verify runs authoritatively). Checks 5 and 5b DO block — re-engage apply until clean before delegating verify.
 
+## Post-Verify Citation Audit (mechanical, BLOCKING)
+
+After sdd-verify returns, re-run the citation check independently — the envelope and the report's own Citation Audit section are declarations, not proof (Rule 6):
+
+```
+bash {install_dir}/skills/_shared/scripts/check-verify-citations.sh .ai-team/changes/{change}/verification-report.md .
+```
+
+- Exit 0 → accept the verify verdict; proceed (reviewer / re-engage routing as usual).
+- Any `UNRESOLVED` line, or envelope `citations_unresolved > 0` on a non-FAIL verdict → re-engage sdd-verify once with the `UNRESOLVED` lines inlined: "downgrade these scenarios to UNTESTED or cite resolvable tests". Still unresolved after re-engage → escalate to user; treat the affected scenarios as UNTESTED MUST (CRITICAL) for gating.
+- Script missing at `{install_dir}` → run `scripts/install.sh`, or perform the check manually (extract `path::test_name` tokens from COMPLIANT/FAILING rows; verify the path exists and the name greps in the file with `grep -F`).
+
+Empirical pattern (2026-06-10 android-offline-first, opencode GO run): verify declared encryption ACs COMPLIANT citing a non-existent test; reviewer and orchestrator both accepted the report; the change archived with zero real coverage of the threat-model CRITICAL. A fabricated citation cannot survive a grep — this check moves citation honesty from model judgment to mechanics.
+
 ## Plan Mode (NOT used inside the SDD pipeline)
 
 **Plan mode is NOT entered during the SDD pipeline.** The pipeline's own approval gates are sufficient.
