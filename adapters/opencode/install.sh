@@ -116,10 +116,22 @@ if [[ -f "$TARGET_JSON" ]]; then
   # Existing operator agents not named sdd-* are preserved.
   # Note: permission.task is merged — stale allow entries may persist on re-installs,
   # which is safe for ai-team's own re-installs (overlay always writes all 8 allows).
+  # Model pins are user-owned: the template ships provider-agnostic placeholders
+  # (opus/sonnet/haiku), so .model and .agent[*].model from the existing config
+  # take precedence over the overlay — a re-install must never downgrade the
+  # operator's provider mapping back to placeholders.
   TMP_JSON=$(mktemp)
-  jq -s '.[0] * .[1]' "$TARGET_JSON" "$OVERLAY_JSON" > "$TMP_JSON"
+  jq -s '
+    .[0] as $existing | .[1] as $overlay |
+    ($existing * $overlay)
+    | .model = ($existing.model // $overlay.model)
+    | (if .model == null then del(.model) else . end)
+    | .agent = (.agent | with_entries(
+        .value.model = ((($existing.agent // {})[.key] // {}).model // .value.model)
+      ))
+  ' "$TARGET_JSON" "$OVERLAY_JSON" > "$TMP_JSON"
   mv "$TMP_JSON" "$TARGET_JSON"
-  info "  -> ~/.config/opencode/opencode.json (merged)"
+  info "  -> ~/.config/opencode/opencode.json (merged, user model pins preserved)"
 else
   cp "$OVERLAY_JSON" "$TARGET_JSON"
   info "  -> ~/.config/opencode/opencode.json (created)"
