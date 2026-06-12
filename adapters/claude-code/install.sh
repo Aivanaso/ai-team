@@ -90,17 +90,18 @@ info "  -> ~/.claude/skills/ ($skill_count phases + _shared)"
 verify_install "$CLAUDE_DIR/skills"
 
 # Rewrite skill paths in the orchestrator protocol for installed location.
-# Guard: skip if already-rewritten absolute prefix is present (idempotency fix).
-# Evidence: adapted from scripts/install.sh lines 54-61 (original unconditional sed).
+# Anchored patterns (command `bash skills/...` and inline-code `` `skills/sdd-... ``) are
+# idempotent by construction — after one rewrite neither pattern matches again — and they
+# leave `{install_dir}/skills/...` references and prose mentioning skill roots untouched.
+# (The old broad guard `grep -q '~/.claude/skills/'` skipped the whole sed once the source
+# protocol legitimately mentioned that path in prose, leaving command lines unrewritten.)
 SDD_PROTOCOL="$CLAUDE_DIR/skills/_shared/sdd-orchestrator-protocol.md"
-if [[ -f "$SDD_PROTOCOL" ]] && ! grep -q '~/.claude/skills/' "$SDD_PROTOCOL"; then
+if [[ -f "$SDD_PROTOCOL" ]]; then
   sed -i \
-    -e 's|skills/_shared/|~/.claude/skills/_shared/|g' \
-    -e 's|skills/sdd-|~/.claude/skills/sdd-|g' \
+    -e 's|bash skills/_shared/|bash ~/.claude/skills/_shared/|g' \
+    -e 's|`skills/sdd-|`~/.claude/skills/sdd-|g' \
     "$SDD_PROTOCOL"
   info "  -> Rewrote skill paths in sdd-orchestrator-protocol.md"
-else
-  info "  -> Skill paths already rewritten (idempotent re-run)"
 fi
 
 # --- 2. Agents ---

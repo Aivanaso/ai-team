@@ -87,16 +87,16 @@ info "  -> ~/.config/opencode/skills/ ($skill_count phases + _shared)"
 verify_install "$OPENCODE_DIR/skills"
 
 # Rewrite skill paths in the orchestrator protocol for installed location.
-# Guard: skip if already-rewritten absolute prefix is present (idempotency fix).
+# Anchored patterns (command `bash skills/...` and inline-code `` `skills/sdd-... ``) are
+# idempotent by construction — after one rewrite neither pattern matches again — and they
+# leave `{install_dir}/skills/...` references and prose mentioning skill roots untouched.
 SDD_PROTOCOL="$OPENCODE_DIR/skills/_shared/sdd-orchestrator-protocol.md"
-if [[ -f "$SDD_PROTOCOL" ]] && ! grep -q '~/.config/opencode/skills/' "$SDD_PROTOCOL"; then
+if [[ -f "$SDD_PROTOCOL" ]]; then
   sed -i \
-    -e 's|skills/_shared/|~/.config/opencode/skills/_shared/|g' \
-    -e 's|skills/sdd-|~/.config/opencode/skills/sdd-|g' \
+    -e 's|bash skills/_shared/|bash ~/.config/opencode/skills/_shared/|g' \
+    -e 's|`skills/sdd-|`~/.config/opencode/skills/sdd-|g' \
     "$SDD_PROTOCOL"
   info "  -> Rewrote skill paths in sdd-orchestrator-protocol.md"
-else
-  info "  -> Skill paths already rewritten (idempotent re-run)"
 fi
 
 # --- 2. AGENTS.md ---
