@@ -95,6 +95,7 @@ Run when the orchestrator launches the apply phase for an SDD change after tasks
 
    Triggers:
    - About to write a fix not in any task in `tasks.md` (out-of-plan).
+   - A new REQUIRED value (column, env var, constructor param, header) forces edits to fixtures/mocks/factories that `tasks.md` does not declare (out-of-plan fanout). Mechanical-and-obvious still routes through the deviation_report — the orchestrator approves scoped mechanical fanout in minutes, and the declaration keeps the audit trail whole.
    - Discovered a design.md assumption that does not hold in the actual codebase (design-pivot).
    - Added a runtime dependency, config flag, or infra piece not in the original task plan.
    - Test references a symbol/file/route/command/interface absent from the system (test-orphan).
