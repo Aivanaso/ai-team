@@ -4,6 +4,8 @@ Annotated YAML template for `.ai-team/config.yaml`. Fill in values detected duri
 
 > **Format**: every block below uses `<placeholder>` or `{placeholder}` syntax for values the scout fills in. Inline comments list common alternatives (e.g. `e.g. typescript | php | go | ...`). The template names no canonical stack — it adapts to whatever the target project uses.
 
+> **Canonical key set**: the orchestrator's Config Refresh Check (Auto-Init in `_shared/sdd-orchestrator-protocol.md`) diffs existing project configs against this template's top-level keys and offers to append the missing ones. When adding a key here, give it a safe-absent default (every consumer keeps working when the key is missing) so pre-existing projects upgrade additively on their next SDD run.
+
 ```yaml
 project:
   name: "{detected from project manifest (package.json / composer.json / Cargo.toml / go.mod / pyproject.toml / Gemfile) or directory name}"

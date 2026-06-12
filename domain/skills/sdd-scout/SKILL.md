@@ -15,6 +15,7 @@ Run when the orchestrator launches scout at the start of a new SDD change or on 
 - Bootstrap: preserve existing `config.yaml` — return `status: blocked` if it already exists (user customizations accumulated across prior SDDs must not be lost). -- because overwriting destroys user customizations (test runner paths, language versions, project conventions) accumulated across prior SDDs.
 - Baseline: document what the code **actually does**, not what you think it should. -- because aspirational specs ("what the code should do") create false baselines that every subsequent SDD inherits as if they were true.
 - Bootstrap writes a `commit_strategy: auto` field at the root of generated `config.yaml`. Existing configs without the field are valid (backward-compatible default).
+- Config evolution for existing projects is owned exclusively by the orchestrator's Config Refresh Check (Auto-Init: additive key diff against `references/config-template.md`); scout writes `config.yaml` only on first bootstrap. -- because a single additive owner keeps user customizations safe — two writers of the same file with different merge semantics would race.
 
 ## Decision Gates
 

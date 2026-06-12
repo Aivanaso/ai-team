@@ -120,7 +120,7 @@ For **Large** tasks without SDD (user declined):
 Before executing any SDD command (`/ai-team new`, `/ai-team ff`, `/ai-team continue`, `/ai-team explore`, `/ai-team baseline`):
 
 1. Check if `.ai-team/config.yaml` exists in the project root
-2. If it exists: proceed normally
+2. If it exists: run the Config Refresh Check below (once per session), then proceed
 3. If missing:
    a. Create `.ai-team/` directory structure inline (dirs + .gitignore)
    b. Delegate to sdd-scout in bootstrap mode to detect the stack
@@ -146,6 +146,17 @@ The `.gitignore` should ignore active changes and explorations but keep specs an
 !/changes/archive/
 /explorations/
 ```
+
+### Config Refresh Check (existing projects)
+
+The config template gains keys as the framework evolves; projects bootstrapped earlier keep working (every consumer defaults safely on absent keys) but stay blind to newer capabilities (`commit_strategy`, `strict_tdd`, `model_overrides`, `test_commands.*`). Once per session, when `.ai-team/config.yaml` already exists:
+
+1. Read the installed template at `{install_dir}/skills/sdd-scout/references/config-template.md`. The template is the canonical key set — comparing against it directly removes the need for any version field or migration table.
+2. Diff top-level keys: collect template keys absent from the project's `config.yaml`.
+3. All keys present → proceed silently. Missing keys → offer a one-line refresh: "config.yaml predates these framework keys: {list}. Append them with safe defaults?"
+4. On accept: append each missing key with its template default plus a `# added by config-refresh {date}` comment. Preserve every existing key and value byte-for-byte — the refresh is additive-only, the same no-overwrite guarantee scout bootstrap gives. On decline: proceed — absent keys keep their safe-absent semantics.
+
+The refresh check is owned here (orchestrator inline) because it is a key diff plus an append — delegating it would cost more than doing it.
 
 ## Dependency Graph
 
@@ -194,6 +205,14 @@ Before the **spec phase**, check if a base spec exists for each domain affected 
 3. If missing: inform user, delegate to sdd-scout in baseline mode, wait, then proceed
 4. If all exist: proceed normally
 
+## Post-Spec ID Continuity Check (mechanical)
+
+After sdd-spec returns and before delegating design, verify REQ-ID continuity by grep — a sub-agent's statement about base-spec state is a declaration, and any declaration that conditions IDs or merges gets verified mechanically (Rule 6 family; a spec agent once declared "base ends at 017" while the base reached 020, numbering colliding IDs that a 10-second grep would have caught):
+
+1. Per affected domain: grep the highest `REQ-{DOMAIN}-NNN` in `.ai-team/specs/{domain}/spec.md` and the IDs used in the delta.
+2. Delta IDs continue the base sequence with zero collisions → proceed to design.
+3. On collision: renumber orchestrator-side when the fix is mechanical (`sed` + one `decisions[]` entry); re-engage sdd-spec when renumbering would break cross-refs.
+
 ## Fast-Forward Workflow
 
 `/ai-team ff <change-name>` chains the planning phases (propose → spec → design → tasks) into a single invocation. Apply, verify, and archive still require explicit `/ai-team continue`.
@@ -213,6 +232,7 @@ Before the **spec phase**, check if a base spec exists for each domain affected 
 | **Apply approval** | tasks | apply | always |
 | **Security: code-audit** | apply | verify | `security_touchpoints` non-empty |
 | **Code review** | verify | work-unit-commits | always |
+| **External multi-angle audit** | code review (last group) | work-unit-commits | optional — user accepts cost; full intensity when `security_touchpoints` non-empty |
 
 At each gate:
 1. Present a concise summary of the completed phase
@@ -312,6 +332,12 @@ When `change_type: infra` AND `security_touchpoints` non-empty:
 
 After `sdd-verify` returns GREEN (PASS or PASS WITH WARNINGS) for a logical group and before `work-unit-commits` is invoked for that group, the orchestrator invokes `sdd-reviewer` (model: opus), passing `group_id`, `group_files` (the `tasks.md` `Files:` list for the group), and `change_name`. The reviewer gate is **always-on** — it applies regardless of `change_type`, `security_touchpoints`, or any other conditional flag.
 
+**Directed-review blocks (mandatory in every reviewer delegation):** reviewer yield is proportional to injection specificity — the same model that saw-and-dismissed a real defect under a generic prompt blocked a CRITICAL pre-commit when the prompt named the flow to trace. Build the prompt with all three:
+
+1. `attention_areas` — ALWAYS populated, from project memories + this change's threat-model findings + `decisions[]` overrides. One line per critical flow, in the form "trace {X} end-to-end and verify {Y}" (e.g., "trace the item id from POST response to PATCH path param — verify the server id, not the locally-generated one, reaches the PATCH").
+2. `untested_scenarios` — the UNTESTED / pre-accepted rows from verify's compliance matrix, verbatim. Each marks a code path zero tests cover; the reviewer inspects these first (pre-accepting an UNTESTED scenario hands it an owner here, instead of letting "pre-accepted" read as "closed").
+3. `spec_paths` — the reviewer calibrates observations against spec MUSTs (an observation contradicting a MUST is a finding, never style).
+
 After the reviewer returns its verdict:
 
 | Verdict | Orchestrator action |
@@ -344,6 +370,17 @@ After the reviewer returns its verdict:
 The orchestrator is the ONLY writer of this entry. The reviewer does NOT write to `decisions[]`.
 
 **Cancel write rule:** When the user selects **Cancel**, set `state.yaml.blocked: true`, `blocked_reason: "Code review: user cancelled on finding(s) {finding-id-list}"`. Stop the pipeline; preserve the change dir.
+
+### External multi-angle audit (optional, pre-commit)
+
+Offer this audit after the LAST group reaches `review-clear` (or its `review-blocked` is resolved) and BEFORE invoking `work-unit-commits` for it. Pre-commit placement folds fixes into the original atomic commits and lets archive merge specs that are already correct — two consecutive retros confirmed that post-archive placement stacks fix-commits on top of "clean" history and merges a spec with wording the fixes then contradict.
+
+- **Shape:** independent finder agents, each with ONE narrow adversarial question over the full change ("what breaks when this call throws?", "who else writes this field?"), then verifier agents that confirm/refute each candidate against the code. Narrow perspectives with 1-vote verification catch the interaction bugs a single full-context reviewer reads past.
+- **Intensity:** `security_touchpoints` non-empty → full (~7 finders); otherwise light (~3 finders). The audit is expensive (~0.7–1M tokens at full intensity) — present the cost and let the user decide; on decline, proceed to commits.
+- **Verifier batching:** group candidates by domain (~3 verifier agents) — verdicts stay independently traceable per candidate at ~1/3 the cost of one-verifier-per-candidate.
+- **Inputs (inject explicitly):** verify's UNTESTED / pre-accepted scenarios (highest-yield targets — a CRITICAL has lived in one), threat-model fragile invariants, `decisions[]` overrides, project memories.
+- **Findings routing:** confirmed CRITICAL/MAJOR → re-engage `sdd-apply` (counts against the group's 3-attempt budget), then re-run verify scoped to the fixed files and the reviewer for the group; MINOR → follow-ups in the final summary.
+- The orchestrator is itself a valid filter: refute candidates using project knowledge the finders lack, citing the evidence in the summary.
 
 ## Re-engage Routing on failure_class
 
@@ -397,7 +434,7 @@ attempt for the group.
 
 ## work-unit-commits Invocation
 
-After `sdd-verify` returns GREEN (PASS or PASS WITH WARNINGS) for a logical group **AND `sdd-reviewer` returns `review-clear` for that group (or the user overrides a `review-blocked` verdict per the Code-review gate)**, invoke work-unit-commits:
+After `sdd-verify` returns GREEN (PASS or PASS WITH WARNINGS) for a logical group **AND `sdd-reviewer` returns `review-clear` for that group (or the user overrides a `review-blocked` verdict per the Code-review gate)** — and, for the last group, after the External multi-angle audit is resolved when the user opted into it — invoke work-unit-commits:
 
 ```
 Inject: group_id={G_id}, mode={config.commit_strategy default auto if absent}, change_name={change_name}
@@ -605,7 +642,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `baseline_path` | `.ai-team/changes/{change_name}/baseline.md` | apply, verify | if file exists |
 | `proposal_path` | `.ai-team/changes/{change_name}/proposal.md` | spec, design, tasks, verify | once propose has run |
 | `design_path` | `.ai-team/changes/{change_name}/design.md` | tasks, apply, verify | once design has run |
-| `spec_paths` | `.ai-team/changes/{change_name}/specs/*/spec.md` (list) | tasks, apply, verify, archive | once spec has run; pass empty list on infra short path |
+| `spec_paths` | `.ai-team/changes/{change_name}/specs/*/spec.md` (list) | tasks, apply, verify, archive, review | once spec has run; pass empty list on infra short path |
 | `tasks_path` | `.ai-team/changes/{change_name}/tasks.md` | apply, verify | once tasks has run |
 | `allowed_edit_roots` | `tasks.md` (per-task `**Files:**` path tables — union of containing directories; see Roots Computation Rule below) | apply | once tasks has run; **omit the field entirely if the computed union is empty** (see Roots Computation Rule fallback) |
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
@@ -615,6 +652,8 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `current_iso_utc` | `date -u +%Y-%m-%dT%H:%M:%SZ` (orchestrator at delegation time) | every phase that writes `state.yaml` | always |
 | `group_id` | tasks.md (the just-passed group) | work-unit-commits, review | always when invoking work-unit-commits or sdd-reviewer |
 | `group_files` | union of the group's `Files:` block paths in tasks.md | review | always when invoking sdd-reviewer |
+| `attention_areas` | project memories + threat-model findings + `decisions[]` of the change (orchestrator-curated; one "trace X end-to-end, verify Y" line per critical flow) | review | always when invoking sdd-reviewer |
+| `untested_scenarios` | verify's compliance matrix rows marked UNTESTED / pre-accepted (verbatim) | review | always when invoking sdd-reviewer; empty list if none |
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
 
 ### Roots Computation (`allowed_edit_roots`)
@@ -665,6 +704,7 @@ SENIORITY (mandatory): You IMPLEMENT or BLOCK. You do NOT author audit-trail ent
 - The orchestrator exclusively authors `decisions[]` entries. Signal deviations via the envelope's `deviation_report` block instead.
 - On any deviation (out-of-plan, design-pivot, test-orphan, new runtime dep): return `status: blocked` with a structured `deviation_report` block (schema in `_shared/result-envelope.md`). Stop. Surface deviations as a structured `deviation_report` in the envelope (in-line fixes are outside SDD scope).
 - Test references a missing symbol/file/route/command? FIRST hypothesis is `test-orphan` -- return `status: blocked` with `deviation_report.kind: test-orphan`. The orchestrator decides whether to add the entity per REQ or to re-engage sdd-tasks.
+- Undeclared fixture/mock fanout IS out-of-plan: when a new REQUIRED value (column, env var, constructor param, header) forces edits to fixtures/mocks/factories that tasks.md does not declare, return `status: blocked` with `deviation_report.kind: out-of-plan` BEFORE executing the ripple. Mechanical-and-obvious still routes through the deviation_report — the orchestrator approves scoped mechanical fanout in minutes, and the declaration is what keeps the audit trail whole.
 - Lint/typecheck/test output you cite MUST be from a re-run inside this same Step (no stale snapshots from before autofix).
 ```
 
@@ -713,6 +753,14 @@ Never ignore `fallback` or unexpected `none` — silent degradation is exactly w
 ### Non-SDD Delegation
 
 For medium tasks that benefit from delegation but don't warrant full SDD: use `model: sonnet`, include relevant project context (config.yaml, applicable skills), give clear file-path instructions, and request a brief summary (not a full envelope).
+
+### Delegating to sdd-design
+
+Use the standard delegation pattern, plus a `## Questions to Answer Against the Code` block: one concrete question per wire-contract, state transition, or external-behavior assumption the spec/proposal asserts, each naming where the evidence lives ("Read {module}; answer in design.md with file:line: does {endpoint} take a request body? which precondition gates the {transition}?"). Source the questions from spec wire-shapes, transition preconditions, and project memories.
+
+Design is the first phase that reads the implementation deeply, which makes it the cheapest drift detector in the pipeline: a specific question with an expected file:line turns design into contract verification — three injected questions once exposed a spec describing a wire-contract that did not exist (body + status code both wrong), amended BEFORE tasks at zero downstream cost. Each unasked question survives as self-consistent drift: apply implements the spec's imaginary contract and verify validates against the same wrong spec, surfacing only in real integration.
+
+When design's answers contradict the spec, amend the spec before delegating tasks: mechanical + evidence-cited → inline edit with a `decisions[]` entry; judgment-laden → re-engage sdd-spec.
 
 ### Delegating to sdd-security
 
