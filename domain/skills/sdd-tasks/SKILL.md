@@ -29,6 +29,7 @@ Run when the orchestrator launches the tasks phase for an SDD change. Produces `
 | Circular dependency between tasks | Merge tasks or introduce a shared types task; never leave cycles in the plan. |
 | Cohesion risk is High and no slice plan set | Set `Decision needed before apply: Yes`; assign every task to a feature-level PR slice. |
 | `config.yaml.stack.testing` is empty | Emit Manual Review Checklist (REQ-TASKS-020 exception path); set `test_file` cells to `#manual-checklist`, `test_id` to `manual-{AC-N}`. |
+| Design introduces a new REQUIRED value (column, env var, constructor param, header, config key) | Run the Step 5b fanout sweep; declare affected fixtures/mocks in the owning task's `Files:` block and the verified-not-affected neighbors in its notes. |
 
 ## Execution Steps
 
@@ -37,6 +38,7 @@ Run when the orchestrator launches the tasks phase for an SDD change. Produces `
 3. Read design.md in full; extract components (name, type, path, action, domain, dependencies). Read delta specs for REQ-IDs and proposal for ACs.
 4. **Phase A** (free) — glob/grep every file path the design mentions: verify existing files exist, new files don't, module registrations match.
 5. **Phase B** (budgeted, 5-15 files) — read only files where Phase A found discrepancies or where critical interface assumptions need confirmation.
+5b. **Required-value fanout sweep:** for every new REQUIRED value the design introduces — DB column, env var, constructor parameter, header, config key — grep ALL fixtures, mocks, factories, and test setups that construct or boot the affected entity/process. Declare each affected file in the owning task's `Files:` block and list the verified-not-affected neighbors in its Implementation Notes ("{TestX} builds {Y} without {value} — no fanout"). -- because the fanout pattern recurs across shapes (a NOT NULL column broke N entity mocks; a required env var broke 34 e2e fixtures) and a pre-grepped fanout list is what keeps apply single-pass and deviation-free.
 6. Build component inventory; group into tasks by execution layer (see Layer Ordering below). Assign each task to exactly one group; number groups sequentially from G1. Check compilability after each task in the sequence.
 7. **Forecast Review Workload** — classify cohesion risk, propose PR slices, emit the grep contract lines (see Output Contract). Use `references/tasks-template.md` for the full tasks.md structure.
 7b. **Test scaffold generation:** If `config.yaml.stack.testing` is non-empty, declare one scaffold file per AC in the delta spec (in the task's `Files:` block) using `references/scaffold-templates.md` dispatch table. Then emit the AC↔Test Traceability table. If `config.yaml.stack.testing: []` (meta-project), emit a Manual Review Checklist table instead with one Bash criterion per AC — see `references/scaffold-templates.md` "Manual Review Checklist Template" section.
