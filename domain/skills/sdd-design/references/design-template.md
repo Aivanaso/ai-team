@@ -91,6 +91,22 @@ Use this template for `.ai-team/changes/{change-name}/design.md`.
 3. {Step 3}
 ...
 
+## Error Propagation
+
+> One row per NEW port, seam, or boundary interface this design introduces.
+
+| Seam / Port | Error mode | Caller | On failure |
+|-------------|------------|--------|------------|
+| {Interface.method} | {throws {types} / returns Result / never-throws} | {caller path:line} | {propagate / degrade / retry / no-op — and the handler's blast radius when the call lands inside an existing catch} |
+
+**Multi-store write sequences:** {none, or one line per sequence — recovery story: single store / persisted intent + idempotent replay / tested recovery}
+
+## Answers to Injected Questions
+
+> Present when the delegation prompt carried a `Questions to Answer Against the Code` block. One answer per question, each grounded in code evidence.
+
+- **Q:** {question} — **A:** {answer} ({path:line})
+
 ## Test Strategy
 
 ### Unit Tests

@@ -15,6 +15,7 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 - Follow existing project patterns — if the project uses repository pattern, use it. Introduce only paradigms the proposal explicitly calls for. -- because novel paradigms introduced at design level create scope creep during apply and inconsistencies that sdd-verify cannot distinguish from bugs.
 - Name actual files, classes, interfaces, and methods. Abstract descriptions are not accepted. -- because abstract descriptions ("a service", "some module") force apply to make design decisions it lacks authority for, creating undocumented scope decisions.
 - Evidence > Assumption: every framework or project-behavior claim MUST cite a config line or existing caller. See `_shared/evidence-protocol.md`.
+- Declare the error contract of every new port, seam, or boundary interface: its error mode (throws / returns Result / never-throws) plus each caller's behavior on failure. A seam with its placement decided and its failure behavior open is half-designed. -- because callers improvise whatever design leaves open: a design once placed a port correctly, left "what happens when it throws" unanswered, and a transient exception after a successful operation escalated to a catch-all that wiped all local data.
 - If any design decision cites a sibling repo as the pattern source, apply Evidence Protocol Rule 5 before finalizing — verify all 5 axes (build topology, dependency layout, framework version, runtime topology, environment scope).
 
 ## Decision Gates
@@ -26,6 +27,7 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 | Change is trivial (single field, rename) | Produce minimal design; omit inapplicable sections; note "Minimal design" in envelope. |
 | Codebase has conflicting patterns | Follow most recent/common; document inconsistency as a design decision. Surface the inconsistency as a risk in the result envelope; the orchestrator decides whether to scope a separate refactoring change. |
 | Stack missing a required capability | Include new dependencies; list as risk; see [references/edge-cases.md](references/edge-cases.md) "Stack Mismatch". |
+| Delegation prompt includes `Questions to Answer Against the Code` | Answer every question IN design.md with `file:line` evidence (template section "Answers to Injected Questions"); a question answered without citation goes to Open Questions as unanswered. When an answer contradicts the spec, flag `spec-drift` in the envelope `risks` — the orchestrator amends the spec before tasks. |
 
 ## Execution Steps
 
@@ -44,6 +46,7 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 7. Design data model changes: new entities, entity modifications, migrations, indexes. Ground in project ORM conventions.
 8. Design API contracts: new/modified endpoints, auth requirements, DTO validation. Follow project conventions from `config.yaml`.
 9. Design component interactions: request flow, event flow, error flow — step-by-step sequence.
+9b. **Error propagation (mandatory for every new port/seam):** fill the Error Propagation table — error mode (throws which types / returns Result / never-throws), each caller's on-failure action (propagate / degrade / retry / no-op), and, when the new call lands inside an existing handler, that handler's blast radius cited `file:line`. For seams writing to more than one store, name the crash-recovery story here (single store / persisted intent + idempotent replay / tested recovery).
 10. **Cross-repo transplant check (Rule 5):** if any decision cites "mirror of {repo}", "same as {other-repo}", or a path crossing repos — enumerate structural prerequisites, verify each axis, decide `proceed` / `adapt` / `reject`. Embed the citation block in the Design Decisions table. If `reject`, surface in Open Questions with failing axis named.
 11. **Side Effects of Topology Decisions (Step 7b):** for any decision touching networking, runtime topology, shared secrets, env vars, or DNS — add an explicit "Side Effects" sub-bullet listing: which namespaces become shared (DNS, env, volumes, secrets); which names could collide; runtime behavior on collision (silent shadow, error, race). The ECO-971 DNS-shadowing incident (joining an external network silently shadowed local services) is the canonical example.
 12. Write `design.md` per [references/design-template.md](references/design-template.md).
