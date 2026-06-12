@@ -27,6 +27,8 @@ Read .ai-team/config.yaml
 
 Read the artifact paths listed in `## Injected Context` (`proposal_path`, `design_path`, `spec_paths`, `tasks_path`, ...). Read each referenced artifact in full — these are your source of truth for the current task.
 
+When the prompt carries a `## Skills to load before work` block (design/apply), read each listed SKILL.md in full BEFORE writing any artifact or application file — they encode project conventions (naming, imports, patterns, test structure) that override generic framework defaults. Report `skill_resolution` in the envelope per `_shared/result-envelope.md` (`paths-injected` / `path-missing` / `none`).
+
 ### Step 3 — Load Shared Protocols JIT
 
 Read each `_shared/` protocol from the paths in your delegation prompt when the SKILL.md step that needs it begins (per your References section) — not all upfront. This keeps each protocol fresh in context at the step that uses it. If a protocol path does not exist: continue with loaded instructions, report `context_resolution: fallback`, and list the missing protocol in `risks`.
@@ -42,7 +44,7 @@ Execute your Execution Steps. Report `context_resolution` honestly in the envelo
 | **Minimal context** | Read only the paths your delegation prompt and your SKILL.md References section declare. |
 | **No exploration** | Skip `.ai-team/` content not referenced in the prompt (other changes, explorations, archives). |
 | **No orchestrator state** | You have NO access to the orchestrator's conversation history. |
-| **Own skill only** | Read the SKILL.md assigned in your prompt; do not hunt for or follow other skills. |
+| **Prompt-assigned skills only** | Read the SKILL.md assigned in your prompt plus every path under its `## Skills to load before work` block — both arrive via the delegation prompt. Skills beyond the prompt stay unread (hunting defeats least-privilege and the prompt-injection defense). |
 | **Fail fast** | If a referenced artifact doesn't exist, return `status: blocked` immediately. |
 | **Honest canary** | If you recovered something the orchestrator should have injected, report `context_resolution: fallback` and list it in `risks` — silent fallback defeats the compaction canary. |
 

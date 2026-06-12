@@ -35,7 +35,7 @@ Run when the orchestrator launches the spec phase for an SDD change after the pr
 
 1. Read `_shared/context-protocol.md` (startup) and `_shared/spec-convention.md` (spec format). Validate injected context; recover missing fields from `state.yaml` if needed.
 2. Read `proposal.md`. Extract ACs, affected domains table, approach, and cross-domain interactions.
-3. Read `.ai-team/config.yaml`: stack, architecture style, conventions. Read `skill-registry.md` if present.
+3. Read `.ai-team/config.yaml`: stack, architecture style, conventions. (Stack skills are consumed by design/apply via `## Skills to load before work`; specs stay behavioral and need none.)
 4. For each affected domain, check whether `.ai-team/specs/{domain}/spec.md` exists. Apply Decision Gates (greenfield / needs-baseline / ready).
 5. **Phase A — Structural scan (cost-free):** glob and grep to map domain structure using `architecture.style` hints from config.
    - `ddd` → aggregate roots + domain events in affected bounded contexts

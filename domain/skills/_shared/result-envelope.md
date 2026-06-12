@@ -89,6 +89,18 @@ The orchestrator inspects this field on every return. See `sdd-orchestrator-prot
 
 **Rule for sub-agents**: do not lie. If you read a path that the orchestrator should have given you, report `fallback` and list which inputs were missing in `risks`. Silent fallback defeats the canary.
 
+### `skill_resolution` (REQUIRED for `sdd-design` and `sdd-apply`)
+
+Skill-injection canary for the phases that consume stack skills. The orchestrator forwards matching SKILL.md paths from `.ai-team/skill-registry.md` as a `## Skills to load before work` block; this field reports what actually happened:
+
+| Value | Meaning |
+|-------|---------|
+| `paths-injected` | Block received; every listed SKILL.md was read in full before writing |
+| `path-missing` | Block received but ≥1 listed path is absent on disk — continued without it; missing paths listed in `risks` |
+| `none` | No skills block in the prompt — proceeded on `config.yaml` conventions alone |
+
+The orchestrator inspects this field on design/apply returns. See `sdd-orchestrator-protocol.md` → "Skill Resolution Feedback".
+
 ### `execution_evidence` (OPTIONAL globally; REQUIRED for `sdd-apply`)
 
 Captures the literal stdout of verify commands and created test files, so the orchestrator can independently confirm apply ran them. Skills where this field is REQUIRED: `sdd-apply` (extensible — other skills may add it without breaking the schema).

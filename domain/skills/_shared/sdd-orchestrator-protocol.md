@@ -126,6 +126,7 @@ Before executing any SDD command (`/ai-team new`, `/ai-team ff`, `/ai-team conti
    b. Delegate to sdd-scout in bootstrap mode to detect the stack
    c. Wait for the scout to finish and verify `config.yaml` was created
    d. Then proceed with the originally requested command
+4. Both paths: run the Skill Registry Refresh below (once per session)
 
 Handle init transparently (the user expects it to happen automatically).
 
@@ -139,12 +140,14 @@ Handle init transparently (the user expects it to happen automatically).
   .gitignore
 ```
 
-The `.gitignore` should ignore active changes and explorations but keep specs and archive:
+The `.gitignore` should ignore active changes, explorations, and the derived skill registry (it holds absolute machine-local paths) but keep specs and archive:
 
 ```
 /changes/*
 !/changes/archive/
 /explorations/
+/skill-registry.md
+/.skill-registry.cache
 ```
 
 ### Config Refresh Check (existing projects)
@@ -157,6 +160,22 @@ The config template gains keys as the framework evolves; projects bootstrapped e
 4. On accept: append each missing key with its template default plus a `# added by config-refresh {date}` comment. Preserve every existing key and value byte-for-byte — the refresh is additive-only, the same no-overwrite guarantee scout bootstrap gives. On decline: proceed — absent keys keep their safe-absent semantics.
 
 The refresh check is owned here (orchestrator inline) because it is a key diff plus an append — delegating it would cost more than doing it.
+
+### Skill Registry Refresh (every session)
+
+Run once per session during Auto-Init (both the existing-config and the bootstrap path):
+
+```
+bash skills/_shared/scripts/refresh-skill-registry.sh --project-root {project_root} --quiet
+```
+
+(The installer rewrites `skills/_shared/` to the adapter's absolute install path.)
+
+- The script scans project skill roots first (`skills/`, `.claude/skills/`, `.opencode/skills/`, `.agents/skills/` — project wins name collisions), then user roots (`~/.claude/skills/`, `~/.config/opencode/skills/`, `~/.agents/skills/`), and writes `.ai-team/skill-registry.md`: an INDEX of stack/convention skills (name, full trigger description, scope, exact path). Pipeline skills (`sdd-*`, `work-unit-commits`, `_shared`) stay out — phases are delegated by the DAG, never matched by stack.
+- Freshness needs zero bookkeeping: a fingerprint cache (`.ai-team/.skill-registry.cache`, mtime+size of every SKILL.md found) makes the repeat run a millisecond "cache-hit" no-op, so adding/editing/removing any skill is picked up on the next session automatically.
+- Script missing at the install dir → proceed without a registry, tell the user once ("skill registry unavailable — run `scripts/install.sh`"), and delegate without skills blocks (sub-agents report `skill_resolution: none`).
+
+The registry feeds the `skills_to_load` flag in Critical Context Forwarding: the orchestrator matches rows against the change's stack and target files, and forwards matching `Path` values to design/apply under `## Skills to load before work`. Paths travel, summaries stay home — sub-agents read the full SKILL.md files so author intent survives delegation.
 
 ## Dependency Graph
 
@@ -617,7 +636,7 @@ IMPORTANT: Use `subagent_type: "sdd-{phase}"` for SDD sub-agents (e.g., `"sdd-ap
 
 **Agent description format:** `"SDD {phase} {change-name} [{model}]"` — e.g., `"SDD apply my-feature [sonnet]"`. The model tag makes routing visible in the UI.
 
-**Prompt structure:** `You are the sdd-{phase} executor...` → `FIRST ACTION: Read your instructions from the skill path below...` → `## Skill and Protocol Paths` (skill + shared protocol paths + references_dir) → `## Injected Context` (per Critical Context Forwarding table) → `## Task` (scope, verify commands, constraints) → `## Output Contract` (summary of expected envelope fields) → mandatory blocks (Untrusted content for every phase; Seniority + Tests for apply only).
+**Prompt structure:** `You are the sdd-{phase} executor...` → `FIRST ACTION: Read your instructions from the skill path below...` → `## Skill and Protocol Paths` (skill + shared protocol paths + references_dir) → `## Injected Context` (per Critical Context Forwarding table) → `## Skills to load before work` (design/apply only, when `skills_to_load` matched — exact SKILL.md paths from the registry) → `## Task` (scope, verify commands, constraints) → `## Output Contract` (summary of expected envelope fields) → mandatory blocks (Untrusted content for every phase; Seniority + Tests for apply only).
 
 Omit shared protocol paths the phase does not reference in its SKILL.md References section (e.g., apply does not need `spec_convention`; archive does not need `evidence_protocol`). The sub-agent reads only what its SKILL.md References declare.
 
@@ -644,6 +663,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `design_path` | `.ai-team/changes/{change_name}/design.md` | tasks, apply, verify | once design has run |
 | `spec_paths` | `.ai-team/changes/{change_name}/specs/*/spec.md` (list) | tasks, apply, verify, archive, review | once spec has run; pass empty list on infra short path |
 | `tasks_path` | `.ai-team/changes/{change_name}/tasks.md` | apply, verify | once tasks has run |
+| `skills_to_load` | `.ai-team/skill-registry.md` — match rows against the change's stack + target file paths; forward the matching `Path` values as a `## Skills to load before work` block | design, apply | when the registry exists and ≥1 row matches; omit the block entirely on zero matches (sub-agent reports `skill_resolution: none`) |
 | `allowed_edit_roots` | `tasks.md` (per-task `**Files:**` path tables — union of containing directories; see Roots Computation Rule below) | apply | once tasks has run; **omit the field entirely if the computed union is empty** (see Roots Computation Rule fallback) |
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` (if present) | apply, verify | if config sets it |
 | `security_touchpoints` | `sdd-propose` envelope (list of touchpoint slugs; empty list = not sensitive) | every phase after propose | once propose has run |
@@ -749,6 +769,16 @@ Every result envelope includes `context_resolution: self-loaded | injected | fal
 | `none` | If the phase has a SKILL.md: agent skipped loading instructions — verify `install_dir`, re-engage with corrected paths or run `scripts/install.sh`. If context-light phase (e.g., health check): no action |
 
 Never ignore `fallback` or unexpected `none` — silent degradation is exactly what this loop prevents.
+
+### Skill Resolution Feedback
+
+Design and apply envelopes report `skill_resolution` (schema in `_shared/result-envelope.md`). Orchestrator action per value:
+
+| Value | Orchestrator action |
+|-------|---------------------|
+| `paths-injected` | Healthy — forwarded skills were read before work |
+| `path-missing` | A forwarded path is absent on disk (listed in envelope `risks`) — re-run the Skill Registry Refresh with `--force` and correct the block in subsequent delegations |
+| `none` | No skills block was forwarded — expected on zero matches; when the stack clearly has matching registry rows, re-check the match step before the next delegation |
 
 ### Non-SDD Delegation
 

@@ -32,7 +32,7 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 ## Execution Steps
 
 1. Read `_shared/context-protocol.md` (startup). Validate injected context; recover missing fields from `state.yaml`; report `context_resolution: fallback` if needed.
-2. Read `config.yaml`: stack, architecture style, conventions. Load matched project skills (`nestjs`, `react`, `typescript`, `testing`, etc.).
+2. Read `config.yaml`: stack, architecture style, conventions. Read in full every SKILL.md path under `## Skills to load before work` from the delegation prompt (project stack conventions). When the prompt carries no skills block, proceed on `config.yaml` conventions and report `skill_resolution: none`; when a listed path is absent on disk, continue without it and report `skill_resolution: path-missing` with the path in `risks`.
 3. Read proposal, delta specs (if available), and base specs for affected domains.
 4. **Phase A — Structural scan (cost-free):** glob and grep to map existing patterns, naming conventions, module structure, shared utilities. Use `config.yaml architecture.style` to focus: `ddd` → aggregates + domain events; `hexagonal` → port interfaces + adapters; `layered/mvc` → controller/service/repository; `modular` → feature folders + module registration.
 5. **Phase B — Selective read (budget: 15–25 source files, in priority order):**
@@ -55,7 +55,7 @@ Run when the orchestrator launches the design phase for an SDD change after prop
 
 ## Output Contract
 
-Write `.ai-team/changes/{change-name}/design.md`. Update `state.yaml` (`phases.design.status → done`, `phases.design.completed → ISO 8601`, `phases.design.agent → sdd-design`, `current_phase → design`, `updated → now`). Return envelope with `status`, `executive_summary`, `artifacts`, `next_recommended`, `model_used`, `context_resolution`.
+Write `.ai-team/changes/{change-name}/design.md`. Update `state.yaml` (`phases.design.status → done`, `phases.design.completed → ISO 8601`, `phases.design.agent → sdd-design`, `current_phase → design`, `updated → now`). Return envelope with `status`, `executive_summary`, `artifacts`, `next_recommended`, `model_used`, `context_resolution`, `skill_resolution` (`paths-injected` / `path-missing` / `none` per Step 2).
 
 ## References
 
