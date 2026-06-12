@@ -38,6 +38,9 @@ Files audited: {list from git diff --name-only}
 ### 5. Data Exposure
 {findings or "No findings"}
 
+### 6. Enforcement Wiring
+{findings or "No findings" — every guard the diff introduces has its executor (CI step, script entry, registration) in the same diff}
+
 ## Dependency Auditor
 
 {output of test_commands.security, or "Dependency auditor: not configured (skipped)"}
@@ -54,7 +57,7 @@ Each finding MUST include all seven fields:
 | Field | Description |
 |-------|-------------|
 | `id` | F-1, F-2, ... (sequential, stable within a single artifact) |
-| `category` | One of the 5 vulnerability categories |
+| `category` | One of the 5 vulnerability categories or `enforcement-wiring` |
 | `file_line` | `path/to/file.ts:42` — mandatory per Evidence Protocol Rule 1 |
 | `severity` | CRITICAL \| WARNING \| SUGGESTION |
 | `description` | 1-3 sentences: what the issue is |

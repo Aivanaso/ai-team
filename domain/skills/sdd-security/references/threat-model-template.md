@@ -46,6 +46,20 @@ Use this template when writing `{change_dir}/threat-model.md` in Step 8.4.
 
 (use category `temporal-invariant-sweep` in each finding; full per-finding structure; "No findings — all temporal fields enforced." if clean)
 
+## Seam & Failure Sweep
+
+(always present in threat-model; transversal sub-pass, runs even when no touchpoints triggered)
+
+| Seam / Mutation | Sub-sweep | Handler / Writers / Stores | Result |
+|-----------------|-----------|----------------------------|--------|
+| {new call-site, bulk mutation, or multi-store write sequence} | failure-mode / interleaving / crash-window | {catch `file:line` + blast radius / writer-reader list / store list + recovery story} | OK / WARNING / CRITICAL |
+
+(one row per seam × sub-sweep; if the change introduces no new seams, write "No new seams introduced — sweep complete." and omit the table)
+
+#### Findings emitted by sweep
+
+(use category `failure-mode-sweep` / `interleaving-sweep` / `crash-window-sweep`; "No findings — all seams accounted for." if clean)
+
 ## Security Requirements
 
 {RFC 2119 requirements block — only present for threat-model; empty list if no findings}
@@ -69,7 +83,7 @@ Each finding MUST include all seven fields:
 | Field | Description |
 |-------|-------------|
 | `id` | F-1, F-2, ... (sequential, stable within a single artifact) |
-| `category` | One of the 9 touchpoints or `temporal-invariant-sweep` |
+| `category` | One of the 9 touchpoints or a sweep category (`temporal-invariant-sweep`, `failure-mode-sweep`, `interleaving-sweep`, `crash-window-sweep`) |
 | `file_line` | `path/to/file.ts:42` — mandatory per Evidence Protocol Rule 1 |
 | `severity` | CRITICAL \| WARNING \| SUGGESTION |
 | `description` | 1-3 sentences: what the issue is |

@@ -18,6 +18,7 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
 - Severity vocabulary: `CRITICAL` / `WARNING` / `SUGGESTION` only. Never use HIGH / MEDIUM / LOW.
 - Report findings with file:line citations; leave remediation to the orchestrator's override decision (the orchestrator owns the security override authority per the seniority model). -- because uncited findings are unverifiable and slow down triage; the orchestrator cannot route a fix without knowing exactly where the vulnerability is.
 - `security_requirements:` block is populated only for `threat-model` mode. For `code-audit`: `security_requirements: []`.
+- Fragile invariants get an owner: when the threat-model identifies an invariant the change depends on that holds only best-effort ("safe today because a cleanup happens to run"), emit it as a `security_requirements:` entry (MUST or SHOULD) so spec/design must implement a structural guard or the user explicitly accepts the risk via a `decisions[]` override. -- because a note without an owner travels artifact-to-artifact until it dies unimplemented: a threat-model once named a fragile invariant, design annotated it "surfaced for verify", and the guard was never built.
 
 ## Decision Gates
 
@@ -27,7 +28,7 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
 | `mode: code-audit` | Run Steps 9.1–9.5 (diff scan). |
 | `mode` missing from context and not recoverable from `state.yaml` | Return `status: blocked`. |
 | `mode` is any other value | Return `status: blocked` with "Invalid mode: '{value}'. Expected threat-model or code-audit." |
-| `security_touchpoints` is empty (threat-model) | Skip 8.2–8.3; STILL run 8.3.5 temporal sweep. |
+| `security_touchpoints` is empty (threat-model) | Skip 8.2–8.3; STILL run 8.3.5 temporal sweep + 8.3.6 seam & failure sweep. |
 | Diff is empty (code-audit) | Return `status: ok`, `verdict: no-findings`. See [references/edge-cases.md](references/edge-cases.md). |
 | Finding confidence > 80% | Record finding. |
 | Finding confidence ≤ 80% | Suppress; add to tally. |
@@ -59,7 +60,12 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
    - **Verify enforcement**: if any read path consumes the field for an auth/access/state decision without the corresponding check, emit a finding with `category: temporal-invariant-sweep`. Severity CRITICAL when bypass enables privilege escalation, session revival, token reuse, or expired-credential auth; WARNING otherwise.
    - **False-positive guardrails**: suppress if field is purely informational (logging/metrics/display); or check exists but via a non-lexical path (view, DB trigger, RLS); or proposal explicitly reserves the field for a future phase.
    - See [references/worked-examples.md](references/worked-examples.md) for the auth-magic-link retrospective.
-6. Write `{change_dir}/threat-model.md` per [references/threat-model-template.md](references/threat-model-template.md). Include: summary, touchpoints triggered, per-touchpoint findings, Temporal Invariant Sweep section (always present), `security_requirements:` block, suppression tally.
+5b. Run Step 8.3.6 Seam & Failure Sweep (transversal — runs always in threat-model mode). Three mechanical sub-sweeps over every integration point the change introduces or touches — each is a systematic question, answerable from the proposal plus targeted code reads, that judgment-driven review keeps skipping:
+   - **Failure-mode per call-site:** for each new call into or from an existing error boundary (try/catch, error middleware, global handler), cite the handler (`file:line`) and state its blast radius when the new call throws — what gets retried, logged, wiped, or signed out. Finding when a transient failure escalates to a destructive or irreversible handler; CRITICAL when user data or auth state is destroyed.
+   - **Interleaving per mutated field:** for each bulk mutation the change introduces (`UPDATE ... WHERE field = X` or equivalent mass write), enumerate ALL writers and readers of that field and analyze each interleaving (a concurrent writer lands between the read and the write). Finding when an interleaving orphans or misattributes records.
+   - **Crash-window per multi-store sequence:** for each write sequence spanning more than one store (key-value + DB, file + DB, cache + DB), require one of: single-store atomicity, persisted intent + idempotent replay, or a documented and tested recovery. Finding when process death between the writes leaves unreconstructible state — an atomicity argument ("the first write commits synchronously") covers each write, never the sequence.
+   - Use `category: failure-mode-sweep | interleaving-sweep | crash-window-sweep`. False-positive guardrails: suppress when the handler is type-scoped away from the new failure mode, or the recovery path already has a passing test.
+6. Write `{change_dir}/threat-model.md` per [references/threat-model-template.md](references/threat-model-template.md). Include: summary, touchpoints triggered, per-touchpoint findings, Temporal Invariant Sweep section (always present), Seam & Failure Sweep section (always present), `security_requirements:` block, suppression tally.
 7. Update `state.yaml`: `phases.threat_model.status: done`, `completed: {ISO 8601}`, `agent: sdd-security`, `mode: threat-model`. Note: runtime key uses snake_case (`threat_model`); `decisions[].phase` uses kebab-case (`security-threat-model`) — asymmetry is intentional (DD-11).
 8. Return envelope per [references/envelope-examples.md](references/envelope-examples.md).
 
@@ -69,7 +75,8 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
 2. Run `git diff --name-only {base_branch}..{change_branch}` to list changed files. `base_branch` MUST be the merge-base SHA injected by the orchestrator (`git merge-base main {change_branch}`), NOT "main" directly. Read each changed file plus up to 10 1-hop callers.
 3. Read `config.yaml`. If `test_commands.security:` exists, run it and capture output. If absent: log "Dependency auditor: not configured (skipped)".
 4. Apply the five audit-prompt categories scoped to the diff per [references/worked-examples.md](references/worked-examples.md): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure.
-5. Write `{change_dir}/audit-report.md` per [references/audit-report-template.md](references/audit-report-template.md). All 5 category sections MUST be present ("No findings" if clean).
+4b. **Enforcement wiring check:** for every guard the diff introduces (lint rule, CI step, test gate, pre-commit hook, middleware, validation), verify the wiring that executes it ships in the SAME diff — workflow step, script entry, registration, route binding. "The guard exists" and "the guard gates" are separate claims; audit both. A guard with no executor is a finding (`category: enforcement-wiring`; WARNING by default, CRITICAL when it is the only control for a CRITICAL threat). -- because a change once shipped an anti-injection guard while its CI ran zero tests for that workspace: the guard existed and gated nothing.
+5. Write `{change_dir}/audit-report.md` per [references/audit-report-template.md](references/audit-report-template.md). All 6 category sections MUST be present ("No findings" if clean).
 6. Update `state.yaml`: `phases.code_audit.status: done`, `completed: {ISO 8601}`, `agent: sdd-security`, `mode: code-audit`. Note: runtime key `code_audit` (snake_case); `decisions[].phase` is `security-code-audit` (kebab-case) — intentional (DD-11).
 7. Return envelope per [references/envelope-examples.md](references/envelope-examples.md).
 
