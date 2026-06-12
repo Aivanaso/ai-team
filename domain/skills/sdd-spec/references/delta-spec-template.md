@@ -51,6 +51,7 @@ Use this template when an affected domain already has a base spec (existing code
 - Only include the sections (ADDED / MODIFIED / REMOVED) that apply — omit empty sections.
 - The highest existing `REQ-{DOMAIN}-NNN` in the base spec determines the starting number for new IDs. Continue the sequence; never reuse removed IDs.
 - Every scenario must be behavioral — describe what the user/system observes, not internal implementation details.
+- Screen/interaction requirements carry a recovery scenario in addition to happy path and error surfacing: failure or lost state → the user has a visible exit (retry / redirect / link); degenerate input (zero, empty, reload mid-flow) → defined behavior.
 
 **Good scenario:**
 ```
