@@ -644,6 +644,22 @@ Omit shared protocol paths the phase does not reference in its SKILL.md Referenc
 
 **Sub-agent fallback chain:** If the skill path does not exist, the sub-agent returns `status: blocked` with `risks: ["SKILL.md not found at {path}"]` — it cannot proceed without primary instructions. If a shared protocol path does not exist, the sub-agent: (1) continues with loaded instructions; (2) reports `context_resolution: fallback`; (3) lists the missing protocol in `risks`. The orchestrator checks `install_dir` correctness and re-engages if needed.
 
+### Synchronous delegation — no live-agent continuation
+
+Every SDD phase is a **synchronous, named-type `Agent` delegation**: it reads its SKILL.md + protocols from disk, writes artifacts and `state.yaml`, returns one envelope, and **terminates**. There is no persistent phase agent to continue afterward. **`SendMessage` / live-agent continuation is not part of this framework** (and may not be a registered tool in the harness at all). When the `Agent` tool's own description advertises "use SendMessage to continue a spawned agent," that is a harness affordance, not a framework path — addenda do not route through it. It targets persistent/background agents (e.g. `fork`, which inherits the full parent context — the opposite of the isolated-context delegation this framework relies on).
+
+**Why synchronous-only** (consistent with the disk-read rationale above and State Recovery below):
+- **Tool-agnostic:** the handoff is disk (`state.yaml` + artifacts), so every adapter behaves identically. Live cross-agent messaging is adapter-specific; relying on it would fork orchestrator behavior per adapter. Pattern confirmed by gentle-ai: across its delegating platforms, isolated one-shot contexts + backend-state handoff + re-run-once-with-feedback; the only message channels it adds are child→parent (an agent asking the human), never parent→child addenda.
+- **Context hygiene:** a continued live agent re-accumulates context — the lost-in-the-middle effect that motivates disk-read delegation in the first place.
+- **Recoverable:** disk state survives compaction/restart; a live agent's in-memory context does not (see State Recovery).
+
+**Handling a small addendum after a phase returns — route by target:**
+- **Planning artifact** (e.g. `tasks.md`, `design.md`, `proposal.md`): the orchestrator edits it **inline** (Write/Edit), authoring a `decisions[]` entry when the edit changes scope. The orchestrator is the exclusive `decisions[]` author, so an inline artifact tweak keeps the audit trail whole; re-delegating a one-line artifact fix is the anti-pattern. Precedent: the orchestrator-side REQ-ID renumber under Post-Spec ID Continuity Check.
+- **Application code** (an `sdd-apply` output): **re-engage `sdd-apply` fresh** with the delta inlined — the orchestrator does not edit application code inline. Inline code edits bypass the always-on reviewer gate, work-unit-commits' exclusive git ownership (REQ-APPLY-021), and the Post-Apply Independent Audit. This is already the prescribed path (Post-Apply Audit Check 5/5b → re-engage apply).
+- **Batch, don't drip:** collect the gaps found in one pass (e.g. all six Post-Apply Audit checks) into a **single** re-engage. A per-gap message would fragment what the audit deliberately batches.
+
+**Limit of a slim re-engage:** a "delta" re-engage prompt (prior envelope + the one increment) trims the *figure-out-what-to-do* cost, but cannot trim the JIT floor every sub-agent entry pays — re-read SKILL.md + target file + re-run the affected tests + emit the envelope. That floor is why a small *code* addendum is intrinsically not cheap, which is precisely why sub-floor addenda belong inline (artifacts) or batched, not in a third "lightweight channel" mechanism.
+
 ### Critical Context Forwarding
 
 Sub-agents are born with **no memory** of prior phases. The orchestrator provides two things: (1) `## Injected Context` YAML block — inline, because it contains session-specific flags the sub-agent cannot derive from disk; (2) `## Skill and Protocol Paths` — disk paths the sub-agent reads itself (JIT per its References section). The Injected Context block is the ONLY content the orchestrator writes inline; SKILL.md and shared protocols are on disk.
