@@ -44,10 +44,10 @@ the prompt; the result is the returned envelope.
 ## Execution Steps
 
 1. Read `_shared/context-protocol.md` (startup sequence) and `_shared/persistence-contract.md` (write rules — loaded because common-rules Principle 5 requires it; this skill writes no `.ai-team/` artifact). Report `context_resolution` honestly.
-2. Validate the Task Brief against the consumer-side checklist (six element names + the pointer to the protocol's canonical definition — see References). Any element missing → the brief-incomplete gate.
+2. Validate the Task Brief against the consumer-side checklist — the six elements it must supply: objective, target repo, allowed edit roots, expected files, acceptance checks, out-of-scope (names only; full definitions live in the protocol's canonical Task Brief section — see References). Any element missing → the brief-incomplete gate.
 3. Read `{target_repo}/.ai-team/config.yaml` if present (conventions, declared commands). Read in full every SKILL.md under `## Skills to load before work`; report `skill_resolution` (`paths-injected` / `path-missing` / `none`).
 4. Orient: read the already-existing files in the expected-files set, plus at most **10** further files (direct callers/neighbours) needed to write correct code. Exceeding the budget → the scope-large gate.
-5. Implement. Before every write, check the target against the brief's allowed edit roots using the within-roots definition in the orchestrator protocol's **Roots Computation (`allowed_edit_roots`)** section — this skill defines no matching rule of its own. Write only paths in the expected-files set.
+5. Implement. Before every write, check the target against the brief's allowed edit roots using the within-roots definition in the orchestrator protocol's **Roots Computation (`allowed_edit_roots`)** section — this skill defines no matching rule of its own. Write only paths in the expected-files set, resolved relative to the brief's `target_repo` root.
 6. Run every acceptance check verbatim, in declared order, capturing each exit code. Re-run any check invalidated by a later edit.
 7. Compose the bounded envelope per the Output Contract (caps enforced, truncation marked).
 8. Return. Nothing is committed; nothing outside the brief's roots was written.

@@ -177,7 +177,7 @@ bash skills/_shared/scripts/refresh-skill-registry.sh --project-root {project_ro
 
 (The installer rewrites `skills/_shared/` to the adapter's absolute install path.)
 
-- The script scans project skill roots first (`skills/`, `.claude/skills/`, `.opencode/skills/`, `.agents/skills/` — project wins name collisions), then user roots (`~/.claude/skills/`, `~/.config/opencode/skills/`, `~/.agents/skills/`), and writes `.ai-team/skill-registry.md`: an INDEX of stack/convention skills (name, full trigger description, scope, exact path). Pipeline skills (`sdd-*`, `work-unit-commits`, `_shared`) stay out — phases are delegated by the DAG, never matched by stack.
+- The script scans project skill roots first (`skills/`, `.claude/skills/`, `.opencode/skills/`, `.agents/skills/` — project wins name collisions), then user roots (`~/.claude/skills/`, `~/.config/opencode/skills/`, `~/.agents/skills/`), and writes `.ai-team/skill-registry.md`: an INDEX of stack/convention skills (name, full trigger description, scope, exact path). Pipeline skills (`sdd-*`, `work-unit-commits`, `organic-implementer`, `_shared`) stay out — phases and route workers are delegated by name, never matched by stack.
 - Freshness needs zero bookkeeping: a fingerprint cache (`.ai-team/.skill-registry.cache`, mtime+size of every SKILL.md found) makes the repeat run a millisecond "cache-hit" no-op, so adding/editing/removing any skill is picked up on the next session automatically.
 - Script missing at the install dir → proceed without a registry, tell the user once ("skill registry unavailable — run `scripts/install.sh`"), and delegate without skills blocks (sub-agents report `skill_resolution: none`).
 
@@ -942,12 +942,18 @@ Route the return by its `status`:
 
 | Worker return | Orchestrator action |
 |---|---|
-| `ok` and `artifacts` cover the expected-files set | Run the Specialist Activation Matrix against `artifacts`; delegate activated specialists; then report/commit. |
+| `ok` and `artifacts` cover the expected-files set | Confirm each `artifacts` path exists on disk under `target_repo` (e.g. `git -C {target_repo} status --porcelain` or `ls`) — self-reported `artifacts` alone do not satisfy DD-10, mirroring Post-Apply Audit Check 1's precedent of re-deriving rather than trusting a self-report. Any path that fails this confirmation routes the return to the partial-run row below (do not activate specialists; resolve the gap first) instead of this row. Otherwise, run the Specialist Activation Matrix against `artifacts`; delegate activated specialists; then report/commit. |
 | `ok` or `warning` but `artifacts` do **not** cover the expected-files set (partial run) | **Do not activate specialists yet** — resolve the gap first. Rationale: `group_files` is derived from `expected_files`; a specialist pointed at files a partial run never created returns a *false clear* (`sdd-reviewer` "none of the declared files exist" → `review-clear`, or security's empty-set gate) — activating on a partial return would hide exactly the surface the matrix flagged. |
 | `warning` (checks failed, objective met, evidence of pre-existing failure) | Present `check_results`; the user decides re-brief / accept / stop; specialists run only once the objective's own checks pass. |
-| `needs_input` | Surface `questions`; amend the brief; re-delegate fresh — no addendum channel. |
-| `blocked` | Route by `scope_report.kind`: `brief-incomplete`/`check-unrunnable` → amend the brief (or fix the environment) and re-delegate; `out-of-roots` → the orchestrator widens roots (mirroring the existing widen-or-stop decision) or stops; `scope-exceeds-brief` → extend `expected_files`/roots and re-brief; `scope-large` → escalate to the user with SDD offered; `check-failed` → present `check_results` and decide re-brief vs accept vs stop. At most 2 re-briefs for the same objective (session-held counter, no state file); the third escalates to the user with SDD offered. |
+| `needs_input` | Surface `questions`; amend the brief; re-delegate fresh — no addendum channel. Re-delegation here counts against the shared 2-re-brief budget (see note below). |
+| `blocked` | Route by `scope_report.kind`: `brief-incomplete`/`check-unrunnable` → amend the brief (or fix the environment) and re-delegate; `out-of-roots` → the orchestrator widens roots (mirroring the existing widen-or-stop decision) or stops; `scope-exceeds-brief` → extend `expected_files`/roots and re-brief; `scope-large` → escalate to the user with SDD offered; `check-failed` → present `check_results` and decide re-brief vs accept vs stop. Re-delegation here counts against the shared 2-re-brief budget (see note below). |
 | `failed` | Report; one re-brief at most, then escalate. |
+
+**Re-brief budget (DD-14):** every re-delegation for the same objective — regardless of
+which row above triggered it (`needs_input`, `blocked`, or a `warning`-path re-brief) —
+counts against one shared, session-held counter of 2; the third re-delegation for that
+objective escalates to the user with SDD offered. `failed`'s "one re-brief at most" is a
+stricter local bound within the same shared counter.
 
 ### Delegating to sdd-design
 
