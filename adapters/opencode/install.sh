@@ -115,7 +115,8 @@ if [[ -f "$TARGET_JSON" ]]; then
   # Deep-merge: right-side (overlay) keys override left-side (existing).
   # Existing operator agents not named sdd-* are preserved.
   # Note: permission.task is merged — stale allow entries may persist on re-installs,
-  # which is safe for ai-team's own re-installs (overlay always writes all 8 allows).
+  # which is safe for ai-team's own re-installs (the overlay always rewrites the full
+  # permission.task allow set, so ai-team's own re-installs converge).
   # Model pins are user-owned: the template ships provider-agnostic placeholders
   # (opus/sonnet/haiku), so .model and .agent[*].model from the existing config
   # take precedence over the overlay — a re-install must never downgrade the

@@ -87,14 +87,19 @@ When in doubt between Medium and Large, choose Large -- it's cheaper to downgrad
 
 For **Medium** tasks:
 1. Get user confirmation on the plan
-2. Delegate implementation to sub-agents per Delegation Philosophy
-3. Review the result
+2. **Delegate implementation — this is the default:** `task({agent: "organic-implementer", …})`
+   with a Task Brief (canonical definition: **Organic Delegation Route (non-SDD)** in
+   `~/.config/opencode/skills/_shared/sdd-orchestrator-protocol.md`). Inline implementation
+   requires an explicit user override ("no subagents" / "hazlo tu" / "do it yourself").
+3. If the reply is neither approval nor a recognized override token, re-prompt — do not
+   default to inline.
+4. Review the returned bounded envelope.
 
 For **Large** tasks with SDD:
 1. Start the SDD workflow (see below)
 
 For **Large** tasks without SDD (user declined):
-1. Treat as Medium -- plan and delegate without formal artifacts
+1. Treat as Medium — the same default-delegate rule applies.
 
 ## SDD Workflow
 
