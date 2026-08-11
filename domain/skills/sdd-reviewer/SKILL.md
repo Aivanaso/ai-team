@@ -7,7 +7,7 @@ user-invocable: false
 
 ## Activation Contract
 
-Run when the orchestrator invokes the reviewer after `sdd-verify` returns GREEN (PASS or PASS WITH WARNINGS) for a logical group, and before `work-unit-commits` creates the commit. Produce `review-report.md` and a blocking verdict. Read application code to find code-correctness defects; never modify it. The reviewer has no modes.
+Run when the orchestrator invokes the reviewer after `sdd-verify` returns GREEN (PASS or PASS WITH WARNINGS) for a logical group, and before `work-unit-commits` creates the commit. Produce `review-report.md` and a blocking verdict. Read application code to find code-correctness defects; never modify it. The reviewer has two invocation modes inferred from its injected inputs — SDD and non-SDD (organic); the four correctness lenses, the >80% confidence threshold, the severity vocabulary, and the verdict semantics (`review-clear`/`review-blocked`) are identical in both modes.
 
 ## Hard Rules
 
@@ -27,7 +27,9 @@ Run when the orchestrator invokes the reviewer after `sdd-verify` returns GREEN 
 
 | Condition | Action |
 |---|---|
-| Missing `group_id` / `group_files` and not recoverable from `state.yaml` | `status: blocked`, reason names the missing field. |
+| **SDD mode** (`change_dir` + `tasks_path` present): Missing `group_id` / `group_files` and not recoverable from `state.yaml` | `status: blocked`, reason names the missing field. |
+| **Non-SDD mode** and `report_destination` missing | `status: blocked`, reason names the missing destination. Never derive a path. |
+| Neither mode's discriminating inputs present | `status: blocked` per the existing gate (missing `group_id`/`group_files`, not recoverable) — unchanged outcome. |
 | `group_files` is empty, or none of the declared files exist on disk | `status: ok`, `verdict: review-clear`; report notes "no group changes to review". See `references/edge-cases.md`. |
 | Finding confidence > 80% | Record finding. |
 | Finding confidence ≤ 80% | Suppress; increment tally. |
@@ -37,16 +39,16 @@ Run when the orchestrator invokes the reviewer after `sdd-verify` returns GREEN 
 
 ## Execution Steps
 
-1. Read `_shared/context-protocol.md` (startup), `_shared/persistence-contract.md` (write rules). Validate injected context: `change_name`, `change_dir`, `group_id`, `group_files`, `project_root`, `tasks_path`, plus the directed-review inputs `attention_areas` (orchestrator-curated "trace X, verify Y" lines), `untested_scenarios` (verify's UNTESTED / pre-accepted rows), and `spec_paths`. Recover missing fields from `state.yaml`/`tasks.md`; report `context_resolution: fallback` if needed. When the directed-review inputs are absent, proceed with the four lenses alone and record the gap in `risks` ("review ran undirected — no attention_areas injected").
-2. Resolve the file set: use injected `group_files`. If absent, derive it from `tasks.md` `Files:` blocks for `group_id` (the same union `work-unit-commits/SKILL.md` Step 5 computes). **Read the full current content of each file** in the set — this covers newly created files, which `git diff HEAD` would not surface. Run `git diff HEAD -- <group_files>` as a scope pointer to the changed regions in tracked files. Read up to 10 1-hop callers for context.
+1. Read `_shared/context-protocol.md` (startup), `_shared/persistence-contract.md` (write rules). Validate injected context: `change_name`, `change_dir`, `group_id`, `group_files`, `project_root`, `tasks_path`, plus the directed-review inputs `attention_areas` (orchestrator-curated "trace X, verify Y" lines), `untested_scenarios` (verify's UNTESTED / pre-accepted rows), and `spec_paths`. **Mode inference (input precedence).** When `change_dir` AND `tasks_path` are present, run the SDD path — unchanged, including the blocking gate below. When both are absent AND `group_files` plus `report_destination` are injected, run the non-SDD (organic) path: same lenses, same threshold, same verdict; no phase-tracking write; the report goes to `report_destination`. If SDD and non-SDD inputs both appear, **SDD wins** — presence of `change_dir`/`tasks_path` always selects SDD mode. Recover missing fields from `state.yaml`/`tasks.md`; report `context_resolution: fallback` if needed. When the directed-review inputs are absent, proceed with the four lenses alone and record the gap in `risks` ("review ran undirected — no attention_areas injected").
+2. Resolve the file set: use injected `group_files`. **SDD mode only:** if absent, derive it from `tasks.md` `Files:` blocks for `group_id` (the same union `work-unit-commits/SKILL.md` Step 5 computes). **Read the full current content of each file** in the set — this covers newly created files, which `git diff HEAD` would not surface. Run `git diff HEAD -- <group_files>` as a scope pointer to the changed regions in tracked files. Read up to 10 1-hop callers for context.
 3. Inspect in priority order: (a) each injected `attention_areas` line — trace the named flow end-to-end exactly as instructed (these encode project memories and threat-model context the lenses alone lack); (b) each `untested_scenarios` row — a pre-accepted UNTESTED scenario marks a code path zero tests cover, the highest-yield place for a defect to hide; (c) then apply the four correctness lenses to the full file contents (concurrency / resource lifecycle / error handling / API-contract misuse). New files are wholly in scope; the diff scopes findings only within already-tracked files (do NOT limit a new file's review to diff hunks). Ground each finding in `file:line`. Before discarding any observation as style, cross-check it against the MUSTs of the group's REQs in `spec_paths` (Hard Rule: MUST contradiction = finding). Suppress confidence ≤ 80% with a tally.
-4. Write `{change_dir}/review-report.md` per `references/review-report-template.md`. All four lens sections present ("No findings" if clean); include the group ID, verdict, numbered findings with stable IDs (`RV-001`, `RV-002`, …), suppression tally, and the confidence threshold applied.
-5. Update `state.yaml`: `phases.review.status: done`, `completed: {current_iso_utc}`, `agent: sdd-reviewer`. (Runtime key `review`; `decisions[].phase` token is `code-review` — written by orchestrator, not here.)
+4. Write the report per `references/review-report-template.md` — to `{change_dir}/review-report.md` in SDD mode, or to the injected `report_destination` in non-SDD mode (create its parent directory if absent). All four lens sections present ("No findings" if clean); include the group ID, verdict, numbered findings with stable IDs (`RV-001`, `RV-002`, …), suppression tally, and the confidence threshold applied.
+5. **SDD mode only:** update `state.yaml`: `phases.review.status: done`, `completed: {current_iso_utc}`, `agent: sdd-reviewer`. (Runtime key `review`; `decisions[].phase` token is `code-review` — written by orchestrator, not here.)
 6. Return envelope per `references/envelope-examples.md`.
 
 ## Output Contract
 
-Writes `.ai-team/changes/{change}/review-report.md`; updates `state.yaml.phases.review`. Returns envelope with `status`, `executive_summary`, `artifacts`, `findings`, `verdict` (`review-clear` | `review-blocked`), `suppressed_count`, `group_id`, `next_recommended`, `risks`, `model_used`, `context_resolution`. No `decisions_written` field (auditor role — the orchestrator exclusively writes `decisions[]` override entries).
+Writes `.ai-team/changes/{change}/review-report.md` in SDD mode, or the injected `report_destination` in non-SDD mode. Updates `state.yaml.phases.review` in SDD mode only — non-SDD mode writes no `state.yaml` (no change directory exists). Returns envelope with `status`, `executive_summary`, `artifacts`, `findings`, `verdict` (`review-clear` | `review-blocked`), `suppressed_count`, `group_id`, `next_recommended`, `risks`, `model_used`, `context_resolution`. No `decisions_written` field (auditor role — the orchestrator exclusively writes `decisions[]` override entries).
 
 ## References
 

@@ -25,7 +25,9 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
 | Condition | Action |
 |---|---|
 | `mode: threat-model` | Run Steps 8.1–8.5 (touchpoint walk + temporal sweep). |
-| `mode: code-audit` | Run Steps 9.1–9.5 (diff scan). |
+| `mode: code-audit` **with** `tasks_path`+`change_branch`+`base_branch` | Run Steps 9.1–9.5 (diff scan) — SDD mode, unchanged. |
+| `mode: code-audit` **without** them, **with** `group_files`+`report_destination` | Run Steps 9.1–9.5 with the file-set scan (Step 9.2b) instead of a branch diff — non-SDD mode. |
+| Non-SDD `code-audit` and `report_destination` missing | `status: blocked`. |
 | `mode` missing from context and not recoverable from `state.yaml` | Return `status: blocked`. |
 | `mode` is any other value | Return `status: blocked` with "Invalid mode: '{value}'. Expected threat-model or code-audit." |
 | `security_touchpoints` is empty (threat-model) | Skip 8.2–8.3; STILL run 8.3.5 temporal sweep + 8.3.6 seam & failure sweep. |
@@ -71,18 +73,19 @@ Run when the orchestrator launches either security gate: `threat-model` mode aft
 
 ### Mode code-audit (Steps 9.1–9.5)
 
-1. Read `_shared/context-protocol.md` (startup), `_shared/persistence-contract.md` (write rules). Validate injected context: `change_name`, `change_dir`, `mode`, `proposal_path`, `project_root`, `tasks_path`, `change_branch`, `base_branch`.
-2. Run `git diff --name-only {base_branch}..{change_branch}` to list changed files. `base_branch` MUST be the merge-base SHA injected by the orchestrator (`git merge-base main {change_branch}`), NOT "main" directly. Read each changed file plus up to 10 1-hop callers.
+1. Read `_shared/context-protocol.md` (startup), `_shared/persistence-contract.md` (write rules). Validate injected context: `change_name`, `change_dir`, `mode`, `project_root`, plus mode-dependent inputs — SDD mode: `proposal_path`, `tasks_path`, `change_branch`, `base_branch`; non-SDD mode: `group_files`, `report_destination`. Their absence in non-SDD mode is expected and is NOT a `context_resolution: fallback` signal. Precedence: if the SDD inputs (`tasks_path`/`change_branch`/`base_branch`) are present, the SDD diff scan wins regardless of what else is injected.
+2. **(SDD)** Run `git diff --name-only {base_branch}..{change_branch}` to list changed files. `base_branch` MUST be the merge-base SHA injected by the orchestrator (`git merge-base main {change_branch}`), NOT "main" directly. Read each changed file plus up to 10 1-hop callers.
+2b. **(non-SDD)** Read each path in the injected `group_files` in full, plus up to 10 1-hop callers — no branch diff is computed.
 3. Read `config.yaml`. If `test_commands.security:` exists, run it and capture output. If absent: log "Dependency auditor: not configured (skipped)".
 4. Apply the five audit-prompt categories scoped to the diff per [references/worked-examples.md](references/worked-examples.md): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure.
 4b. **Enforcement wiring check:** for every guard the diff introduces (lint rule, CI step, test gate, pre-commit hook, middleware, validation), verify the wiring that executes it ships in the SAME diff — workflow step, script entry, registration, route binding. "The guard exists" and "the guard gates" are separate claims; audit both. A guard with no executor is a finding (`category: enforcement-wiring`; WARNING by default, CRITICAL when it is the only control for a CRITICAL threat). -- because a change once shipped an anti-injection guard while its CI ran zero tests for that workspace: the guard existed and gated nothing.
-5. Write `{change_dir}/audit-report.md` per [references/audit-report-template.md](references/audit-report-template.md). All 6 category sections MUST be present ("No findings" if clean).
-6. Update `state.yaml`: `phases.code_audit.status: done`, `completed: {ISO 8601}`, `agent: sdd-security`, `mode: code-audit`. Note: runtime key `code_audit` (snake_case); `decisions[].phase` is `security-code-audit` (kebab-case) — intentional (DD-11).
+5. Write the report per [references/audit-report-template.md](references/audit-report-template.md) — to `{change_dir}/audit-report.md` in SDD mode, or to the injected `report_destination` in non-SDD mode (create its parent directory if absent). All 6 category sections MUST be present ("No findings" if clean).
+6. **SDD mode only:** update `state.yaml`: `phases.code_audit.status: done`, `completed: {ISO 8601}`, `agent: sdd-security`, `mode: code-audit`. Note: runtime key `code_audit` (snake_case); `decisions[].phase` is `security-code-audit` (kebab-case) — intentional (DD-11).
 7. Return envelope per [references/envelope-examples.md](references/envelope-examples.md).
 
 ## Output Contract
 
-Write `.ai-team/changes/{change}/threat-model.md` (threat-model mode) or `.ai-team/changes/{change}/audit-report.md` (code-audit mode). Update `state.yaml` (`phases.threat_model` or `phases.code_audit` → `done`). Return envelope with `status`, `executive_summary`, `mode`, `artifacts`, `findings`, `security_requirements`, `verdict`, `suppressed_count`, `next_recommended`, `risks`, `model_used`, `context_resolution`.
+Write `.ai-team/changes/{change}/threat-model.md` (threat-model mode) or, for `code-audit` mode, `{change_dir}/audit-report.md` in SDD mode / the injected `report_destination` in non-SDD mode. Update `state.yaml` in SDD mode only (`phases.threat_model` or `phases.code_audit` → `done`); non-SDD `code-audit` writes no `state.yaml`. Return envelope with `status`, `executive_summary`, `mode`, `artifacts`, `findings`, `security_requirements`, `verdict`, `suppressed_count`, `next_recommended`, `risks`, `model_used`, `context_resolution`.
 
 ## References
 
