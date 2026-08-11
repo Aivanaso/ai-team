@@ -18,17 +18,21 @@ Skill-specific rules follow this bullet. Verbatim reproduction of the three cons
 
 Read application code, never modify it. Source files are read only to verify design assumptions, gather evidence, or orient the current task. No skill phase writes to application source files. If a bug or improvement is found, surface it as a risk in the result envelope — never fix it in-place.
 
-### Exception: sdd-apply
+### Exceptions: sdd-apply and organic-implementer
 
 `sdd-apply` writes to application source files by design (per the Execution Steps in its SKILL.md, exactly the files declared in `tasks.md`). Apply's Hard Rules section MUST include the reference line AND a one-line exception note:
 
     - Writes application source files (exception to read-only principle — apply's primary responsibility).
 
+`organic-implementer` writes to application source files by design, bounded by the Task Brief's edit roots (REQ-ORGANIC-005) rather than by `tasks.md`. Its Hard Rules section MUST likewise reference `_shared/common-rules.md` and MAY explicitly note this exception.
+
+Neither exception widens the other — `sdd-apply`'s exception stays scoped to `tasks.md`-declared paths; `organic-implementer`'s exception stays scoped to the Task Brief's edit roots. Every other SDD skill remains fully bound by the read-only principle.
+
 ## Principle 2 — Write-scope (REQ-CR-003)
 
-Write only to `.ai-team/` (and declared application files for sdd-apply). No SDD skill writes to paths outside `.ai-team/` except sdd-apply (which writes to the paths declared in `tasks.md` for the current change). Shared protocols, SKILL.md files, project config files, and CI/CD pipelines are ALL read-only for SDD skills; they are modified only via the SDD pipeline itself running on the meta-project.
+Write only to `.ai-team/` (and declared application files for apply and organic-implementer). No SDD skill writes to paths outside `.ai-team/` except sdd-apply (which writes to the paths declared in `tasks.md`) and organic-implementer (which writes to the paths within its Task Brief's edit roots). Shared protocols, SKILL.md files, project config files, and CI/CD pipelines are ALL read-only for SDD skills; they are modified only via the SDD pipeline itself running on the meta-project.
 
-**Enforcement for sdd-apply:** sdd-apply's application-code write surface is bounded by the forwarded `allowed_edit_roots` set. Before writing any application-source file, apply checks the target path against the forwarded roots (segment-prefix per the orchestrator's Roots Computation rule). A write whose target path falls outside all forwarded roots is a blocking deviation — apply returns `status: blocked` with a `deviation_report` instead of performing the write. When `allowed_edit_roots` is not forwarded (uncomputable/empty roots), apply falls back to the existing inner exact-file discipline with no outer gate active.
+**Enforcement for sdd-apply and organic-implementer:** sdd-apply's application-code write surface is bounded by the forwarded `allowed_edit_roots` set (from `tasks.md`); organic-implementer's application-code write surface is bounded by the Task Brief's edit-roots element. Both reuse the same within-roots (segment-prefix) definition (orchestrator Roots Computation rule) rather than each defining its own. Before writing any application-source file, each checks the target path against its respective roots. A write whose target path falls outside all roots is a blocking deviation — neither skill performs the write; sdd-apply returns `status: blocked` with a `deviation_report`, organic-implementer returns per its own Decision Gates. When `allowed_edit_roots` is not forwarded to sdd-apply (uncomputable roots), apply falls back to the existing inner exact-file discipline with no outer gate active — this fallback is unchanged and does NOT extend to organic-implementer, whose brief always declares edit roots explicitly.
 
 ### Exception: work-unit-commits
 
@@ -54,6 +58,7 @@ Each SDD pipeline role has a single authority and a single product. Each role op
 | **Implementing skill** (`sdd-apply`) | Implement `tasks.md` exactly; verify compilability; populate `execution_evidence`; OR return `status: blocked` with a structured `deviation_report` | Application source files; `state.yaml.phases.apply.*` (status, progress) | The orchestrator exclusively authors `decisions[]` entries; Reads SDD artifacts (`tasks.md`, `design.md`, specs, proposal) without modifying them; Uses only read-only git commands; state-changing commands (commit, add, push, stash, reset, rm) are exclusively owned by work-unit-commits. |
 | **Mechanical skill** (`work-unit-commits`) | Stage declared files + create commit per group (auto/manual); backfill commit SHA into existing `decisions[]` entries | Commits in the working tree; `state.yaml.phases.apply.commits[group_id]`; commit SHA backfill into existing decisions[] entries | Updates the `commits[]` field of orchestrator-authored `decisions[]` entries (does not create new entries). |
 | **Auditing skill** (`sdd-reviewer`) | Diagnose code-correctness defects in the group's changed files; emit a blocking verdict (`review-clear` / `review-blocked`) | `review-report.md` (per group); result envelope verdict | Read-only on application code; MUST NOT run state-changing git commands; MUST NOT write `decisions[]` entries (the orchestrator records review overrides exclusively) |
+| **Non-SDD implementing skill** (`organic-implementer`) | Implement one Task Brief in one repo; verify against the brief's acceptance checks; OR block per its own Decision Gates | Application source files bounded by the brief's edit roots; result envelope (bounded evidence) | Does not author `decisions[]` entries (no `state.yaml` exists for organic tasks — there is nothing to write into); does not create commits (orchestrator/user commits); uses no git commands beyond read-only inspection needed to run acceptance checks. |
 
 ### Why this exists
 

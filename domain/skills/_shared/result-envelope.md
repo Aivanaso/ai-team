@@ -129,6 +129,8 @@ execution_evidence:
 - All commands are read verbatim from the project's `config.yaml`. The schema does NOT name any specific tool, package manager, or test runner — those are project-level concerns.
 - Apply MUST populate this field before composing the envelope. An empty or absent `execution_evidence` in an apply envelope is a contract violation (equivalent to `status: ok` with no evidence).
 
+> The non-SDD (organic) delegation route defines its own **bounded** envelope variant in `organic-implementer`'s Output Contract; it changes no field of this schema.
+
 ### `deviation_report` (OPTIONAL globally; REQUIRED for `sdd-apply` with `status: blocked`)
 
 Structured block apply emits when a deviation from `tasks.md` is required and apply cannot
