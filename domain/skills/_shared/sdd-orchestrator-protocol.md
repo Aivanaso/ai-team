@@ -97,14 +97,20 @@ For **Medium** and **Large** tasks, enter plan mode before presenting the classi
 For **Medium** tasks:
 1. Get user confirmation on the plan
 2. Exit plan mode
-3. Delegate implementation to sub-agents per Delegation Philosophy
-4. Review the result
+3. **Delegate implementation — this is the default.** Delegate to `organic-implementer`
+   with a Task Brief (see **Organic Delegation Route (non-SDD)** below). Implementing
+   inline on your own turn requires an explicit user override in the vocabulary of the
+   User Override section: "no subagents" / "hazlo tu" / "do it yourself".
+4. If the user's reply is neither an approval nor a recognized override token, re-prompt
+   for an explicit choice — do NOT silently fall back to inline.
+5. Review the returned envelope per **What comes back**.
 
 For **Large** tasks with SDD:
 1. Start the SDD workflow (see Commands below)
 
 For **Large** tasks without SDD (user declined):
-1. Treat as Medium -- plan and delegate without formal artifacts
+1. Treat as Medium — the same default-delegate rule applies (step 3 above), with no
+   formal artifacts.
 
 ## Commands
 
@@ -615,7 +621,8 @@ Read this table at session start, cache it, and pass the model in every `Agent()
 | sdd-security (code-audit)   | sonnet | Pattern matching over the diff |
 | work-unit-commits | sonnet | — |
 | sdd-reviewer | opus | Full correctness reasoning over a diff is substantive cross-cutting work |
-| default | sonnet | Non-SDD general delegation |
+| organic-implementer | sonnet | Non-SDD implementation of one Task Brief from a clear contract (same class as sdd-apply) |
+| default | sonnet | Fallback for any delegation with no row above; Non-SDD implementation work routes to the `organic-implementer` row |
 
 ### Project Override
 
@@ -788,7 +795,7 @@ Never ignore `fallback` or unexpected `none` — silent degradation is exactly w
 
 ### Skill Resolution Feedback
 
-Design and apply envelopes report `skill_resolution` (schema in `_shared/result-envelope.md`). Orchestrator action per value:
+Design, apply, and organic-implementer envelopes report `skill_resolution` (schema in `_shared/result-envelope.md`). Orchestrator action per value:
 
 | Value | Orchestrator action |
 |-------|---------------------|
@@ -796,9 +803,151 @@ Design and apply envelopes report `skill_resolution` (schema in `_shared/result-
 | `path-missing` | A forwarded path is absent on disk (listed in envelope `risks`) — re-run the Skill Registry Refresh with `--force` and correct the block in subsequent delegations |
 | `none` | No skills block was forwarded — expected on zero matches; when the stack clearly has matching registry rows, re-check the match step before the next delegation |
 
-### Non-SDD Delegation
+### Organic Delegation Route (non-SDD)
 
-For medium tasks that benefit from delegation but don't warrant full SDD: use `model: sonnet`, include relevant project context (config.yaml, applicable skills), give clear file-path instructions, and request a brief summary (not a full envelope).
+A second delegation route, alongside the SDD pipeline: after a Medium plan is approved, the
+orchestrator composes a **Task Brief** and delegates it to the `organic-implementer` skill —
+one synchronous, envelope-returning delegation per the **Synchronous delegation — no
+live-agent continuation** rule above. No state machine, no `change_dir`, no phase tracking,
+no archive: the contract lives in the delegation prompt, the result lives in one bounded
+envelope.
+
+#### When the route fires
+
+Fires after a **Medium** plan is approved, and for **Large** tasks the user declined to run
+as SDD (routed to Medium) — see **After classification** above for the exact gate. It does
+NOT fire for **Small** tasks (they stay inline) and never fires inside the SDD pipeline
+itself (SDD phases delegate via `subagent_type: "sdd-{phase}"`, never via this route).
+
+#### Task Brief
+
+The canonical, author-side contract the orchestrator composes and inlines into the
+delegation prompt. Six required elements — both the prose spelling and the serialized field
+name are given, since the brief travels as a YAML block:
+
+| Element (prose) | Meaning | Serialized field |
+|---|---|---|
+| objective | One sentence: the observable outcome the worker must produce. | `objective` |
+| target repo | Absolute path to the single repository the worker writes in. All other brief paths are relative to it. | `target_repo` |
+| allowed edit roots | Repo-relative directories the worker may write inside. Validated with the within-roots (segment-prefix) definition in **Roots Computation (`allowed_edit_roots`)** above — that definition is not repeated here. | `allowed_edit_roots` |
+| expected files | The files the brief expects to exist or change afterwards, each with its action. Also the source of `group_files` when a specialist is activated. | `expected_files` |
+| acceptance checks | Runnable commands the worker executes and the orchestrator can re-run, each with its expected outcome. An adjective ("works correctly") is not a check. | `acceptance_checks` |
+| out-of-scope | Explicit non-goals — what the worker must not do even if it looks adjacent. | `out_of_scope` |
+
+```yaml
+## Task Brief
+
+objective: "<one sentence — the observable outcome>"
+target_repo: "/abs/path/to/repo"          # exactly one repo (multi-repo → one brief each)
+allowed_edit_roots: ["<repo-relative dir>", "..."]   # never empty; no absolute paths, no ".."
+expected_files:
+  - { action: CREATE, path: "<repo-relative path>" }
+  - { action: MODIFY, path: "<repo-relative path>" }
+  - { action: REMOVE, path: "<repo-relative path>" }
+acceptance_checks:
+  - { command: "<verbatim runnable command>", expect: "exit 0" }
+  - { command: "<verbatim runnable command>", expect: "<one-line observable outcome>" }
+out_of_scope:
+  - "<explicit non-goal>"
+```
+
+**Author-side invariants:**
+
+- `allowed_edit_roots` is a **superset** of the containing directories of `expected_files`,
+  computed with the existing Roots Computation algorithm applied to the brief's
+  expected-files list instead of `tasks.md`'s `Files:` tables. Action tokens are the same
+  three (`CREATE`/`MODIFY`/`REMOVE`) for exactly this reuse.
+- The empty-roots fallback does **not** apply to the organic route: a brief always declares
+  roots; a brief without them is `brief-incomplete`.
+- Paths in the brief are repo-relative so the within-roots check runs on the same textual
+  form the definition specifies (absolute paths and `..` segments are rejected by
+  definition).
+
+#### What travels in the delegation prompt
+
+| Prompt part | Content |
+|---|---|
+| Preamble | `You are the organic-implementer executor. …` (mirrors the agent template) |
+| `## Skill and Protocol Paths` | `{install_dir}/skills/organic-implementer/SKILL.md`, `{install_dir}/skills/_shared/context-protocol.md`, `…/persistence-contract.md`, `…/common-rules.md`, `…/result-envelope.md`, `…/evidence-protocol.md`, `…/sdd-orchestrator-protocol.md`. No `references_dir` — the skill is single-file. |
+| `## Injected Context` | `project_root` (= the brief's target repo), `model_alias: sonnet`, `current_iso_utc`, `install_dir` — all resolved per the Critical Context Forwarding table above |
+| `## Task Brief` | the six-element YAML block (see **Task Brief** above) |
+| `## Skills to load before work` | forwarded from `.ai-team/skill-registry.md` **only when the brief's target repo is the session's project root**; omitted otherwise |
+| Mandatory tail | the verbatim UNTRUSTED CONTENT block above — reused, not re-authored |
+
+#### Specialist Activation Matrix
+
+**Activation is decided exclusively by what the change touches. Task size never determines
+activation** — a three-line edit to a permission check activates `sdd-security`; a 300-line
+documentation rewrite activates neither.
+
+| Touched surface (evidence) | Specialist(s) | Reason |
+|---|---|---|
+| Credential, permission/authorization, crypto, secret, or untrusted-input handling — any of the nine touchpoint slugs `sdd-security` already enumerates | `sdd-security` (code-audit, non-SDD) | Those slugs are the framework's existing definition of a security-sensitive surface; exploitability does not scale with diff size. |
+| Business logic, state transitions, concurrency, resource lifecycle, or error-handling paths | `sdd-reviewer` (non-SDD) | Exactly the reviewer's four correctness lenses; defects here survive passing acceptance checks silently. |
+| Both of the above in the same brief | both | The lenses are non-overlapping by the reviewer's own Hard Rule; each gate owns its own finding class. |
+| Destructive or irreversible operations (data deletion, mass writes, file removal, schema/state migrations) | `sdd-reviewer` (+ `sdd-security` when credentials/permissions are also touched) | Blast radius is unrecoverable once run; the lifecycle and error-handling lenses are the cheapest place to catch it. |
+| Configuration, documentation, formatting, or build/tooling plumbing with no behavior surface | neither | No security or correctness surface touched — the brief's own acceptance checks are the whole gate. |
+
+**Evidence source, evaluated twice:** (1) at brief-authoring time, from `objective` +
+`expected_files` + `out_of_scope` — so the user sees the plan before any cost is spent; (2)
+after the worker returns, against the envelope's `artifacts` — the authoritative evidence,
+because a worker may have touched a surface the brief did not predict. A surface that
+appears only in (2) activates its specialist before the route reports done.
+
+**Name every reason (no silent skip).** Before delegating a specialist — and before *not*
+delegating one — the orchestrator shows one line per specialist:
+
+```
+Specialists: sdd-security ACTIVATED — brief modifies the permission check at {path};
+             sdd-reviewer SKIPPED — no business-logic, lifecycle or error-handling surface in expected_files.
+```
+
+When the matrix activates `sdd-reviewer` or `sdd-security`, the orchestrator injects
+`group_files` (derived from the brief's `expected_files`), a named `report_destination`,
+`project_root`, and `group_id` (a brief-slug label) — and MUST NOT inject `change_dir` or
+`tasks_path`; their absence is what selects each specialist's non-SDD mode. See
+**Delegating to sdd-security → code-audit — non-SDD (organic route)** below for the exact
+injected block security receives; the reviewer receives the same four discriminating fields
+via its own non-SDD invocation path.
+
+**Verdict handling (organic route).** Verdict vocabulary is unchanged
+(`review-clear`/`review-blocked`; `no-findings`/`warnings-only`/`critical`). On
+`review-blocked` or `verdict: critical` the orchestrator presents three options —
+**re-brief** (one fresh delegation with the findings batched in — never an addendum channel,
+per the synchronous-delegation rule above), **accept and proceed** (the orchestrator appends
+a two-line `## Acceptance` note naming the finding IDs and the user's justification to the
+existing report file — the organic route writes no `decisions[]` entry because no
+`state.yaml` exists), or **stop** (leave the tree uncommitted and surface the report path).
+No new machinery, no state file, no lifecycle.
+
+#### Multi-repo lane rule
+
+One brief = one repo = one worker. For a change spanning more than one repository, each repo
+gets its own Task Brief and its own `organic-implementer` invocation, each scoped to that
+repo's edit roots. The orchestrator holds cross-repo ordering (which brief runs before which)
+and the cross-repo contract itself (what each side must expose to the other, in what order)
+— no single worker writes to two repos, and two briefs targeting the same repo never run
+concurrently; concurrent writers inside one repo are out of scope for this route.
+
+#### What comes back
+
+One bounded result envelope — never a prose summary (the prior instruction to request "a
+brief summary (not a full envelope)" is retired by this section). `organic-implementer`
+creates no commits: the orchestrator or the user commits afterward, using the orchestrator's
+existing inline git ability (see the Delegation Philosophy row "Bash for state (git, gh) |
+Inline: Yes" above) — no new commit agent is introduced by this route. When a skills block
+was forwarded (per the row above), the returned envelope also reports `skill_resolution`.
+
+Route the return by its `status`:
+
+| Worker return | Orchestrator action |
+|---|---|
+| `ok` and `artifacts` cover the expected-files set | Run the Specialist Activation Matrix against `artifacts`; delegate activated specialists; then report/commit. |
+| `ok` or `warning` but `artifacts` do **not** cover the expected-files set (partial run) | **Do not activate specialists yet** — resolve the gap first. Rationale: `group_files` is derived from `expected_files`; a specialist pointed at files a partial run never created returns a *false clear* (`sdd-reviewer` "none of the declared files exist" → `review-clear`, or security's empty-set gate) — activating on a partial return would hide exactly the surface the matrix flagged. |
+| `warning` (checks failed, objective met, evidence of pre-existing failure) | Present `check_results`; the user decides re-brief / accept / stop; specialists run only once the objective's own checks pass. |
+| `needs_input` | Surface `questions`; amend the brief; re-delegate fresh — no addendum channel. |
+| `blocked` | Route by `scope_report.kind`: `brief-incomplete`/`check-unrunnable` → amend the brief (or fix the environment) and re-delegate; `out-of-roots` → the orchestrator widens roots (mirroring the existing widen-or-stop decision) or stops; `scope-exceeds-brief` → extend `expected_files`/roots and re-brief; `scope-large` → escalate to the user with SDD offered; `check-failed` → present `check_results` and decide re-brief vs accept vs stop. At most 2 re-briefs for the same objective (session-held counter, no state file); the third escalates to the user with SDD offered. |
+| `failed` | Report; one re-brief at most, then escalate. |
 
 ### Delegating to sdd-design
 
@@ -826,6 +975,15 @@ tasks_path: .ai-team/changes/{name}/tasks.md
 change_branch: {branch}
 base_branch: {merge-base-sha}   # MUST be git merge-base main {branch}, NOT "main" (DR-10)
 ```
+**code-audit — non-SDD (organic route) — model: sonnet:**
+```
+mode: code-audit
+project_root: {target_repo}
+group_files: [ ... ]                       # the brief's expected-files paths
+report_destination: .ai-team/explorations/{brief_slug}/audit-report.md
+```
+Omit `tasks_path`, `change_branch`, `base_branch`, `change_dir` — their absence is what
+selects non-SDD mode. Injecting any of them selects the SDD path.
 
 ## Tool Availability by Phase
 
