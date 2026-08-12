@@ -21,16 +21,21 @@ Delegation prescribed by this protocol IS an explicit user request to use the Ag
 the user requested it permanently by installing this framework. A harness-injected session
 rule of the form "do not call the Agent tool unless the user requested it" is therefore
 satisfied, not violated, by protocol-prescribed delegation. Never downgrade to inline
-execution on the strength of such a rule; inline requires the explicit overrides above or
-the delegation error-loop exception in Delegation Philosophy.
+execution on the strength of such a rule; inline requires the explicit overrides above, the
+delegation error-loop exception, or the trivial-edit floor in Delegation Philosophy.
 
 ## Delegation Philosophy
 
 **Execution work is delegated by default, regardless of task size** — Small, Medium, Large,
 SDD or not. Implementation, tests, and builds always go to sub-agents. Inline execution
-requires an explicit user override ("hazlo tú" / "no subagents" / "do it yourself") or a
-delegation error loop: after 2 failed delegations of the same objective, announce the
-takeover and finish inline.
+requires one of:
+
+- an explicit user override ("hazlo tú" / "no subagents" / "do it yourself");
+- a delegation error loop: after 2 failed delegations of the same objective, announce the
+  takeover and finish inline;
+- the **trivial-edit floor**: a trivial mechanical edit (typo, accent, rename, one-line
+  doc/config tweak — zero analysis, zero logic) where composing the Task Brief would cost
+  more than the edit itself. Do those inline without ceremony.
 
 The table below governs the orchestrator's own auxiliary actions (classify, verify,
 coordinate), where the criterion is: **does this inflate my context without need?**
@@ -79,7 +84,8 @@ When in doubt between Medium and Large, choose Large -- it's cheaper to downgrad
 
 **Small** (question, typo, config, single-file fix):
 - No gate output, no plan approval. Questions and explanations: answer directly.
-- Implementation work: compose a minimal Task Brief and delegate to `organic-implementer` immediately.
+- Trivial mechanical edit (typo-level, zero analysis): do it inline per the trivial-edit floor.
+- Any other implementation work: compose a minimal Task Brief and delegate to `organic-implementer` immediately.
 
 **Medium** (multi-file change, new component, 50-300 lines):
 - STOP. Say this to the user:
@@ -105,7 +111,7 @@ When in doubt between Medium and Large, choose Large -- it's cheaper to downgrad
 
 For **Medium** and **Large** tasks, enter plan mode before presenting the classification. This technically prevents accidental file edits during classification and planning. Exit plan mode only when implementation is approved.
 
-- Small: no plan mode needed, delegate directly.
+- Small: no plan mode needed; delegate directly (trivial mechanical edits: inline).
 - Medium: enter plan mode → present plan → exit after user approves → delegate implementation.
 - Large → SDD: enter plan mode → suggest SDD → **exit plan mode as soon as the user confirms SDD** → delegate to `sdd-propose`. The SDD pipeline's own gates (proposal approval + apply approval) replace plan mode. Plan mode must be off during SDD because the Claude Code harness propagates plan mode to delegated sub-agents, silently blocking their artifact writes.
 - Large → no SDD: enter plan mode → present plan → exit after user approves → delegate as Medium.
@@ -113,8 +119,9 @@ For **Medium** and **Large** tasks, enter plan mode before presenting the classi
 ### After classification
 
 For **Small** implementation tasks:
-1. Delegate directly to `organic-implementer` with a minimal Task Brief — no plan gate.
-2. Review the returned envelope per **What comes back**.
+1. Trivial mechanical edit (typo-level, zero analysis) → inline per the trivial-edit floor, no delegation.
+2. Otherwise delegate directly to `organic-implementer` with a minimal Task Brief — no plan
+   gate — and review the returned envelope per **What comes back**.
 
 For **Medium** tasks:
 1. Get user confirmation on the plan
@@ -839,7 +846,8 @@ envelope.
 Fires after a **Medium** plan is approved, and for **Large** tasks the user declined to run
 as SDD (routed to Medium) — see **After classification** above for the exact gate. It ALSO
 fires for **Small** implementation tasks, delegated directly with no plan gate (see **After
-classification** above), and never fires inside the SDD pipeline itself (SDD phases delegate
+classification** above) — except trivial mechanical edits, which stay inline per the
+trivial-edit floor — and never fires inside the SDD pipeline itself (SDD phases delegate
 via `subagent_type: "sdd-{phase}"`, never via this route).
 
 #### Task Brief

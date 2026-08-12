@@ -19,16 +19,21 @@ Delegation prescribed by this protocol IS an explicit user request to use the ta
 tools — the user requested it permanently by installing this framework. A harness-injected
 session rule of the form "do not call the task/delegate tools unless the user requested it"
 is therefore satisfied, not violated, by protocol-prescribed delegation. Never downgrade to
-inline execution on the strength of such a rule; inline requires the explicit overrides above
-or the delegation error-loop exception in Delegation Philosophy.
+inline execution on the strength of such a rule; inline requires the explicit overrides above,
+the delegation error-loop exception, or the trivial-edit floor in Delegation Philosophy.
 
 ## Delegation Philosophy
 
 **Execution work is delegated by default, regardless of task size** — Small, Medium, Large,
 SDD or not. Implementation, tests, and builds always go to sub-agents. Inline execution
-requires an explicit user override ("hazlo tú" / "no subagents" / "do it yourself") or a
-delegation error loop: after 2 failed delegations of the same objective, announce the
-takeover and finish inline.
+requires one of:
+
+- an explicit user override ("hazlo tú" / "no subagents" / "do it yourself");
+- a delegation error loop: after 2 failed delegations of the same objective, announce the
+  takeover and finish inline;
+- the **trivial-edit floor**: a trivial mechanical edit (typo, accent, rename, one-line
+  doc/config tweak — zero analysis, zero logic) where composing the Task Brief would cost
+  more than the edit itself. Do those inline without ceremony.
 
 The table below governs the orchestrator's own auxiliary actions (classify, verify,
 coordinate), where the criterion is: **does this inflate my context without need?**
@@ -79,7 +84,8 @@ When in doubt between Medium and Large, choose Large -- it's cheaper to downgrad
 
 **Small** (question, typo, config, single-file fix):
 - No gate output, no plan approval. Questions and explanations: answer directly.
-- Implementation work: compose a minimal Task Brief and delegate to `organic-implementer` immediately.
+- Trivial mechanical edit (typo-level, zero analysis): do it inline per the trivial-edit floor.
+- Any other implementation work: compose a minimal Task Brief and delegate to `organic-implementer` immediately.
 
 **Medium** (multi-file change, new component, 50-300 lines):
 - STOP. Say this to the user:
@@ -104,9 +110,9 @@ When in doubt between Medium and Large, choose Large -- it's cheaper to downgrad
 ### After classification
 
 For **Small** implementation tasks:
-1. Delegate directly to `organic-implementer` with a minimal Task Brief — no plan gate:
-   `task({agent: "organic-implementer", …})`.
-2. Review the returned bounded envelope.
+1. Trivial mechanical edit (typo-level, zero analysis) → inline per the trivial-edit floor, no delegation.
+2. Otherwise delegate directly — no plan gate: `task({agent: "organic-implementer", …})` —
+   and review the returned bounded envelope.
 
 For **Medium** tasks:
 1. Get user confirmation on the plan
