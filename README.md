@@ -4,12 +4,12 @@ A tool-agnostic framework for spec-driven development with AI agents.
 
 ## Architecture
 
-Each supported AI coding tool runs an **orchestrator** agent: small tasks inline, large tasks via SDD with sub-agents. The orchestrator classifies every task by size and delegates accordingly.
+Each supported AI coding tool runs an **orchestrator** agent: execution is delegated to sub-agents by default at every task size; large tasks go through the full SDD pipeline. Classification governs ceremony (plan gate, SDD recommendation), never inline-vs-delegate.
 
 ```
 User ↔ Claude Code (orchestrator)          User ↔ OpenCode (sdd-orchestrator agent)
            │                                             │
-           ├── Small: inline                             ├── Small: inline
+           ├── Small: delegate (no gate)                 ├── Small: delegate (no gate)
            ├── Medium: plan + delegate                   ├── Medium: plan + delegate
            └── Large: full SDD pipeline                  └── Large: full SDD pipeline
                          ↓                                             ↓
