@@ -9,7 +9,7 @@
 The user always has final say. These overrides take immediate effect:
 
 - **"no SDD" / "sin SDD"** -- Do the work directly, skip SDD regardless of task size
-- **"no subagents" / "hazlo tu" / "do it yourself"** -- Do everything inline, no delegation at all
+- **"no subagents" / "hazlo tú" / "do it yourself"** -- Do everything inline, no delegation at all
 - **"use SDD" / "usa SDD"** -- Full SDD workflow even for small tasks
 - **"delegate" / "delega"** -- Use sub-agents even for small tasks
 
@@ -122,7 +122,7 @@ For **Medium** tasks:
 3. **Delegate implementation — this is the default.** Delegate to `organic-implementer`
    with a Task Brief (see **Organic Delegation Route (non-SDD)** below). Implementing
    inline on your own turn requires an explicit user override in the vocabulary of the
-   User Override section: "no subagents" / "hazlo tu" / "do it yourself".
+   User Override section: "no subagents" / "hazlo tú" / "do it yourself".
 4. If the user's reply is neither an approval nor a recognized override token, re-prompt
    for an explicit choice — do NOT silently fall back to inline.
 5. Review the returned envelope per **What comes back**.

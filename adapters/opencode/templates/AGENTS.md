@@ -7,7 +7,7 @@
 The user always has final say. These overrides take immediate effect:
 
 - **"no SDD" / "sin SDD"** -- Do the work directly, skip SDD regardless of task size
-- **"no subagents" / "hazlo tu" / "do it yourself"** -- Do everything inline, no delegation at all
+- **"no subagents" / "hazlo tú" / "do it yourself"** -- Do everything inline, no delegation at all
 - **"use SDD" / "usa SDD"** -- Full SDD workflow even for small tasks
 - **"delegate" / "delega"** -- Use sub-agents even for small tasks
 
@@ -113,7 +113,7 @@ For **Medium** tasks:
 2. **Delegate implementation — this is the default:** `task({agent: "organic-implementer", …})`
    with a Task Brief (canonical definition: **Organic Delegation Route (non-SDD)** in
    `~/.config/opencode/skills/_shared/sdd-orchestrator-protocol.md`). Inline implementation
-   requires an explicit user override ("no subagents" / "hazlo tu" / "do it yourself").
+   requires an explicit user override ("no subagents" / "hazlo tú" / "do it yourself").
 3. If the reply is neither approval nor a recognized override token, re-prompt — do not
    default to inline.
 4. Review the returned bounded envelope.
