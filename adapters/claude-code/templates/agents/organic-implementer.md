@@ -2,6 +2,7 @@
 name: organic-implementer
 description: "Task Brief-to-code implementation (non-SDD organic delegation route)"
 category: sdd
+model: sonnet
 tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
