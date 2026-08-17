@@ -1,10 +1,10 @@
 # Common Rules
 
-> Consolidated principles repeated across SDD SKILL.md files. Every SKILL.md MUST reference this file from its Hard Rules section instead of reproducing these principles.
+> Consolidated principles repeated across the route's SKILL.md files. Every SKILL.md MUST reference this file from its Hard Rules section instead of reproducing these principles.
 
 ## Why this exists
 
-The redesign-v2 invariant grep (Evidence Protocol Rule 4) found these principles in 7/9 ("Read application code; never modify it"), 8/9 ("Result envelope always"), 7/9 ("Write only to .ai-team/") of the SDD SKILL.md files. Consolidation removes ~20+ duplicate Hard Rule lines across the framework.
+An invariant grep (Evidence Protocol Rule 4) found these principles duplicated across most of the framework's SKILL.md files ("Read application code; never modify it", "Result envelope always", "Write only to declared paths"). Consolidation removes duplicate Hard Rule lines across the framework.
 
 ## Reference line — required in every SKILL.md
 
@@ -16,27 +16,25 @@ Skill-specific rules follow this bullet. Verbatim reproduction of the three cons
 
 ## Principle 1 — Read-only on application code (REQ-CR-002)
 
-Read application code, never modify it. Source files are read only to verify design assumptions, gather evidence, or orient the current task. No skill phase writes to application source files. If a bug or improvement is found, surface it as a risk in the result envelope — never fix it in-place.
+Read application code, never modify it. Source files are read only to verify design assumptions, gather evidence, or orient the current task. No skill writes to application source files. If a bug or improvement is found, surface it as a risk in the result envelope — never fix it in-place.
 
-### Exceptions: sdd-apply and organic-implementer
+### Exception: organic-implementer
 
-`sdd-apply` writes to application source files by design (per the Execution Steps in its SKILL.md, exactly the files declared in `tasks.md`). Apply's Hard Rules section MUST include the reference line AND a one-line exception note:
+`organic-implementer` writes to application source files by design, bounded by the Task Brief's `allowed_edit_roots`. Its Hard Rules section MUST reference `_shared/common-rules.md` (the reference line) AND MAY explicitly note this exception:
 
-    - Writes application source files (exception to read-only principle — apply's primary responsibility).
+    - Writes application source files (exception to read-only principle — this skill's primary responsibility).
 
-`organic-implementer` writes to application source files by design, bounded by the Task Brief's edit roots (REQ-ORGANIC-005) rather than by `tasks.md`. Its Hard Rules section MUST likewise reference `_shared/common-rules.md` and MAY explicitly note this exception.
-
-Neither exception widens the other — `sdd-apply`'s exception stays scoped to `tasks.md`-declared paths; `organic-implementer`'s exception stays scoped to the Task Brief's edit roots. Every other SDD skill remains fully bound by the read-only principle.
+This is the only exception. Every other skill on this route (`organic-reviewer`, `organic-security`, `organic-scout`, `work-unit-commits`) remains fully bound by the read-only principle — `work-unit-commits` writes to the working tree only via `git add`/`git commit` (Principle 2's exception), never by editing file contents.
 
 ## Principle 2 — Write-scope (REQ-CR-003)
 
-Write only to `.ai-team/` (and declared application files for apply and organic-implementer). No SDD skill writes to paths outside `.ai-team/` except sdd-apply (which writes to the paths declared in `tasks.md`) and organic-implementer (which writes to the paths within its Task Brief's edit roots). Shared protocols, SKILL.md files, project config files, and CI/CD pipelines are ALL read-only for SDD skills; they are modified only via the SDD pipeline itself running on the meta-project.
+Write only application files declared within a Task Brief's `allowed_edit_roots` (organic-implementer), or via commit creation (work-unit-commits). No other skill on this route writes to any path. Shared protocols, SKILL.md files, project config files, and CI/CD pipelines are ALL read-only for every delegated skill; they are modified only by editing this framework directly.
 
-**Enforcement for sdd-apply and organic-implementer:** sdd-apply's application-code write surface is bounded by the forwarded `allowed_edit_roots` set (from `tasks.md`); organic-implementer's application-code write surface is bounded by the Task Brief's edit-roots element. Both reuse the same within-roots (segment-prefix) definition (orchestrator Roots Computation rule) rather than each defining its own. Before writing any application-source file, each checks the target path against its respective roots. A write whose target path falls outside all roots is a blocking deviation — neither skill performs the write; sdd-apply returns `status: blocked` with a `deviation_report`, organic-implementer returns per its own Decision Gates. When `allowed_edit_roots` is not forwarded to sdd-apply (uncomputable roots), apply falls back to the existing inner exact-file discipline with no outer gate active — this fallback is unchanged and does NOT extend to organic-implementer, whose brief always declares edit roots explicitly.
+**Enforcement for organic-implementer:** its application-code write surface is bounded by the Task Brief's `allowed_edit_roots` element, using the within-roots (segment-prefix) definition in the orchestrator's Roots Computation rule rather than a rule of its own. Before writing any application-source file, it checks the target path against those roots. A write whose target path falls outside all roots is a blocking deviation — organic-implementer performs no such write and returns per its own Decision Gates (`scope_report.kind: out-of-roots`).
 
 ### Exception: work-unit-commits
 
-`work-unit-commits` writes to the working tree via `git add` + `git commit` in auto mode (per REQ-WUC-003). This is a deliberate exception — work-unit-commits is the exclusive owner of commit creation. Apply uses only read-only git commands; `git commit` is exclusively owned by work-unit-commits (REQ-APPLY-021).
+`work-unit-commits` writes to the working tree via `git add` + `git commit` in auto mode. This is a deliberate exception — work-unit-commits is the exclusive owner of commit creation on this route; every other skill uses only read-only git commands.
 
 ### Exception: orchestrator metric memory
 
@@ -48,39 +46,39 @@ Every skill execution returns a result envelope. No skill exits silently. Even w
 
 ## Principle 4 — Seniority Model (REQ-CR-008)
 
-Each SDD pipeline role has a single authority and a single product. Each role operates within its single authority boundary — crossing authorities creates separation-of-duties failures (an executor cannot also be its own auditor; an auditor cannot also be its own decision-maker).
+Each role on the route has a single authority and a single product. Each role operates within its single authority boundary — crossing authorities creates separation-of-duties failures (an executor cannot also be its own auditor; an auditor cannot also be its own decision-maker).
 
 | Role | Authority | Product | Boundary |
 |------|-----------|---------|----------|
-| **Deciding skills** (`sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`) | Decide their domain (scope, requirements, interfaces, task plan) | Domain artifacts (`proposal.md`, delta specs, `design.md`, `tasks.md`) | The orchestrator exclusively authors `decisions[]` entries (recorded against the approved plan these phases produce). |
-| **Diagnosing skill** (`sdd-verify`) | Diagnose factual deviations from spec/design/tasks (run tests, build, lint; compute `failure_class`; emit Drift Summary) | `verification-report.md` + envelope `failure_class` | The orchestrator authors `decisions[]` entries. Verify reports drift via Drift Summary; orchestrator records it. |
-| **Coordinating skill** (the orchestrator, in `_shared/orchestrator-protocol.md`) | Coordinate delegation, classify scope, decide the evidence tier and route review | Delegation prompts; Evidence-Tier Review classification | Delegates all code execution, artifact writing, and test runs to skills. |
-| **Implementing skill** (`sdd-apply`) | Implement `tasks.md` exactly; verify compilability; populate `execution_evidence`; OR return `status: blocked` with a structured `deviation_report` | Application source files; `state.yaml.phases.apply.*` (status, progress) | The orchestrator exclusively authors `decisions[]` entries; Reads SDD artifacts (`tasks.md`, `design.md`, specs, proposal) without modifying them; Uses only read-only git commands; state-changing commands (commit, add, push, stash, reset, rm) are exclusively owned by work-unit-commits. |
-| **Mechanical skill** (`work-unit-commits`) | Stage declared files + create commit per group (auto/manual); backfill commit SHA into existing `decisions[]` entries | Commits in the working tree; `state.yaml.phases.apply.commits[group_id]`; commit SHA backfill into existing decisions[] entries | Updates the `commits[]` field of orchestrator-authored `decisions[]` entries (does not create new entries). |
-| **Auditing skill** (`sdd-reviewer`) | Diagnose code-correctness defects in the group's changed files; emit a blocking verdict (`review-clear` / `review-blocked`) | `review-report.md` (per group); result envelope verdict | Read-only on application code; MUST NOT run state-changing git commands; MUST NOT write `decisions[]` entries (the orchestrator records review overrides exclusively) |
-| **Non-SDD implementing skill** (`organic-implementer`) | Implement one Task Brief in one repo; verify against the brief's acceptance checks; OR block per its own Decision Gates | Application source files bounded by the brief's edit roots; result envelope (bounded evidence) | Does not author `decisions[]` entries (no `state.yaml` exists for organic tasks — there is nothing to write into); does not create commits (orchestrator/user commits); uses no git commands beyond read-only inspection needed to run acceptance checks. |
+| **Coordinating skill** (the orchestrator, in `_shared/orchestrator-protocol.md`) | Coordinate delegation, classify scope, decide the evidence tier and route review | Delegation prompts; Evidence-Tier Review classification; the review receipt's `overrides` field | Delegates all code execution, artifact writing, and test runs to skills; is the exclusive author of a user-accepted override. |
+| **Discovery skill** (`organic-scout`) | Optional pre-brief exploration to cut scope uncertainty; bootstrap `.ai-team/config.yaml` | Findings summary; `config.yaml` | Read-only on application code; never writes application files. |
+| **Implementing skill** (`organic-implementer`) | Implement one Task Brief in one repo exactly; verify against the brief's declared acceptance checks; OR block per its own Decision Gates | Application source files bounded by the brief's `allowed_edit_roots`; bounded result envelope | Authors no audit-trail entry (no persistent artifact exists for organic tasks — there is nothing to write into); creates no commits (work-unit-commits owns commit creation); uses no git commands beyond read-only inspection needed to run acceptance checks. |
+| **Auditing skills** (`organic-reviewer`, `organic-security`) | Diagnose correctness/security defects in the candidate's `group_files`; `organic-reviewer` alone emits the blocking verdict (`review-clear` / `review-blocked`) | Review Receipt (schema: `_shared/result-envelope.md` → Review Receipt); optional on-disk report copy | Read-only on application code; MUST NOT run state-changing git commands; MUST NOT populate the receipt's `overrides` field — only the orchestrator records a user-accepted override. |
+| **Mechanical skill** (`work-unit-commits`) | Stage the declared `group_files` and create one commit per group (auto/manual); enforce the receipt gate for tier ≥ 1 candidates | Commits in the working tree | The exclusive owner of commit creation; creates no audit-trail entry (none exists on this route); refuses to commit a tier ≥ 1 candidate whose Review Receipt is absent. |
 
 ### Why this exists
 
-The most common failure mode in apply phases is the executor laundering its own gaps through a
-free-form audit field. The fix is structural: deny the executor the write surface. The audit
-role moves to the orchestrator (which already coordinates and audits via Post-Apply Audit per
-Rule 6 of evidence-protocol).
+The most common failure mode is the implementer laundering its own gaps through a free-form
+evidence field. The fix is structural: deny the implementer the write surface an auditor or a
+commit-gate needs, and give the orchestrator sole authority over overrides. The audit role
+belongs to `organic-reviewer`/`organic-security`, the commit gate belongs to
+`work-unit-commits`, and the override record belongs exclusively to the orchestrator (Evidence
+Protocol Rule 6).
 
 ### Enforcement
 
-- `sdd-apply` removes the `decisions[]` write path from Hard Rules, Decision Gates, Execution
-  Steps, and references (REQ-APPLY-022 audit verifies this).
-- `sdd-verify` Step 10 flags WARNING on any `decisions[]` entry with `phase: apply` AND
-  `date >= state.yaml.created` (lifecycle-scoped check; legacy archives exempt).
-- `persistence-contract.md` enumerates the Writer Set explicitly (orchestrator + user via
-  orchestrator).
+- `organic-implementer`'s Output Contract carries no field that could double as an audit-trail
+  write path — `scope_report` is a bounded block-and-escalate report, not a decision log.
+- `work-unit-commits` refuses to commit a tier ≥ 1 candidate without its injected Review
+  Receipt (Decision Gates).
+- `organic-reviewer` and `organic-security` return `overrides: []` on every run — the
+  orchestrator is the only party that populates that field.
 - The reference bullet in every affected SKILL.md's Hard Rules section names this principle
   by token ("seniority") so a downstream grep can verify propagation.
 
 ## Principle 5 — Startup sequence (REQ-CR-005)
 
-Every skill begins by loading `_shared/context-protocol.md` (startup sequence) and `_shared/persistence-contract.md` (write rules, timestamp rules, decisions[] schema). These two protocols govern how the skill reads its context and how it writes state. They MUST be loaded before any application code is read or any artifact is written.
+Every skill begins by loading `_shared/context-protocol.md` (startup sequence) and `_shared/persistence-contract.md` (write rules, timestamp rules). These two protocols govern how the skill reads its context and how it writes state. They MUST be loaded before any application code is read or any artifact is written.
 
 ## Principle 6 — Untrusted content (REQ-CR-011)
 
@@ -96,27 +94,16 @@ Sub-agents read arbitrary repo content with Bash and Write available. A hostile 
 
 ## Logical group — canonical definition (REQ-CR-006)
 
-A **logical group** in `tasks.md` is a named set of one or more consecutive tasks that together produce a deployable or testable unit of the planned change. Groups are defined by the Execution Order table.
+A **logical group** on this route is one Task Brief delegated to `organic-implementer`: one `group_id`, one candidate diff, one review (tier ≥ 1), one commit.
+
+### group_id
+
+The brief-slug label the orchestrator assigns when composing the Task Brief — stable across every re-delegation counted against the shared re-brief budget (DD-14, `orchestrator-protocol.md`). Injected into `organic-reviewer`, `organic-security`, and `work-unit-commits`.
+
+### group_files — canonical definition
+
+`group_files` is the declared file set for one group: the **union** of the brief's `expected_files` paths and the returned implementer envelope's `artifacts` paths. The union closes the gap between what the brief predicted and what the worker actually produced — a worker may touch a surface `expected_files` did not name in full, or a partial run may return fewer `artifacts` than `expected_files` listed. Skills that consume the file set (`organic-reviewer`, `organic-security`, `work-unit-commits`) read the injected `group_files` value directly; none of them re-derives it from a plan artifact.
 
 ### Source of truth
 
-`tasks.md` is the owning artifact. The canonical definition lives here in `common-rules.md`. The Execution Order table contains a `Group` column listing `G1`, `G2`, ..., with `## Group GN: {Name}` section headers below the table.
-
-### Detecting the last task in a group (deterministic rule)
-
-Task X is the last task in group G{N} if and only if the next row in the Execution Order table belongs to a different group (G{N+1}, G{N+2}, ...) OR task X is the last row in the table. This rule is referenced by:
-
-- REQ-TASKS-021 (tasks.md structure)
-- REQ-APPLY-007 (group boundary tests)
-- REQ-APPLY-014 (group completion hand-off to orchestrator)
-- REQ-VERIFY-006 (per-group Spec Compliance Matrix)
-- REQ-ORCHESTRATOR-010 (work-unit-commits invocation per group)
-- REQ-WUC-001 (work-unit-commits activation per group)
-
-### Group numbering invariant
-
-Groups MUST be numbered sequentially starting at G1 with no gaps (G1, G2, G3, ...). A gap (e.g., G1, G3) is a structural error caught by sdd-verify (REQ-VERIFY-004 Check 1).
-
-### Task↔group mapping (D-4 resolution)
-
-The canonical task→group mapping is the `Group` column of the `## Execution Order` table in tasks.md. Skills that need the mapping (work-unit-commits, verify, apply) MUST read the table column, not the section headers.
+The orchestrator computes `group_files` once per candidate, after the implementer's envelope returns, and injects it verbatim into every downstream delegation for that candidate (Critical Context Forwarding, `orchestrator-protocol.md`). `work-unit-commits` treats an absent `group_files` injection as a fallback condition (Decision Gates in its own SKILL.md), never as an empty set.

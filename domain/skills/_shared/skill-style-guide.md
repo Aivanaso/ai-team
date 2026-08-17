@@ -17,7 +17,7 @@ Every SKILL.md must contain exactly these six `##` sections, in this order:
 5. **Output Contract** — what the envelope looks like, required fields, mandatory grep-contracts. No envelope examples inline (those go to `references/envelope-examples.md`).
 6. **References** — list of `references/` files with a one-line "load when" annotation each. Empty section is fine if no references exist yet.
 
-The six sections above are the complete and fixed structure. Additional sections go in `references/` files; reordering breaks the structural grep contracts in sdd-verify.
+The six sections above are the complete and fixed structure. Additional sections go in `references/` files; reordering breaks the structural grep contracts in the framework's citation-audit tooling (`_shared/scripts/check-verify-citations.sh`).
 
 ---
 
@@ -26,9 +26,9 @@ The six sections above are the complete and fixed structure. Additional sections
 The following items MUST remain in the SKILL.md body and must NOT be moved to `references/`:
 
 - **9 security touchpoint slugs** (verbatim, `auth/authz` with slash; the other 8 with dashes): `auth/authz`, `crypto`, `deserialization`, `file-io-uploads`, `network-ssrf`, `db-direct-input`, `new-dependencies`, `env-secrets`, `regex-external-input`
-- **Severity vocabulary**: `CRITICAL` / `WARNING` / `SUGGESTION`
-- **Evidence Protocol Rule citations**: Rule 1, Rule 2, Rule 3, Rule 4, Rule 5 (cite by number; full text lives in `evidence-protocol.md`)
-- **`decisions:` schema keys**: `phase`, `task_ref`, `decision`, `reason`, `evidence`, `commits`
+- **Severity vocabulary**: `CRITICAL` / `MAJOR` / `MINOR` (Review Receipt schema, `result-envelope.md`)
+- **Evidence Protocol Rule citations**: Rule 1, Rule 2, Rule 3, Rule 4, Rule 5, Rule 6 (cite by number; full text lives in `evidence-protocol.md`)
+- **Review Receipt schema keys**: `tier`, `tier_reason`, `lenses`, `verification`, `overrides` (`result-envelope.md` → Review Receipt)
 - **Result envelope canary fields**: `status`, `executive_summary`, `model_used`, `context_resolution`
 - **Mode dispatch logic**: if a skill has multiple modes (e.g. security's `threat-model` / `code-audit`; archive's Step 0 surfaces table), the dispatch table stays inline. The mode-specific detail goes to `references/`.
 
@@ -82,7 +82,7 @@ Every SKILL.md must open with a YAML frontmatter block containing exactly these 
 
 ```yaml
 ---
-name: sdd-{phase}
+name: {skill-name}
 description: "Trigger: {one-line activation condition, ≤ 120 chars}"
 disable-model-invocation: true
 user-invocable: false
@@ -107,7 +107,7 @@ Extract this content to `references/` files instead:
 - Multi-paragraph rule explanations → one sentence per rule inline; rest in `references/`
 - Code examples longer than 5 lines → move to `references/`
 - Commented-out sections → remove or extract to `references/`
-- "TODO" or "FIXME" annotations → track in tasks.md, not inline
+- "TODO" or "FIXME" annotations → track externally (issue tracker, commit message), not inline
 
 ---
 

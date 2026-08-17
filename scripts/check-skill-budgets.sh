@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-skill-budgets.sh -- Check that each sdd-* SKILL.md stays within the 250-line budget.
+# check-skill-budgets.sh -- Check that each skill's SKILL.md stays within the 250-line budget.
 #
 # Usage:
 #   ./scripts/check-skill-budgets.sh
@@ -18,12 +18,14 @@ BUDGET=250
 over=0
 total=0
 
+# Every skill directory has a SKILL.md; _shared holds only shared protocols and
+# scripts (no SKILL.md), so the glob excludes it without a separate filter.
 shopt -s nullglob
-files=("$REPO_ROOT"/domain/skills/sdd-*/SKILL.md)
+files=("$REPO_ROOT"/domain/skills/*/SKILL.md)
 shopt -u nullglob
 
 if (( ${#files[@]} == 0 )); then
-  echo "check-skill-budgets: ERROR: no SKILL.md files found under skills/sdd-*/" >&2
+  echo "check-skill-budgets: ERROR: no SKILL.md files found under domain/skills/*/" >&2
   exit 2
 fi
 

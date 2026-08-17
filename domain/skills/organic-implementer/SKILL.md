@@ -19,12 +19,12 @@ the prompt; the result is the returned envelope.
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Writes application source files, bounded by the Task Brief's allowed edit roots (exception to the read-only principle — this skill's primary responsibility; the second and only other exception beside sdd-apply, see common-rules Principle 1).
+- Writes application source files, bounded by the Task Brief's allowed edit roots (exception to the read-only principle — this skill's primary responsibility, and the only such exception, see common-rules Principle 1).
 - One brief, one repo: every write target is inside the brief's target repo; a brief naming two repos is a blocking gate, never a two-repo run. -- because one writer per lane is what keeps roots repo-relative and cross-repo ordering the orchestrator's job.
 - Bounded evidence: every returned field obeys the caps in the Output Contract; **no raw command output** — no multi-line literal stdout/stderr block appears in any envelope field, only an exit code, a pass/fail outcome and a one-line capped digest. -- because an unbounded evidence field turns one delegation return into an orchestrator-context overflow.
 - Checks are run, never inferred: a check is `pass` only when it was executed in this run and its exit code observed; re-run after the last edit (no stale snapshots). -- because "lint passes so the tests pass" is the documented apply failure class this rule exists to prevent.
 - No state-changing version control. Read-only inspection (`git status`, `git diff --name-only`) is permitted; creating commits, staging, pushing, resetting or discarding history is not. The working tree is left dirty for the orchestrator or the user to finish. -- because the framework keeps a single committer discipline, and this route introduces no commit agent.
-- Block, never improvise: work the brief does not cover is reported, not performed; a brief whose true scope is Large is handed back, never self-promoted into the SDD pipeline. -- because a worker that widens its own scope destroys the only bound the brief provides.
+- Block, never improvise: work the brief does not cover is reported, not performed; a brief whose true scope is Large is handed back to the orchestrator, never self-promoted into a wider delegation. -- because a worker that widens its own scope destroys the only bound the brief provides.
 - Framework-agnostic: no rule, gate or field names a language, framework, package manager, test runner or user project; concrete names appear only inside `# e.g.` enumerations. -- because the tool-agnostic invariant must hold across all `domain/` skills (mirrors organic-reviewer's framework-agnostic rule).
 
 ## Decision Gates
@@ -34,7 +34,7 @@ the prompt; the result is the returned envelope.
 | Brief missing or unusable in any of the six elements (incl. an "acceptance check" that is not a runnable command, or a brief naming two repos) | `status: needs_input`, `scope_report.kind: brief-incomplete`, `questions[]` names each missing element. Never improvise a substitute. |
 | A required write target is outside the brief's allowed edit roots (within-roots definition, protocol § Roots Computation) | `status: blocked`, `kind: out-of-roots`, `scope_report.target` = the rejected path. Check **before** the write; never write and report after. |
 | Achieving the objective needs files the brief's expected-files list does not declare | `status: blocked`, `kind: scope-exceeds-brief`, `needed_files[]` (≤10). Never write them "to finish the job". |
-| Mid-execution the true scope proves Large (6+ files across module boundaries, or contradicting the declared roots) | `status: blocked`, `kind: scope-large`. Hand the decision back; never auto-promote into SDD. |
+| Mid-execution the true scope proves Large (6+ files across module boundaries, or contradicting the declared roots) | `status: blocked`, `kind: scope-large`. Hand the decision back to the orchestrator; never self-promote into a wider delegation. |
 | Orientation needs more than 10 files beyond the expected-files set | Same as above (`kind: scope-large`) — the read budget is the cheapest Large detector. |
 | ≥1 acceptance check fails and it tests the brief's own objective | `status: blocked`, `kind: check-failed`, failing command + exit code in `check_results`. Never `ok`. |
 | ≥1 acceptance check fails but the failure is pre-existing (same check fails on files this run did not touch — evidence required) | `status: warning`, `kind: check-failed`, evidence cited in the entry's `digest`. |
@@ -55,10 +55,9 @@ the prompt; the result is the returned envelope.
 ## Output Contract
 
 The bounded envelope below is `organic-implementer`'s complete Output Contract — a separate,
-bounded variant from the SDD envelope schema in `_shared/result-envelope.md` (see
-References). `execution_evidence`, `deviation_report`, `tasks_status`, and
-`decisions_written` are **not** part of this envelope — they are `sdd-apply`-specific SDD
-fields with no organic-route analogue.
+bounded variant from the base schema in `_shared/result-envelope.md` (see References):
+bounded evidence (`check_results`, capped digests) instead of a raw-stdout evidence field, and
+`scope_report` instead of a structured deviation block.
 
 ```yaml
 status: ok | warning | needs_input | blocked | failed
@@ -91,10 +90,8 @@ always *marked*, never silent — a truncated digest sets `truncated: true`; a c
 sets its `*_omitted` counter; a capped `risks`/`questions` list spends its last slot on "N
 further items omitted". **Whole-envelope bound: ≤ 120 lines.**
 
-`scope_report` is deliberately **not** named `deviation_report`: same block-and-escalate
-spirit, a separate name and a separate `kind` vocabulary, so the SDD schema in
-`_shared/result-envelope.md` stays untouched and no parser confuses an organic block for an
-apply one.
+`scope_report` uses its own name and its own `kind` vocabulary — a block-and-escalate report
+scoped to this skill's Decision Gates, not a generic structured deviation block.
 
 **Worked example** (one compact instance, the `ok` path):
 

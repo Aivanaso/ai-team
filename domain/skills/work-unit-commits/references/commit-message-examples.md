@@ -1,36 +1,38 @@
 # Commit Message Examples — work-unit-commits
 
-> Load-on-demand reference for Step 4 (message composition). Three worked examples.
+> Load-on-demand reference for Step 6 (message composition). Three worked examples.
 
 ## Example 1 — Pure feat group
 
-Group G1 adds a new skill file. All tasks are new functionality.
+The Task Brief `billing-export` adds a new endpoint. All declared files are new functionality.
 
 ```
-feat(sdd-redesign-v2/G1): add common-rules.md + persistence-contract extensions
+feat(billing-export): add billing export endpoint + smoke test
 
-Covers: REQ-CR-001, REQ-CR-002, REQ-CR-003, REQ-CR-004, REQ-CR-005, REQ-CR-006, REQ-CR-007, REQ-WUC-007
+Files: services/billing/export.py, tests/billing/test_export.py
 ```
 
-- `type`: `feat` — all tasks create new content
-- `scope`: `{change-name}/G{N}` — `sdd-redesign-v2/G1`
-- Subject is 62 chars — within the 72-char limit
-- Body lists all REQ-IDs covered by tasks in this group
+- `type`: `feat` — all files are new functionality
+- `scope`: `{group_id}` — the brief-slug label, `billing-export`
+- Subject is 47 chars — within the 72-char limit
+- Body lists the files the commit covers
 
 ## Example 2 — Mixed feat+fix group with subject truncation
 
-Group G3 modifies 5 SKILL.md files and one task required an out-of-plan fix (logged in decisions[]). The natural subject line would be 79 chars; truncation is required.
+Group `invoice-refactor` modifies 5 files, including a fix the implementer folded into the
+same candidate. The natural subject line would be 79 chars; truncation is required.
 
 **Before truncation (79 chars — TOO LONG):**
 ```
-feat(sdd-redesign-v2/G3): refactor 5 SKILL.md files + remove duplicate rules
+feat(invoice-refactor): refactor 5 billing files + fix duplicate line-item rule
 ```
 
 **After truncation with WARNING:**
 ```
-feat(sdd-redesign-v2/G3): refactor 5 SKILL.md files, remove duplicate rules
+feat(invoice-refactor): refactor 5 billing files, fix duplicate line-item rule
 
-Covers: REQ-CR-007, REQ-TASKS-019, REQ-APPLY-021, REQ-ARCHIVE-002, REQ-SCOUT-015
+Files: services/billing/invoice.py, services/billing/lines.py, services/billing/tax.py,
+tests/billing/test_invoice.py, tests/billing/test_lines.py
 ```
 
 Envelope includes:
@@ -41,24 +43,26 @@ risks:
 
 ## Example 3 — Project-skill override
 
-The project has `{project_root}/.claude/skills/commit/SKILL.md` which mandates a different scope token format: `[PROJ-NNN] {description}` instead of `{change-name}/G{N}`.
+The project has `{project_root}/.claude/skills/commit/SKILL.md` which mandates a different
+scope token format: `[PROJ-NNN] {description}` instead of `{group_id}`.
 
-**Default (REQ-WUC-005):**
+**Default:**
 ```
-feat(sdd-redesign-v2/G5): update references/ files for redesigned skills
+feat(api-cleanup): update references/ files for the renamed client
 ```
 
 **Project-skill override applied:**
 ```
-feat[ECO-1234]: update references/ files for redesigned skills
+feat[ECO-1234]: update references/ files for the renamed client
 
-Covers: REQ-TASKS-012, REQ-APPLY-014, REQ-VERIFY-006
+Files: services/api/client.py, tests/api/test_client.py
 ```
 
 Envelope includes:
 ```yaml
 risks:
-  - "WARNING: project commit skill overrode scope token — applied [ECO-1234] instead of default (sdd-redesign-v2/G5)"
+  - "WARNING: project commit skill overrode scope token — applied [ECO-1234] instead of default (api-cleanup)"
 ```
 
-Note: the project skill's scope token replaces the parenthetical scope; the `type:` and `Covers:` body remain from REQ-WUC-005 as the floor.
+Note: the project skill's scope token replaces the parenthetical scope; the `type:` and file
+body remain from the default composition rule as the floor.

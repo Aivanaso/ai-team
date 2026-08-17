@@ -1,78 +1,58 @@
 # Envelope Examples — work-unit-commits
 
-> Load-on-demand reference for Step 10. Four envelope variants covering the main outcomes.
+> Load-on-demand reference for Step 8. Four envelope variants covering the main outcomes.
 
 ## ok (auto mode)
 
 ```yaml
 status: ok
-executive_summary: "Committed G1 (2 tasks, 3 files) — SHA abc1234ef"
+executive_summary: "Committed billing-export (2 files) — SHA abc1234ef"
 mode: auto
 commit_sha: "abc1234ef"
-group_id: "G1"
+group_id: "billing-export"
 artifacts:
-  - name: "G1 commit"
+  - name: "billing-export commit"
     path: "git:abc1234ef"
 risks: []
 model_used: "sonnet"
-context_resolution: "injected"
-```
-
-State update (auto mode):
-```yaml
-phases:
-  apply:
-    commits:
-      "G1": "abc1234ef"
+context_resolution: "self-loaded"
 ```
 
 ## ok (manual mode)
 
 ```yaml
 status: ok
-executive_summary: "Manual commit prepared for G2 — run the commands in manual_commit.commands"
+executive_summary: "Manual commit prepared for invoice-refactor — run the commands in manual_commit.commands"
 mode: manual
 manual_commit:
-  message: "feat(sdd-redesign-v2/G2): add work-unit-commits skill\n\nCovers: REQ-WUC-001, REQ-WUC-002, REQ-WUC-003"
+  message: "feat(invoice-refactor): add pro-rata line-item calculation"
   files:
-    - "domain/skills/work-unit-commits/SKILL.md"
-    - "domain/skills/work-unit-commits/references/envelope-examples.md"
-    - "domain/skills/work-unit-commits/references/commit-message-examples.md"
-    - "domain/skills/work-unit-commits/references/edge-cases.md"
+    - "services/billing/invoice.py"
+    - "tests/billing/test_invoice.py"
   commands:
-    - "git add domain/skills/work-unit-commits/SKILL.md"
-    - "git add domain/skills/work-unit-commits/references/envelope-examples.md"
-    - "git add domain/skills/work-unit-commits/references/commit-message-examples.md"
-    - "git add domain/skills/work-unit-commits/references/edge-cases.md"
-    - "git commit -m 'feat(sdd-redesign-v2/G2): add work-unit-commits skill'"
-group_id: "G2"
+    - "git add services/billing/invoice.py"
+    - "git add tests/billing/test_invoice.py"
+    - "git commit -m 'feat(invoice-refactor): add pro-rata line-item calculation'"
+group_id: "invoice-refactor"
 risks:
-  - "WARNING: manual mode — user must run commands before state.yaml.commits[G2] is populated"
+  - "WARNING: manual mode — user must run the listed commands; no commit exists yet"
 model_used: "sonnet"
-context_resolution: "injected"
-```
-
-State update (manual mode):
-```yaml
-phases:
-  apply:
-    commits:
-      "G2": "manual-pending"
+context_resolution: "self-loaded"
 ```
 
 ## failed (hook reject)
 
 ```yaml
 status: failed
-executive_summary: "pre-commit hook rejected commit for G1 — see risks"
+executive_summary: "pre-commit hook rejected commit for billing-export — see risks"
 mode: auto
-group_id: "G1"
+group_id: "billing-export"
 artifacts: []
 risks:
-  - "pre-commit hook rejected: eslint found 2 errors in domain/skills/work-unit-commits/SKILL.md"
+  - "pre-commit hook rejected: eslint found 2 errors in services/billing/export.py"
   - "git output: husky > pre-commit hook failed (add --no-verify to bypass)"
 model_used: "sonnet"
-context_resolution: "injected"
+context_resolution: "self-loaded"
 ```
 
 ## blocked (config missing)
@@ -85,5 +65,5 @@ artifacts: []
 risks:
   - "Expected .ai-team/config.yaml at project root; file not found"
 model_used: "sonnet"
-context_resolution: "injected"
+context_resolution: "self-loaded"
 ```

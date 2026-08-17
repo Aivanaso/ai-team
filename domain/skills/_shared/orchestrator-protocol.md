@@ -105,7 +105,7 @@ Run once per session, before the first delegation.
 
 The config template gains keys as the framework evolves; projects bootstrapped earlier keep working (every consumer defaults safely on absent keys) but stay blind to newer capabilities (`commit_strategy`, `strict_tdd`, `model_overrides`, `test_commands.*`). Once per session, when `.ai-team/config.yaml` already exists:
 
-1. Read the installed template at `{install_dir}/skills/sdd-scout/references/config-template.md`. The template is the canonical key set — comparing against it directly removes the need for any version field or migration table.
+1. Read the installed template at `{install_dir}/skills/organic-scout/references/config-template.md`. The template is the canonical key set — comparing against it directly removes the need for any version field or migration table.
 2. Diff top-level keys: collect template keys absent from the project's `config.yaml`.
 3. All keys present → proceed silently. Missing keys → offer a one-line refresh: "config.yaml predates these framework keys: {list}. Append them with safe defaults?"
 4. On accept: append each missing key with its template default plus a `# added by config-refresh {date}` comment, preserving every existing key and value byte-for-byte (additive-only). On decline: proceed — absent keys keep their safe-absent semantics.
@@ -135,7 +135,7 @@ The canonical, author-side contract the orchestrator composes and inlines into t
 | objective | One sentence: the observable outcome the worker must produce. | `objective` |
 | target repo | Absolute path to the single repository the worker writes in. All other brief paths are relative to it. | `target_repo` |
 | allowed edit roots | Repo-relative directories the worker may write inside. Validated with the within-roots (segment-prefix) definition in **Roots Computation** below. | `allowed_edit_roots` |
-| expected files | The files the brief expects to exist or change afterwards, each with its action. Also the source of `group_files` when a lens is activated. | `expected_files` |
+| expected files | The files the brief expects to exist or change afterwards, each with its action. Contributes to `group_files` when a lens or `work-unit-commits` is activated — see **Logical group — canonical definition** in `common-rules.md`. | `expected_files` |
 | acceptance checks | Runnable commands the worker executes and the orchestrator can re-run, each with its expected outcome. An adjective ("works correctly") is not a check. | `acceptance_checks` |
 | out-of-scope | Explicit non-goals — what the worker must not do even if it looks adjacent. | `out_of_scope` |
 
@@ -175,7 +175,7 @@ Activation previews the tier decision at brief-authoring time, before any cost i
 
 **Name every reason (no silent skip).** Before delegating a lens — and before *not* delegating one — show one line per lens: `"Tier: 2 — organic-security ACTIVATED (permission check at {path}); organic-reviewer ACTIVATED (same diff)."`
 
-When a lens is activated, inject `group_files` (the brief's `expected_files` paths), `project_root`, `group_id` (a brief-slug label), `tier`, and `tier_reason`. No `change_dir`, no `tasks_path` — those fields have no analogue on this route.
+When a lens is activated, inject `group_files` (the union of the brief's `expected_files` paths and the returned envelope's `artifacts` paths — canonical definition in `common-rules.md` → "Logical group"), `project_root`, `group_id` (a brief-slug label), `tier`, and `tier_reason`. No `change_dir`, no `tasks_path` — those fields have no analogue on this route.
 
 **Verdict handling.** Verdict vocabulary: `review-clear` / `review-blocked`. On `review-blocked` the orchestrator presents three options — **re-brief** (one fresh delegation with the findings batched in — never a live addendum, per Synchronous delegation below), **accept and proceed** (recorded in the review receipt's `overrides` field — no `decisions[]` entry, no `state.yaml`), or **stop** (leave the tree uncommitted, surface the report path).
 
@@ -241,11 +241,14 @@ Every delegated implementation returns a result envelope (bounded, per `organic-
 After a candidate is ready — `organic-implementer` returns `status: ok` (or `warning` accepted by the user) — AND, when the diff is tier ≥ 1, `organic-reviewer` returns `review-clear` (or the user overrides a `review-blocked` verdict per Evidence-Tier Review) — invoke `work-unit-commits`:
 
 ```
-Inject: group_id={brief-slug}, mode={config.commit_strategy default auto if absent}, project_root={target_repo}
+Inject: group_id={brief-slug}, mode={config.commit_strategy default auto if absent}, project_root={target_repo},
+        group_files={union of expected_files and the implementer envelope's artifacts}, tier={N}, tier_reason={one line}
+        [tier >= 1 only] Review Receipt: {organic-reviewer's returned receipt, verbatim}
 ```
 
 - Invoke only after the candidate's own acceptance checks pass and, for tier ≥ 1, the review receipt exists; never before either resolves.
 - Read `commit_strategy` from `.ai-team/config.yaml`; default `auto` if the field is absent.
+- `group_files` and `tier`/`tier_reason` are always injected (Critical Context Forwarding above); the Review Receipt is injected verbatim only when `tier >= 1` — this is what makes the receipt gate fireable and restores scoped staging to exactly the declared file set.
 - Model: sonnet.
 
 ## Deviation Report Ingestion
@@ -341,8 +344,9 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` | organic-implementer | if config sets it |
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
 | `group_id` | brief-slug label | work-unit-commits, organic-reviewer, organic-security | always when invoking these |
-| `group_files` | the brief's `expected_files` paths | organic-reviewer, organic-security | always when invoking a lens |
-| `tier` / `tier_reason` | Evidence-Tier Review classifier | organic-reviewer, organic-security | always when invoking a lens |
+| `group_files` | the union of the brief's `expected_files` paths and the implementer envelope's `artifacts` paths (canonical definition: `common-rules.md` → "Logical group") | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits — makes the receipt gate fireable and restores scoped staging |
+| `tier` / `tier_reason` | Evidence-Tier Review classifier | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits |
+| Review Receipt | `organic-reviewer`'s returned receipt (schema: `result-envelope.md` → Review Receipt) | work-unit-commits | verbatim, when `tier >= 1` — the receipt gate `work-unit-commits` enforces reads this injection |
 
 Inject all fields from the table above as a `## Injected Context (from orchestrator)` block at the top of the delegation prompt. The sub-agent treats this block as the source of truth for paths and flags — it does NOT re-derive them from disk.
 
