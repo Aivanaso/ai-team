@@ -1,11 +1,11 @@
 # Threat Model Output Template
 
-Use this template when writing `{change_dir}/threat-model.md` in Step 8.4.
+Use this template when writing `threat-model.md` at the injected `report_destination`.
 
 ## Template
 
 ```markdown
-# Threat Model: {change-name}
+# Threat Model: {scope}
 
 **Date:** {ISO 8601}
 **Mode:** threat-model
@@ -21,7 +21,7 @@ Use this template when writing `{change_dir}/threat-model.md` in Step 8.4.
 
 #### F-{n}: {short title}
 
-- **Severity:** CRITICAL | WARNING | SUGGESTION
+- **Severity:** CRITICAL | MAJOR | MINOR
 - **File:line:** {path:line}
 - **Description:** {1-3 sentences}
 - **Exploit scenario:** {paragraph}
@@ -32,13 +32,13 @@ Use this template when writing `{change_dir}/threat-model.md` in Step 8.4.
 
 ## Temporal Invariant Sweep
 
-(always present in threat-model; transversal sub-pass, runs even when no touchpoints triggered)
+(always present; transversal sub-pass, runs even when no touchpoints triggered)
 
-**Temporal fields detected:** {comma-separated list of `table.column` or proposal references, or "none"}
+**Temporal fields detected:** {comma-separated list of `table.column` or scope references, or "none"}
 
 | Field | Read path | Rejection semantic | Enforcement | Result |
 |-------|-----------|--------------------|-----------:|--------|
-| {table.column} | {endpoint or method} | {`now > field` / `IS NOT NULL` / etc.} | {Yes — cite / No} | OK / WARNING / CRITICAL |
+| {table.column} | {endpoint or method} | {`now > field` / `IS NOT NULL` / etc.} | {Yes — cite / No} | OK / MINOR / CRITICAL |
 
 (one row per field × read path; if no temporal fields detected, write "No temporal fields detected — sweep complete." and omit the table)
 
@@ -48,11 +48,11 @@ Use this template when writing `{change_dir}/threat-model.md` in Step 8.4.
 
 ## Seam & Failure Sweep
 
-(always present in threat-model; transversal sub-pass, runs even when no touchpoints triggered)
+(always present; transversal sub-pass, runs even when no touchpoints triggered)
 
 | Seam / Mutation | Sub-sweep | Handler / Writers / Stores | Result |
 |-----------------|-----------|----------------------------|--------|
-| {new call-site, bulk mutation, or multi-store write sequence} | failure-mode / interleaving / crash-window | {catch `file:line` + blast radius / writer-reader list / store list + recovery story} | OK / WARNING / CRITICAL |
+| {new call-site, bulk mutation, or multi-store write sequence} | failure-mode / interleaving / crash-window | {catch `file:line` + blast radius / writer-reader list / store list + recovery story} | OK / MINOR / CRITICAL |
 
 (one row per seam × sub-sweep; if the change introduces no new seams, write "No new seams introduced — sweep complete." and omit the table)
 
@@ -73,7 +73,7 @@ security_requirements:
 
 ## Suppression Tally
 
-{N} findings suppressed (confidence < 80%). Reasons: {brief list, or "none"}
+{N} findings suppressed (confidence ≤ 80%). Reasons: {brief list, or "none"}
 ```
 
 ## Per-Finding Structure
@@ -85,7 +85,7 @@ Each finding MUST include all seven fields:
 | `id` | F-1, F-2, ... (sequential, stable within a single artifact) |
 | `category` | One of the 9 touchpoints or a sweep category (`temporal-invariant-sweep`, `failure-mode-sweep`, `interleaving-sweep`, `crash-window-sweep`) |
 | `file_line` | `path/to/file.ts:42` — mandatory per Evidence Protocol Rule 1 |
-| `severity` | CRITICAL \| WARNING \| SUGGESTION |
+| `severity` | CRITICAL \| MAJOR \| MINOR |
 | `description` | 1-3 sentences: what the issue is |
 | `exploit_scenario` | One paragraph: how an attacker would use this |
 | `recommendation` | One paragraph or fix snippet |

@@ -1,10 +1,18 @@
 # config.yaml Template
 
-Annotated YAML template for `.ai-team/config.yaml`. Fill in values detected during bootstrap mode.
+Annotated YAML template for `.ai-team/config.yaml`. Fill in values detected during bootstrap
+mode.
 
-> **Format**: every block below uses `<placeholder>` or `{placeholder}` syntax for values the scout fills in. Inline comments list common alternatives (e.g. `e.g. typescript | php | go | ...`). The template names no canonical stack — it adapts to whatever the target project uses.
+> **Format**: every block below uses `<placeholder>` or `{placeholder}` syntax for values the
+> scout fills in. Inline comments list common alternatives (e.g. `e.g. typescript | php | go
+> | ...`). The template names no canonical stack — it adapts to whatever the target project
+> uses.
 
-> **Canonical key set**: the orchestrator's Config Refresh Check (Auto-Init in `_shared/sdd-orchestrator-protocol.md`) diffs existing project configs against this template's top-level keys and offers to append the missing ones. When adding a key here, give it a safe-absent default (every consumer keeps working when the key is missing) so pre-existing projects upgrade additively on their next SDD run.
+> **Canonical key set**: the orchestrator's Config Refresh Check (Session Init in
+> `_shared/orchestrator-protocol.md`) diffs existing project configs against this template's
+> top-level keys and offers to append the missing ones. When adding a key here, give it a
+> safe-absent default (every consumer keeps working when the key is missing) so pre-existing
+> projects upgrade additively on their next session.
 
 ```yaml
 project:
@@ -31,7 +39,7 @@ stack:
 
 conventions:
   # Extract from existing config files (lint config, formatter config, editor config, language strictness flags).
-  # Each entry is a one-line constraint that downstream phases must respect.
+  # Each entry is a one-line constraint that downstream delegations must respect.
   - "{constraint}"
   # Common examples (replace with detected): "max line length 120", "no default exports", "snake_case file names", "PSR-4 autoloading", "Conventional Commits", "strict mode enabled".
 

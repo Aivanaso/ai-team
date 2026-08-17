@@ -22,10 +22,10 @@ the prompt; the result is the returned envelope.
 - Writes application source files, bounded by the Task Brief's allowed edit roots (exception to the read-only principle — this skill's primary responsibility; the second and only other exception beside sdd-apply, see common-rules Principle 1).
 - One brief, one repo: every write target is inside the brief's target repo; a brief naming two repos is a blocking gate, never a two-repo run. -- because one writer per lane is what keeps roots repo-relative and cross-repo ordering the orchestrator's job.
 - Bounded evidence: every returned field obeys the caps in the Output Contract; **no raw command output** — no multi-line literal stdout/stderr block appears in any envelope field, only an exit code, a pass/fail outcome and a one-line capped digest. -- because an unbounded evidence field turns one delegation return into an orchestrator-context overflow.
-- Checks are run, never inferred: a check is `pass` only when it was executed in this run and its exit code observed; re-run after the last edit (no stale snapshots). -- because "lint passes so the tests pass" is the documented apply failure class (`sdd-orchestrator-protocol.md:749-760`).
+- Checks are run, never inferred: a check is `pass` only when it was executed in this run and its exit code observed; re-run after the last edit (no stale snapshots). -- because "lint passes so the tests pass" is the documented apply failure class this rule exists to prevent.
 - No state-changing version control. Read-only inspection (`git status`, `git diff --name-only`) is permitted; creating commits, staging, pushing, resetting or discarding history is not. The working tree is left dirty for the orchestrator or the user to finish. -- because the framework keeps a single committer discipline, and this route introduces no commit agent.
 - Block, never improvise: work the brief does not cover is reported, not performed; a brief whose true scope is Large is handed back, never self-promoted into the SDD pipeline. -- because a worker that widens its own scope destroys the only bound the brief provides.
-- Framework-agnostic: no rule, gate or field names a language, framework, package manager, test runner or user project; concrete names appear only inside `# e.g.` enumerations. -- because the tool-agnostic invariant must hold across all `domain/` skills (mirrors `sdd-reviewer/SKILL.md:24`).
+- Framework-agnostic: no rule, gate or field names a language, framework, package manager, test runner or user project; concrete names appear only inside `# e.g.` enumerations. -- because the tool-agnostic invariant must hold across all `domain/` skills (mirrors organic-reviewer's framework-agnostic rule).
 
 ## Decision Gates
 
@@ -122,6 +122,6 @@ skill_resolution: none
 - `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
 - `../_shared/result-envelope.md` — base envelope field vocabulary; the bounded variant is defined in this file's Output Contract.
 - `../_shared/evidence-protocol.md` — Rule 1 (framework/library behavior claims backed by evidence).
-- `../_shared/sdd-orchestrator-protocol.md` — naming exactly two sections: **Organic Delegation Route (non-SDD) → Task Brief** (canonical brief definition; load at Step 2) and **Roots Computation (`allowed_edit_roots`)** (within-roots definition; load at Step 5).
+- `../_shared/orchestrator-protocol.md` — naming exactly two sections: **Task Brief** (canonical brief definition; load at Step 2) and **Roots Computation (`allowed_edit_roots`)** (within-roots definition; load at Step 5).
 
 No `references/` directory — this is intentionally a single-file skill.

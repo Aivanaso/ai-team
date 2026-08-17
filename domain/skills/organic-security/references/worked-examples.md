@@ -1,26 +1,30 @@
-# Worked Examples — sdd-security
+# Worked Examples — organic-security
 
 ## 1. Temporal Invariant Sweep: auth-magic-link Retrospective
 
-This worked example shows how Step 8.3.5 (Temporal Invariant Sweep) applies retroactively to the `auth-magic-link` change. Use it as a reference when running the sweep in threat-model mode.
+This worked example shows how the Temporal Invariant Sweep applies retroactively to a
+magic-link auth change. Use it as a reference when running the sweep in threat-model mode.
 
-| Field | Read path | Enforcement in proposal | Sweep result |
-|-------|-----------|-------------------------|--------------|
-| `magic_link_tokens.expires_at` | `POST /v1/auth/verify` | Yes (AC-8) | OK |
-| `magic_link_tokens.consumed_at` | `POST /v1/auth/verify` | Yes (AC-7) | OK |
-| `sessions.revoked_at` | AuthGuard per-request | Yes (F-5 MUST) | OK |
-| **`sessions.refresh_expires_at`** | **`POST /v1/auth/refresh`** | **Not stated** | **WARNING — emit finding** |
+| Field | Read path | Enforcement in scope | Sweep result |
+|-------|-----------|-----------------------|--------------|
+| `magic_link_tokens.expires_at` | `POST /v1/auth/verify` | Yes | OK |
+| `magic_link_tokens.consumed_at` | `POST /v1/auth/verify` | Yes | OK |
+| `sessions.revoked_at` | AuthGuard per-request | Yes (MUST) | OK |
+| **`sessions.refresh_expires_at`** | **`POST /v1/auth/refresh`** | **Not stated** | **MINOR — emit finding** |
 
-The fourth row (`sessions.refresh_expires_at`) is the finding that slipped past threat-model in the original run and was only caught by code-audit (post-implementation). With the sweep, this finding fires in threat-model instead — before code is written — and converts into a `MUST` security requirement that the spec phase ingests.
+The fourth row (`sessions.refresh_expires_at`) is the finding that slipped past an earlier
+design pass and was only caught by a later code-audit. With the sweep, this finding fires
+before code is written — and converts into a `MUST` security requirement a follow-up Task
+Brief must implement.
 
 **Finding that would have been emitted:**
 
 ```
 id: F-1
 category: temporal-invariant-sweep
-file_line: proposal.md:42 (sessions schema definition)
-severity: WARNING
-description: "sessions.refresh_expires_at is defined in the schema but the proposal
+file_line: (scope_description reference — sessions schema definition)
+severity: MINOR
+description: "sessions.refresh_expires_at is defined in the schema but the change scope
   does not state that POST /v1/auth/refresh rejects requests where refresh_expires_at
   < now. No enforcement clause referenced."
 exploit_scenario: "An attacker who obtains a refresh token that has expired at the
@@ -28,15 +32,16 @@ exploit_scenario: "An attacker who obtains a refresh token that has expired at t
   rotation TTL."
 recommendation: "Add a MUST requirement: POST /v1/auth/refresh MUST reject tokens
   where refresh_expires_at < now with HTTP 401."
-confidence_rationale: "Proposal defines the column and lists the endpoint in scope;
-  grep over proposal.md finds no 'refresh_expires_at' check clause."
+confidence_rationale: "Scope description defines the column and lists the endpoint in
+  scope; grep over the schema finds no 'refresh_expires_at' check clause."
 ```
 
 ---
 
 ## 2. Audit Prompt: Five Vulnerability Categories (Full Detail)
 
-Apply these five categories to every diff (code-audit) or proposal section (threat-model). Each category below includes the complete heuristics for what to look for.
+Apply these five categories to every candidate diff (code-audit) or scope description
+(threat-model). Each category below includes the complete heuristics for what to look for.
 
 ### Category 1: Input Validation
 
@@ -49,9 +54,9 @@ Check that user-supplied input is validated, sanitised, and never passed directl
 - Template engines (server-side template injection, e.g., Jinja2, Twig, Handlebars with user templates)
 - File paths (path traversal: `../../../etc/passwd` via unvalidated path components)
 
-Heuristics for code-audit: grep for `.execute(`, `.query(`, `exec(`, `execSync(`, `spawn(`, `readFile(`, `join(path,` in changed files and 1-hop callers. Trace arguments back to HTTP request objects.
+Heuristics for code-audit: grep for `.execute(`, `.query(`, `exec(`, `execSync(`, `spawn(`, `readFile(`, `join(path,` in `group_files` and 1-hop callers. Trace arguments back to HTTP request objects.
 
-Heuristics for threat-model: look for proposal language mentioning "user input is passed to", "search query from user", "file path from request", "dynamic query".
+Heuristics for threat-model: look for scope-description language mentioning "user input is passed to", "search query from user", "file path from request", "dynamic query".
 
 ### Category 2: Authentication & Authorization
 
