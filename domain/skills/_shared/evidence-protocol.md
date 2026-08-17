@@ -160,7 +160,7 @@ This rule covers the orchestrator's responsibility *after* receiving an envelope
 - The change has >3 tasks, OR >1 affected domain, OR any open question / cross-cutting decision was resolved
 - The envelope returned `status: ok` or `status: warning`
 
-**When triggered**, the orchestrator MUST cross-check four things (operational details in `sdd-orchestrator-protocol.md → Post-Apply Independent Audit`):
+**When triggered**, the orchestrator MUST cross-check four things (the closest surviving operational hooks are the artifact-confirmation check in `orchestrator-protocol.md` → "Organic Delegation Route → What comes back" and the Citation audit in "Evidence-Tier Review"):
 
 1. **Scope drift** — every file in `git diff --name-only` traces to a `tasks.md` `Files:` block or a `decisions[]` entry. Unaccounted files = scope creep to flag.
 2. **Resolution coverage** — every open question, design decision, and cross-cutting requirement recorded in the spec/design appears in the diff (grep by keyword/invariant). A resolution that does not surface anywhere is a silent skip.

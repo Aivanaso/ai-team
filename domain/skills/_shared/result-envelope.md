@@ -85,7 +85,7 @@ Each SKILL.md declares an "Expected Context (injected by orchestrator)" list. At
 | `fallback` | One or more expected inputs were missing; the sub-agent recovered them by reading `.ai-team/changes/{change}/` directly | Cache miss — orchestrator likely lost state (compaction). Re-read state and re-inject in subsequent delegations |
 | `none` | No expected inputs declared for this phase, or the sub-agent had nothing to verify | No signal — phase is context-light (e.g., scout bootstrap) |
 
-The orchestrator inspects this field on every return. See `sdd-orchestrator-protocol.md` → "Context Resolution Feedback" for the self-correction rule.
+The orchestrator inspects this field on every return. See `orchestrator-protocol.md` → "Context Resolution Feedback" for the self-correction rule.
 
 **Rule for sub-agents**: do not lie. If you read a path that the orchestrator should have given you, report `fallback` and list which inputs were missing in `risks`. Silent fallback defeats the canary.
 
@@ -99,7 +99,7 @@ Skill-injection canary for the phases that consume stack skills. The orchestrato
 | `path-missing` | Block received but ≥1 listed path is absent on disk — continued without it; missing paths listed in `risks` |
 | `none` | No skills block in the prompt — proceeded on `config.yaml` conventions alone |
 
-The orchestrator inspects this field on design/apply returns. See `sdd-orchestrator-protocol.md` → "Skill Resolution Feedback".
+The orchestrator inspects this field on design/apply returns. See `orchestrator-protocol.md` → "Skill Resolution Feedback".
 
 ### `execution_evidence` (OPTIONAL globally; REQUIRED for `sdd-apply`)
 
@@ -165,7 +165,7 @@ benefit.
 - Other phases MAY include `deviation_report` if they have a structured block to surface, but
   this is not currently triggered by any phase other than apply.
 - The orchestrator translates `deviation_report` into a `decisions[]` entry per the Deviation
-  Report Ingestion subsection in `sdd-orchestrator-protocol.md`. Apply does NOT touch `decisions:`.
+  Report Ingestion subsection in `orchestrator-protocol.md`. Apply does NOT touch `decisions:`.
 
 **Roots-violation case (forwarded `allowed_edit_roots` guard).** When `sdd-apply` is about to
 write an application-source file whose target path falls outside the forwarded
@@ -195,6 +195,35 @@ identically to any other `out-of-plan` report.
   - `mixed` — both at once, OR uncertain (default to `mixed` when in doubt)
 - The orchestrator uses `infra` to offer skipping the spec phase at the proposal approval gate. `feature` and `mixed` always run spec
 - Only the `sdd-propose` envelope sets this; other phases omit it
+
+## Review Receipt
+
+Produced by `organic-reviewer` for every candidate Evidence-Tier Review classifies as tier ≥ 1 (schema: `orchestrator-protocol.md` → "Evidence-Tier Review"). Consumed by `work-unit-commits` (commit gate) and the orchestrator (routing, Re-engage Routing on `failure_class`). An absent receipt for a tier ≥ 1 candidate is a hard block on commit — `work-unit-commits` refuses without it.
+
+```yaml
+tier: 0 | 1 | 2
+tier_reason: "<one line, mandatory — e.g. 'tier 2: modifies session auth middleware'>"
+lenses:
+  correctness:
+    status: pass | findings
+    findings:
+      - { id: "F-1", severity: CRITICAL | MAJOR | MINOR, file: "<path>", line: <int>, claim: "<one line>" }
+  security:                # present only when the diff activated organic-security (tier 2)
+    status: pass | findings
+    findings:
+      - { id: "F-2", severity: CRITICAL | MAJOR | MINOR, file: "<path>", line: <int>, claim: "<one line>" }
+verification:
+  - { command: "<verbatim>", exit_code: 0, outcome: pass | fail }
+overrides:                 # user-accepted findings, if any — omit entirely when empty
+  - { finding_id: "F-1", justification: "<user-supplied, one sentence>" }
+```
+
+**Rules:**
+- `tier_reason` is REQUIRED and non-empty for tier 1 and tier 2 — review cost is never unexplained.
+- `lenses.security` is present only when Evidence-Tier Review activated `organic-security` (tier 2); omit it entirely for tier 1.
+- Every `findings[]` entry's `claim` MUST resolve to a `file:line` citation — this is the receipt-side half of the Citation audit in `orchestrator-protocol.md` → "Evidence-Tier Review"; a claim without a resolvable citation is a contract violation.
+- `overrides` is populated only when the user accepted-and-proceeded over a finding instead of re-engaging the worker; omit the field entirely when no override occurred.
+- Tier 0 candidates produce no receipt — the result envelope alone is the record.
 
 ## Rules
 
