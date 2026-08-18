@@ -58,6 +58,21 @@ commit_strategy: auto  # commit strategy for work-unit-commits skill: auto | man
 #   `security` is the dependency auditor organic-security reads in code-audit mode; omit
 #   if not configured.
 
+# review_gates:
+#   - name: "{gate-id}"      # e.g. coverage, migration-lint
+#     command: "{command}"   # e.g. "npm run coverage -- --min 80"; exit 0 = pass. The threshold
+#                             # lives inside the command / project config, not in this key.
+#     blocking: true          # optional, default true
+#   Optional, safe-absent. Objective review gates executed by organic-reviewer's verification
+#   lens (SKILL.md Step 4) alongside the Task Brief's acceptance_checks re-run — exit code
+#   only. A failing gate lands in `lenses.correctness.findings[]` citing this gate's own
+#   declaration line, so the confidence threshold and the citation-suppression rule never
+#   apply to it (no exemption: the citation is always present). A failing blocking gate (blocking: true,
+#   or blocking absent) is a CRITICAL finding (verdict: review-blocked); blocking: false is a
+#   MAJOR finding that documents but does not block. An unrunnable gate is omitted from
+#   `verification` and noted in `risks` — never fabricated pass/fail. See config/schema.yaml
+#   for the full field reference.
+
 structure:
   source: "src/"
   tests: "src/**/*.test.ts"

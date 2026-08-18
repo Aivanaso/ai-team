@@ -6,9 +6,9 @@
 # mandatory `commit_strategy` (default auto) the first time the orchestrator
 # runs in a project with no config.yaml yet — there is no separate init
 # command in the organic route. The remaining keys below (`strict_tdd`,
-# `test_commands`, `model_overrides`, `rules`) are optional and safe-absent:
-# add them by hand, or accept them via the orchestrator's Config Refresh
-# Check. Canonical annotated source (same key set):
+# `test_commands`, `review_gates`, `model_overrides`, `rules`) are optional
+# and safe-absent: add them by hand, or accept them via the orchestrator's
+# Config Refresh Check. Canonical annotated source (same key set):
 # domain/skills/organic-scout/references/config-template.md.
 
 project:
@@ -48,6 +48,14 @@ commit_strategy: auto  # commit strategy for work-unit-commits: auto | manual
 #   unit: "{command}"       # e.g. "npm test" | "pytest" | "phpunit"
 #   security: "{command}"   # e.g. "npm audit" | "composer audit"
 #   Optional. See domain/skills/organic-scout/references/config-template.md for full semantics.
+
+# review_gates:
+#   - name: "{gate-id}"      # e.g. coverage, migration-lint
+#     command: "{command}"   # e.g. "npm run coverage -- --min 80"; exit 0 = pass. Threshold lives
+#                             # inside the command / project config, not in this key.
+#     blocking: true          # optional, default true
+#   Optional, safe-absent. Objective review gates executed by organic-reviewer (verification
+#   lens). See config/schema.yaml for full semantics.
 
 structure:
   source: "{src-dir}/"           # e.g., src/, app/, lib/

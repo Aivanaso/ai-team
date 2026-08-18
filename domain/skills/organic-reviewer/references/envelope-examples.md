@@ -84,7 +84,35 @@ model_used: "opus"
 context_resolution: self-loaded
 ```
 
-## Variant 4: blocked (missing context)
+## Variant 4: review-blocked, failing blocking `review_gates` entry
+
+```yaml
+status: ok
+executive_summary: "Review complete for payment-webhook. 1 CRITICAL finding: blocking review gate 'coverage' exited non-zero. Gate is blocked; override or re-engage required."
+group_id: payment-webhook
+artifacts: []
+tier: 1
+tier_reason: "tier 1: standard code change"
+lenses:
+  correctness:
+    status: findings
+    findings:
+      - { id: "F-1", severity: CRITICAL, file: ".ai-team/config.yaml", line: 34, claim: "review_gates entry 'coverage' ('<coverage check>') exited 1." }
+verification:
+  - { command: "<test suite>", exit_code: 0, outcome: pass }
+  - { command: "<coverage check>", exit_code: 1, outcome: fail, gate: "coverage" }
+overrides: []
+verdict: review-blocked
+suppressed_count: 0
+next_recommended:
+  - "override or re-engage"
+risks:
+  - "CRITICAL finding F-1 requires user override or re-engage before commit"
+model_used: "opus"
+context_resolution: self-loaded
+```
+
+## Variant 5: blocked (missing context)
 
 ```yaml
 status: blocked

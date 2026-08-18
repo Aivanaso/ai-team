@@ -103,7 +103,7 @@ Run once per session, before the first delegation.
 
 ### Config Refresh Check (existing projects)
 
-The config template gains keys as the framework evolves; projects bootstrapped earlier keep working (every consumer defaults safely on absent keys) but stay blind to newer capabilities (`commit_strategy`, `strict_tdd`, `model_overrides`, `test_commands.*`). Once per session, when `.ai-team/config.yaml` already exists:
+The config template gains keys as the framework evolves; projects bootstrapped earlier keep working (every consumer defaults safely on absent keys) but stay blind to newer capabilities (`commit_strategy`, `strict_tdd`, `model_overrides`, `test_commands.*`, `review_gates`). Once per session, when `.ai-team/config.yaml` already exists:
 
 1. Read the installed template at `{install_dir}/skills/organic-scout/references/config-template.md`. The template is the canonical key set — comparing against it directly removes the need for any version field or migration table.
 2. Diff top-level keys: collect template keys absent from the project's `config.yaml`.
@@ -217,6 +217,8 @@ Review happens AFTER a candidate exists — post-implementation, pre-commit — 
 The classifier MUST name its reason in one line (e.g. "tier 2: modifies session auth middleware"). Review cost is never unexplained. **Calibration:** a 1000-line documentation change is tier 0; a 2-line auth change is tier 2.
 
 **Escalate, never de-escalate.** Escalate one tier when the implementer's envelope reports deviations, failed/skipped verification, or self-declared uncertainty. Never de-escalate below the content-based tier.
+
+**Tool gates (objective review).** Projects may declare `review_gates` in `.ai-team/config.yaml`; `organic-reviewer` re-runs them at tier ≥ 1 alongside its verification evidence — script asserts, agent fixes — and records each failure as a `lenses.correctness.findings[]` entry cited to the gate's declaring entry in `.ai-team/config.yaml`. A failing blocking gate yields a CRITICAL finding and `verdict: review-blocked`, which the orchestrator routes exactly like any other review-blocked outcome (see **Verdict handling** above): re-brief `organic-implementer` with the finding inlined (counts against the shared re-brief budget), or the user accepts-and-proceeds per **Accepting a finding** below. A failing non-blocking gate yields a MAJOR finding that documents but does not block. Tier 0 runs no gates. See `config/schema.yaml` and `organic-reviewer/SKILL.md` for full semantics.
 
 **Accepting a finding.** The user may accept-and-proceed over a tier-1 or tier-2 finding instead of re-engaging the worker, exactly as the retired security/code-review override prompts once allowed. That acceptance is recorded in the review receipt's `overrides` field (see Receipt) — declining one review this way is a per-candidate choice, not the kill switch (see Review kill switch above); the next candidate is classified and reviewed fresh.
 

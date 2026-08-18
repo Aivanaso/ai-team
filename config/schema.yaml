@@ -7,10 +7,11 @@
 # writes only a subset of it verbatim on first bootstrap (project / stack /
 # conventions / structure / architecture / commit_strategy; see the next
 # entry below). The remaining keys in that template (strict_tdd,
-# test_commands, model_overrides, rules) are optional and safe-absent: added
-# by hand, or accepted via the orchestrator's Config Refresh Check. This file
-# is the flat schema reference layered on top: keys the orchestrator and
-# work-unit-commits read but organic-scout does not itself write.
+# test_commands, review_gates, model_overrides, rules) are optional and
+# safe-absent: added by hand, or accepted via the orchestrator's Config
+# Refresh Check. This file is the flat schema reference layered on top:
+# keys the orchestrator and work-unit-commits read but organic-scout
+# does not itself write.
 #
 # Model routing defaults and rationale are NOT duplicated here — read
 # domain/skills/_shared/orchestrator-protocol.md -> "Model Routing" (a
@@ -53,6 +54,22 @@
 #   Additional project-declared build/lint commands are re-run by
 #   organic-reviewer's verification lens when the Task Brief's
 #   acceptance_checks do not already cover them.
+
+# review_gates:
+#   - name: "<gate-id>"
+#     command: "<command>"   # exit 0 = pass; threshold lives inside the command / project config
+#     blocking: true          # optional, default true
+#   Optional, safe-absent. Read by organic-reviewer (SKILL.md Step 4) alongside the Task
+#   Brief's acceptance_checks re-run. Each gate command executes as an objective assertion —
+#   exit code only. A failing gate lands in `lenses.correctness.findings[]`; its `file`/`line`
+#   cite this gate's own `name:`/`command:` declaration above — always resolvable, so the 80%
+#   confidence threshold and the citation-suppression rule never apply to it (no exemption:
+#   the citation is simply always present). blocking: true (or blocking absent) is CRITICAL
+#   (verdict: review-blocked); blocking: false is MAJOR (documents, does not block). An
+#   unrunnable gate is omitted from `verification` and noted in `risks` — never fabricated
+#   pass/fail, same rule as an unrunnable acceptance_checks entry. Safe-absent: no gates
+#   declared -> organic-reviewer's verification re-run behaves exactly as before this key
+#   existed.
 
 # rules:
 #   - "<constraint>"

@@ -43,14 +43,29 @@ reached after {N}/{total} files; {M} files not reviewed". Return the partial ver
 
 ## Verification Check Cannot Be Re-Run
 
-**Condition:** A declared `acceptance_checks` command, or a `config.yaml`-declared build/lint
-command, cannot be executed in this environment (missing runner, no network, sandboxed tool).
+**Condition:** A declared `acceptance_checks` command, a `config.yaml`-declared build/lint
+command, or a `review_gates` entry cannot be executed in this environment (missing runner, no
+network, sandboxed tool).
 
 **Behavior:** Omit that command from `verification` — never fabricate `pass` or `fail` for a
 command that did not run. Note the gap in `risks`: "verification check '{command}' could not
-be re-run in this environment". This does not by itself block the verdict (the correctness
-lenses still resolve normally); it does mean the receipt's verification evidence is partial —
-record that plainly rather than padding the list.
+be re-run in this environment" (for an unrunnable `review_gates` entry, name the gate:
+"review gate '{name}' ('{command}') could not be re-run in this environment"). This does not
+by itself block the verdict (the correctness lenses still resolve normally); it does mean the
+receipt's verification evidence is partial — record that plainly rather than padding the list.
+
+## Failing Non-Blocking Gate
+
+**Condition:** A `review_gates` entry with `blocking: false` exits non-zero.
+
+**Behavior:** The command still runs and its outcome is recorded in `verification` (`outcome:
+fail`, `gate: "<name>"`) — objective evidence, never suppressed. Also record a MAJOR finding in
+`lenses.correctness.findings[]`, `file`/`line` citing the gate's declaring entry in
+`.ai-team/config.yaml` — the same container and citation shape as the blocking case (Decision
+Gates), just a lower severity. This finding alone never sets `verdict: review-blocked`
+(Decision Gates: verdict is `review-blocked` iff ≥ 1 CRITICAL finding exists). When no CRITICAL
+finding exists elsewhere in the run, the verdict stays `review-clear`; the failure is
+documented, not blocking.
 
 ## Verification Discrepancy
 

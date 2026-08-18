@@ -123,7 +123,7 @@ lenses:
     findings:
       - { id: "F-2", severity: CRITICAL | MAJOR | MINOR, file: "<path>", line: <int>, claim: "<one line>" }
 verification:
-  - { command: "<verbatim>", exit_code: 0, outcome: pass | fail }
+  - { command: "<verbatim>", exit_code: 0, outcome: pass | fail, gate: "<name>" }  # gate: optional, present only for review_gates outcomes
 overrides:                 # user-accepted findings, if any — omit entirely when empty
   - { finding_id: "F-1", justification: "<user-supplied, one sentence>" }
 ```
@@ -134,6 +134,7 @@ overrides:                 # user-accepted findings, if any — omit entirely wh
 - `lenses.security` is present only when Evidence-Tier Review activated `organic-security` (tier 2); omit it entirely for tier 1.
 - Every `findings[]` entry's `claim` MUST resolve to a `file:line` citation — this is the receipt-side half of the Citation audit in `orchestrator-protocol.md` → "Evidence-Tier Review"; a claim without a resolvable citation is a contract violation.
 - `overrides` is populated only when the user accepted-and-proceeded over a finding instead of re-engaging the worker; omit the field entirely when no override occurred.
+- A `verification[]` entry carrying `gate:` is an objective `review_gates` outcome from `.ai-team/config.yaml` — exit code only, never subject to the confidence threshold. A failing gate additionally lands as a `lenses.correctness.findings[]` entry: `file`/`line` cite the gate's declaring entry in `.ai-team/config.yaml` (always a resolvable citation, so the citation-suppression rule above never suppresses it), and `claim` names gate name + command + exit code. A failing blocking gate is CRITICAL and forces `verdict: review-blocked`; a failing non-blocking gate is MAJOR and does not block.
 - Tier 0 candidates produce no receipt — the result envelope alone is the record.
 
 ## Rules

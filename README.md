@@ -147,9 +147,9 @@ tracking and no `state.yaml`. A project accumulates these filesystem artifacts:
 
 - `.ai-team/config.yaml` — project stack, conventions, structure, architecture, and
   `commit_strategy` (default `auto`), written once by `organic-scout` on first bootstrap, then
-  read by every worker. Optional keys (`strict_tdd`, `test_commands`, `model_overrides`,
-  `rules`) are not written by bootstrap — they default safely when absent, and are added later
-  by hand or via the orchestrator's Config Refresh Check.
+  read by every worker. Optional keys (`strict_tdd`, `test_commands`, `review_gates`,
+  `model_overrides`, `rules`) are not written by bootstrap — they default safely when absent,
+  and are added later by hand or via the orchestrator's Config Refresh Check.
 - `.ai-team/skill-registry.md` and `.ai-team/.skill-registry.cache` — the stack/convention
   skill index and its freshness fingerprint, refreshed once per session (see the orchestrator
   protocol's Session Init → "Skill Registry Refresh").
