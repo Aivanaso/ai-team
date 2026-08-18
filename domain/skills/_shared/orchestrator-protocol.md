@@ -148,7 +148,7 @@ The canonical, author-side contract the orchestrator composes and inlines into t
 
 objective: "<one sentence — the observable outcome>"
 target_repo: "/abs/path/to/repo"          # exactly one repo (multi-repo → one brief each)
-allowed_edit_roots: ["<repo-relative dir>", "..."]   # never empty; no absolute paths, no ".."
+allowed_edit_roots: ["<repo-relative dir>", "..."]   # no ".", no absolute paths, no ".."; empty list legal only in the all-top-level-files case (Roots Computation)
 expected_files:
   - { action: CREATE, path: "<repo-relative path>" }
   - { action: MODIFY, path: "<repo-relative path>" }
@@ -160,7 +160,7 @@ out_of_scope:
   - "<explicit non-goal>"
 ```
 
-**Author-side invariants:** `allowed_edit_roots` is a **superset** of the containing directories of `expected_files`, per the Roots Computation algorithm below. Paths in the brief are repo-relative so the within-roots check runs on the same textual form the definition specifies (absolute paths and `..` segments are rejected by definition). A brief without `allowed_edit_roots` is `brief-incomplete` — there is no empty-roots fallback on this route.
+**Author-side invariants:** `allowed_edit_roots` is a **superset** of the containing directories of `expected_files` (a top-level, no-`/` entry contributes none — it is permitted by its own exact-path declaration instead, never by root membership; see **Roots Computation** below), per the Roots Computation algorithm below. Paths in the brief are repo-relative so the within-roots check runs on the same textual form the definition specifies (absolute paths and `..` segments are rejected by definition). A brief without the `allowed_edit_roots` field is `brief-incomplete` — there is no empty-roots fallback on this route (an empty *list* is legitimate only in the all-top-level-files case Roots Computation defines, never elsewhere).
 
 **Composition inversion — verify, don't compose.** When a discovery pass ran, the scout's `scope_proposal` (`organic-scout`'s Output Contract, discover mode) is the SOURCE of the brief's `expected_files` and `acceptance_checks` — the orchestrator verifies it against the Scope Verification Checklist below and copies it into the brief; it does not recompose the file list from its own reading. Adoption copies only the proposal's `action`/`path` pairs into `expected_files` and `command`/`expect` pairs into `acceptance_checks` — the brief's six-element YAML schema gains no new fields; the proposal's `evidence` and `verified:` keys stay in the scout's discovery report, which remains the audit trail, referenced from the Brief File's Amendments section. Discovery that will feed a Task Brief is always delegated to `organic-scout`, whose Evidence Protocol contract makes every claim citable — never to a bare general-purpose or Explore-style agent, whose uncited conclusions have twice contradicted raw evidence already in the orchestrator's hands. A discovery pass that returns without a `scope_proposal` block (the contract not honored — e.g. an older installed scout) routes to the no-discovery branch below: the orchestrator composes the brief itself against the same checklist, and records the gap in the Brief File's Amendments section.
 
@@ -184,7 +184,7 @@ Each item names its evidence; none may be skipped silently. **Failure consequenc
 |---|---|
 | Preamble | `You are the organic-implementer executor. …` (mirrors the agent template) |
 | `## Skill and Protocol Paths` | `{install_dir}/skills/organic-implementer/SKILL.md`, `{install_dir}/skills/_shared/context-protocol.md`, `…/persistence-contract.md`, `…/common-rules.md`, `…/result-envelope.md`, `…/evidence-protocol.md`, `…/orchestrator-protocol.md`. No `references_dir` — the skill is single-file. |
-| `## Injected Context` | `project_root` (= the brief's target repo), `model_alias: sonnet`, `current_iso_utc`, `install_dir` — all resolved per the Critical Context Forwarding table below |
+| `## Injected Context` | `project_root` (= the brief's target repo), `model_alias: sonnet`, `current_iso_utc`, `install_dir`, `amendment_requests_used`, `amendments_denied` — all resolved per the Critical Context Forwarding table below |
 | `## Task Brief` | the six-element YAML block (see **Task Brief** above) |
 | `## Skills to load before work` | forwarded from `.ai-team/skill-registry.md` **only when the brief's target repo is the session's project root**; omitted otherwise |
 | Mandatory tail | the verbatim UNTRUSTED CONTENT block in Critical Context Forwarding below — reused, not re-authored |
@@ -228,8 +228,17 @@ complete — this is the pause/resume state)
 ## Amendments
 (records Scope Verification Checklist events — a brief-feeding discovery that returned no
 `scope_proposal`, or an item the orchestrator closed with its own evidence — and, when a
-proposal fed this brief, a pointer to the scout's discovery report; "none" until the first.
-The general live-amendment channel ships in a later change.)
+proposal fed this brief, a pointer to the scout's discovery report; plus every `paused`
+scope-amendment request issued for a given objective, across every delegation and
+re-engage/replay that objective has had — not just the current one — tagged with its
+objective/`group_id` so a Brief File spanning more than one objective (one Task Brief block per
+objective, per the section above) can filter and count them independently per objective. Each
+scope-amendment entry records: approved or denied, the verifying evidence, the `artifacts` paths
+captured from the paused envelope at pause time, and, when approved, the `expected_files` entries
+it added, the recomputed `allowed_edit_roots`, any approved `proposed_checks`, and the running
+amendment count for that objective; when denied, the denied paths or gap ids — the source the
+orchestrator resolves the forwarded `amendments_denied` flag from (Critical Context Forwarding
+below) — see "Amendment ingestion" below. "none" until the first entry of either kind.)
 ## Close
 (written when status flips to done: totals — agents, tokens; re-brief count with causes;
 receipt reference(s); commit hashes)
@@ -243,7 +252,8 @@ The only execution route: the orchestrator composes a Task Brief (above) and del
 
 #### What comes back
 
-One bounded result envelope — never a prose summary. `organic-implementer` creates no commits: the orchestrator invokes `work-unit-commits` (the route's exclusive owner of commit creation, see Receipt and **work-unit-commits Invocation** below) with the injected context assembled per Critical Context Forwarding — a tier 0 candidate (or "review off") commits under ordinary policy, a tier ≥ 1 candidate requires the Review Receipt. When a skills block was forwarded, the envelope also reports `skill_resolution`. At every envelope ingestion the orchestrator appends one row to the Brief File's Cost Ledger and updates its Phases checkboxes (see **Task Brief** → "Brief File (durable copy)").
+One bounded result envelope per return — never a prose summary (a delegation that pauses returns
+its `paused` envelope first, then one terminal envelope). `organic-implementer` creates no commits: the orchestrator invokes `work-unit-commits` (the route's exclusive owner of commit creation, see Receipt and **work-unit-commits Invocation** below) with the injected context assembled per Critical Context Forwarding — a tier 0 candidate (or "review off") commits under ordinary policy, a tier ≥ 1 candidate requires the Review Receipt. When a skills block was forwarded, the envelope also reports `skill_resolution`. At every envelope ingestion the orchestrator appends one row to the Brief File's Cost Ledger and updates its Phases checkboxes (see **Task Brief** → "Brief File (durable copy)").
 
 Route the return by its `status`:
 
@@ -252,11 +262,111 @@ Route the return by its `status`:
 | `ok` and `artifacts` cover the expected-files set | Confirm each `artifacts` path exists on disk under `target_repo` — self-reported `artifacts` alone is not proof. Any path that fails this confirmation routes to the partial-run row below instead. Otherwise run the Specialist Activation Matrix against `artifacts`, resolve the tier (Evidence-Tier Review), delegate activated lenses, then commit. |
 | `ok` or `warning` but `artifacts` do **not** cover the expected-files set (partial run) | Do not activate lenses yet — resolve the gap first. A lens pointed at files a partial run never created returns a *false clear*. |
 | `warning` (checks failed, objective met, evidence of pre-existing failure) | Present `check_results`; the user decides re-brief / accept / stop; lenses run only once the objective's own checks pass. |
-| `needs_input` | Surface `questions`; amend the brief; re-delegate fresh — no addendum channel. Counts against the shared re-brief budget (see below). |
-| `blocked` | Route by `scope_report.kind`: `brief-incomplete`/`check-unrunnable` → amend the brief (or fix the environment) and re-delegate; `out-of-roots` → widen-or-stop (see Apply-Blocked Re-engage Routing below); `scope-exceeds-brief` → extend `expected_files`/roots and re-brief; `scope-large` → escalate to the user (offer an `organic-scout` discovery pass or splitting into multiple briefs); `check-failed` → present `check_results` and decide re-brief vs accept vs stop. Counts against the shared re-brief budget. |
+| `needs_input` | Surface `questions`; amend the brief; re-delegate fresh — no addendum channel. Counts against the shared re-brief budget (`paused` amendment requests do not — see Amendment ingestion below). |
+| `blocked` | Route by `scope_report.kind`: `brief-incomplete`/`check-unrunnable` → amend the brief (or fix the environment) and re-delegate; `out-of-roots` → widen-or-stop (see Apply-Blocked Re-engage Routing below); `scope-exceeds-brief` → extend `expected_files`/roots and re-brief; `scope-large` → escalate to the user (offer an `organic-scout` discovery pass or splitting into multiple briefs); `check-failed` → present `check_results` and decide re-brief vs accept vs stop. Counts against the shared re-brief budget (`paused` amendment requests do not — see Amendment ingestion below). |
+| `paused` | An intermediate, non-terminal envelope carrying `amendment_request` — route to **Amendment ingestion** below. Does not count against the shared re-brief budget. |
 | `failed` | Report; one re-brief at most, then escalate. |
 
-**Re-brief budget (DD-14):** every re-delegation for the same objective — regardless of which row above triggered it — counts against one shared, session-held counter of 2; the third re-delegation for that objective escalates to the user. `failed`'s "one re-brief at most" is a stricter local bound within the same shared counter.
+**Re-brief budget (DD-14):** every re-delegation for the same objective — regardless of which row above triggered it — counts against one shared, session-held counter of 2, with exactly two named exemptions: a `paused` amendment request (Amendment ingestion below) and an infra-death re-delegation (Infra-death policy below) consume none of this counter. The third counted re-delegation for that objective escalates to the user. `failed`'s "one re-brief at most" is a stricter local bound within the same shared counter.
+
+#### Amendment ingestion
+
+On `status: paused` with `amendment_request.kind: scope-amendment` (schema:
+`result-envelope.md` → "Intermediate envelope — paused"): first, fold the envelope's `artifacts`
+into `group_files` immediately, before answering — an abandoned or later-denied pause still
+leaves its pre-pause writes visible to any lens or `work-unit-commits` invocation for this
+candidate. (Disambiguation: the Brief File's frontmatter `status: paused`, task-level — interrupted
+or session ended mid-task — and the envelope's `status: paused`, delegation-level — this worker
+is waiting on one continuation message — are distinct states; the Brief File's `status` does not
+change while an amendment is pending.)
+
+0. **Count independently, before evidence review.** Count this objective's recorded
+   `scope-amendment` entries in the Brief File's `## Amendments` section (approved + denied,
+   across every delegation this objective has had, not just this one) — the cap is
+   **objective-scoped, not delegation-scoped**. On the 3rd such entry, deny outright without
+   evidence review and force terminal `blocked`, regardless of what the worker's own count or
+   `amendment_requests_used` claims. Inject the running total as `amendment_requests_used` into
+   this and every subsequent re-engage/replay prompt for the objective (Critical Context
+   Forwarding below).
+1. **Denylist check, evidence-independent.** Refuse any `proposed_expected_files` entry whose
+   path matches a protected class — the authoritative list is `result-envelope.md` →
+   "Intermediate envelope — paused" — without evidence review; the class match alone is
+   disqualifying. This governs `proposed_expected_files` only, never the original brief's own
+   `expected_files`, which the orchestrator declared directly, outside this channel.
+2. **Verify the request's evidence** for every surviving entry with the orchestrator's own
+   commands before answering — in the spirit of Scope Verification Checklist items 2/3 above,
+   spot-check at least one claim (e.g. grep the cited `path:line`, or run the cited command)
+   rather than trusting the request as proof.
+3. **Content-gate every `proposed_checks` entry before approval — safety, not merely
+   runnability.** Refuse regardless of its own `verified:` attestation when the command falls in
+   a refusal class: network access (`curl`/`wget`/`nc`, or any fetch piped to an interpreter),
+   state mutation outside the target repo, privilege escalation (`sudo`/`su`), or an interpreter
+   one-liner executing remote or generated content. For every surviving entry, EXECUTE the
+   command once — it must be side-effect-free by definition of an acceptance check — and approve
+   only on observed sane behavior; prefer a command resolvable to project-declared tooling
+   (`.ai-team/config.yaml` → `test_commands`, or a package-manifest script) and hold anything else
+   to heightened scrutiny. An entry failing this gate is struck from the approval; the amendment
+   may still approve the surviving `proposed_expected_files` entries.
+4. **Recompute derived state for the entries being approved**: `allowed_edit_roots` is
+   recomputed over the amended `expected_files` set (Roots Computation) — a top-level, no-`/`
+   approved entry never widens roots beyond its own path, per Roots Computation's top-level-files
+   rule, the same as at brief-authoring time — and `group_files` extends to include the approved
+   paths.
+5. **Record the amendment in the Brief File BEFORE sending the answer** — approved or denied,
+   with the verifying evidence, the recomputed `expected_files`/`allowed_edit_roots`, and the
+   running amendment count — in the `## Amendments` section. Recording first is the recovery
+   truth: an entry with no matching worker response is recoverable from disk; a response with no
+   entry is not.
+6. **Answer in ONE continuation message**: `AMENDMENT APPROVED` carries the COMPLETE updated
+   `expected_files` and `allowed_edit_roots` lists (verbatim, orchestrator-computed — the worker
+   adopts them and never computes roots itself) plus any approved `proposed_checks`, which are
+   also appended to the brief's `acceptance_checks` (Brief File copy too) so the worker runs them
+   like any declared check; or `AMENDMENT DENIED` (finish within original scope if the objective
+   still holds, else return terminal `blocked` with a `scope_report` composed for the denied
+   gap — this denial is final for that gap and never re-satisfies the pause condition again in
+   this delegation).
+
+Amendment requests do not consume the shared re-brief budget — the channel replaces the
+blocked→full-re-brief cycle for scope gaps the evidence already proves, it does not add to it.
+Neither does the disk-degradation re-delegation below, which carries the running
+`amendment_requests_used` count forward. The cap is 2 amendment requests **per objective** (not
+per delegation) and the orchestrator enforces it independently per step 0 above, regardless of
+what the worker self-reports — a 3rd forces terminal `blocked`.
+
+**Harness affordance.** Where the harness affords a live continuation to the paused worker, the
+approve/deny answer travels that way, and the worker's context stays alive to resume at its own
+Execution Steps. Where it does not, or the paused worker's session dies before the answer
+arrives, that is a death that returned one envelope but not a terminal one — route it through
+**Infra-death policy** below, which now governs exactly this case.
+
+#### Infra-death policy
+
+A delegation that dies without returning a **terminal envelope** (`ok | warning | needs_input |
+blocked | failed` — harness error, API failure, session kill) is not itself a `failed` envelope —
+there was no terminal result to route, and it does not consume the re-brief budget (there is
+nothing to learn a lesson from). **This includes a worker that dies while `paused`**: it returned
+one envelope, but a non-terminal one, so partial writes are CERTAIN, not merely possible (Execution
+Steps implement before the pause gate). Before re-delegating:
+
+1. **Verify tree state on disk** with orchestrator commands — `git status`/`git diff --stat`,
+   mtimes of the brief's expected paths — never assume a dead worker wrote nothing; a worker can
+   die after writing but before its envelope returns. Mandatory for every infra-death, including a
+   paused-worker death.
+2. **Re-delegate the ORIGINAL prompt verbatim** (per the Re-engage prompt block below) — an
+   infra-death is not evidence of a brief defect, so nothing about the brief changes. **Exception
+   for a paused-worker death:** the Brief File's recorded amendment state — approved entries, any
+   denial recorded for this objective, running amendment count — Amendment ingestion above — is
+   authoritative; the replay's `## Task Brief` block carries the amended
+   `expected_files`/`allowed_edit_roots` merged in as structured fields, not a prose note, and its
+   `## Injected Context` carries the running `amendment_requests_used` and `amendments_denied` —
+   one instance of the general always-fresh-fields rule (**Re-engage prompt block** below); a
+   denied gap stays denied across the replay.
+3. **Record the death** in the Brief File's Cost Ledger with outcome `infra-death` (tokens/tool
+   uses are unknown for that row — the harness never reported them).
+
+Two consecutive infra-deaths of the same delegation surface to the user before a third attempt —
+an environment problem, not a brief problem, past that point. This bound, and the tree-state
+verification above, cover a paused-worker death identically to any other infra-death.
 
 ## Evidence-Tier Review (post-candidate)
 
@@ -330,9 +440,9 @@ When a delegated worker's envelope carries a non-null `failure_class` (its own d
 
 ### Apply-Blocked Re-engage Routing (`scope_report.kind: out-of-roots`)
 
-When `organic-implementer` returns `status: blocked` with `scope_report.kind: out-of-roots`, present the user a **widen-or-stop** decision: (a) **widen** — approve the attempted path, add its containing directory to `allowed_edit_roots`, re-delegate with the wider roots re-injected; or (b) **stop** — treat the write as scope creep, keep the current roots and record the rejection. Either way this counts against the shared re-brief budget.
+When `organic-implementer` returns `status: blocked` with `scope_report.kind: out-of-roots`, present the user a **widen-or-stop** decision: (a) **widen** — approve the attempted path; if it has a containing directory, add that directory to `allowed_edit_roots` — a top-level, no-`/` path adds no root and is permitted by its own exact-path declaration in `expected_files` instead (Roots Computation) — re-delegate with the wider roots (and the extended `expected_files` entry) re-injected; or (b) **stop** — treat the write as scope creep, keep the current roots and record the rejection. Either way this counts against the shared re-brief budget.
 
-**Re-engage prompt block.** Every re-delegation for the same objective inlines a `## Re-engage Reason` block into the fresh delegation prompt, naming: the prior run's outcome (`status` + one-line cause), the specific evidence (file:line, command + exit code, or finding IDs), and the exact fix expected. This keeps a re-brief a single self-contained delegation rather than a live-agent addendum (see Synchronous delegation below).
+**Re-engage prompt block.** Every re-delegation for the same objective inlines a `## Re-engage Reason` block into the fresh delegation prompt, naming: the prior run's outcome (`status` + one-line cause), the specific evidence (file:line, command + exit code, or finding IDs), and the exact fix expected. This keeps a re-brief a single self-contained delegation rather than a live-agent addendum (see Synchronous delegation below). A re-brief carries the ORIGINAL delegation prompt VERBATIM — including its `## Skill and Protocol Paths`, `## Injected Context`, and every other injected block — with the `## Re-engage Reason` prepended, **except the always-fresh injected-context fields, which are re-resolved at every re-engage: `current_iso_utc`, `amendment_requests_used`, and `amendments_denied`** (the paused-death replay's carve-out, Infra-death policy step 2 above, is one instance of this general rule); re-writing a re-brief from scratch loses fields silently (this is also the recovery path an infra-death or a paused-worker death falls back to — see Infra-death policy and Amendment ingestion above).
 
 ## Model Routing
 
@@ -376,11 +486,42 @@ Omit shared protocol paths the worker does not reference in its SKILL.md Referen
 
 ### Synchronous delegation — no live-agent continuation
 
-Every delegation is a **synchronous, named-type `Agent` delegation**: it reads its SKILL.md + protocols from disk, writes the files its brief declares, returns one envelope, and **terminates**. There is no persistent agent to continue afterward. **`SendMessage` / live-agent continuation is not part of this framework** (and may not be a registered tool in the harness at all). When the `Agent` tool's own description advertises "use SendMessage to continue a spawned agent," that is a harness affordance, not a framework path.
+One-shot synchronous delegation remains the **default**, and the terminal-envelope contract is
+unchanged: every delegation is a **synchronous, named-type `Agent` delegation**: it reads its
+SKILL.md + protocols from disk, writes the files its brief declares, returns one terminal
+envelope (`ok | warning | needs_input | blocked | failed`), and **terminates**. There is no
+persistent agent to continue after a terminal envelope. **`SendMessage` / free-form live-agent
+continuation is not part of this framework** (and may not be a registered tool in the harness at
+all). When the `Agent` tool's own description advertises "use SendMessage to continue a spawned
+agent," that is a harness affordance, not a general framework path.
 
-**Why synchronous-only:** the handoff is disk (the repo diff + the envelope), so every adapter behaves identically — tool-agnostic, matching gentle-ai's isolated one-shot contexts + backend-state handoff + re-run-once-with-feedback pattern. A continued live agent would also re-accumulate context (the lost-in-the-middle effect disk-read delegation exists to avoid) and lose recoverability — disk state survives compaction/restart, a live agent's in-memory context does not.
+**The one exception: the scope-amendment channel.** A worker's `status: paused` envelope
+(schema: `result-envelope.md` → "Intermediate envelope — paused") is not terminal — it keeps the
+delegation's context alive, waiting on exactly ONE orchestrator continuation message per
+amendment request (`AMENDMENT APPROVED` / `AMENDMENT DENIED`, per Amendment ingestion above), and
+resumes on that single answer. No other live continuation exists on this route: no
+drip-feeding instructions across multiple messages, and no addendum channel after a *terminal*
+envelope returns — that path remains re-engage-fresh (a brand-new delegation) per the Re-engage
+prompt block below, never a live continuation of the terminated agent.
 
-**Handling a small addendum after a candidate returns:** the orchestrator does not edit application code inline — re-engage the worker fresh with the delta inlined (a `## Re-engage Reason` block, see Re-engage Routing above). Inline code edits bypass Evidence-Tier Review and work-unit-commits' exclusive git ownership. Batch, don't drip: collect every gap found in one pass into a single re-engage rather than a per-gap message.
+**Why synchronous-only (still holds, amendment channel included):** the handoff is disk (the
+repo diff + the envelope), so every adapter behaves identically — tool-agnostic, matching
+gentle-ai's isolated one-shot contexts + backend-state handoff + re-run-once-with-feedback
+pattern. Disk is still the recovery truth for the amendment channel too: if a `paused` worker
+dies before its continuation message arrives, that is an infra-death (**Infra-death policy**
+above now governs it explicitly) — the Brief File's `## Amendments` entry plus its recorded
+amendment state are what the tree-verified replay carries forward, nothing the live channel
+carried was ever the sole record. A continued live agent outside this one exception would
+re-accumulate context (the lost-in-the-middle effect disk-read delegation exists to avoid) and
+lose that recoverability.
+
+**Handling a small addendum after a *terminal* candidate returns:** the orchestrator does not
+edit application code inline — re-engage the worker fresh with the delta inlined (a `## Re-engage
+Reason` block, see Re-engage Routing above). Inline code edits bypass Evidence-Tier Review and
+work-unit-commits' exclusive git ownership. Batch, don't drip: collect every gap found in one
+pass into a single re-engage rather than a per-gap message. This addendum rule is unchanged by
+the amendment channel — it governs only what happens after a *terminal* envelope; a `paused`
+envelope is answered per Amendment ingestion above, not re-engaged fresh.
 
 ### Critical Context Forwarding
 
@@ -397,6 +538,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `references_dir` | `skills/{name}/references/` (literal, not project-relative) | every delegation | when the skill has one |
 | `skills_to_load` | `.ai-team/skill-registry.md` — match rows against the brief's stack + `expected_files` paths; forward matching `Path` values | organic-implementer | when the registry exists and ≥1 row matches; omit the block on zero matches |
 | `allowed_edit_roots` | the brief's `expected_files` (Roots Computation below) | organic-implementer | always — the brief always declares roots |
+| `amendment_requests_used` / `amendments_denied` | count of this objective's recorded `scope-amendment` entries, and the list of gaps (path or gap-id) recorded as denied, both from the Brief File's `## Amendments` section (0 / empty list if none yet) | organic-implementer | always — every delegation and re-engage/replay for the objective, so the worker's own counter and denied-gap gate start from the true objective-wide state, never from zero |
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` | organic-implementer | if config sets it |
 | `scope_proposal` | orchestrator's decision at delegation time | organic-scout | always when the discovery pass will feed a Task Brief (an on-demand inspection that feeds no brief may omit it) |
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
@@ -427,11 +569,11 @@ This block closes the channel between hostile repo content and an agent armed wi
 
 **Algorithm:** for every entry in the brief's `expected_files` list, take its `path` and drop the last `/`-segment (its containing directory). **All action types contribute** — CREATE, MODIFY, and REMOVE paths each contribute their containing directory. `allowed_edit_roots` is the **union** (de-duplicated set) of those containing directories.
 
-**Top-level files (no directory component):** a declared path with no `/` has the repo root as its containing directory; represent it as the sentinel `.`. A root of `.` contains every relative target, so for that entry the gate **degrades to inactive** — the top-level declared path stays permitted by its own declaration, rather than collapsing to an empty-string root that would match nothing and false-block the declaring write.
+**Top-level files (no directory component), globally:** a declared path with no `/` contributes NO root at all — never the sentinel `.` — anywhere this algorithm runs: the original brief, the Apply-Blocked widen branch, or Amendment ingestion's recompute step alike. `allowed_edit_roots` never contains `.`. Such a path is permitted only by its own exact-path declaration in `expected_files` — see the exception clause in Within-roots definition immediately below — never by root membership, so one top-level entry can never widen write access beyond itself.
 
-**Within-roots definition (segment-prefix, normalized):** normalize each root and the candidate target path by (1) stripping a single leading `./`, (2) stripping any trailing `/`. A target `T` is **within** a root `R` iff `T == R` OR `T` begins with the literal string `R + "/"`. Requiring that `/` separator after the root keeps a partial-name sibling outside: `src/foobar` stays outside root `src/foo`. `T` is within the set if it is within at least one root. A target containing any `..` path segment, or an absolute path (leading `/`), is **outside all roots by definition** — reject it without prefix comparison. The guard never resolves `..`; it rejects it, which closes textual-prefix bypasses like `src/foo/../../etc`.
+**Within-roots definition (segment-prefix, normalized):** normalize each root and the candidate target path by (1) stripping a single leading `./`, (2) stripping any trailing `/`. A target `T` is **within** a root `R` iff `T == R` OR `T` begins with the literal string `R + "/"`. Requiring that `/` separator after the root keeps a partial-name sibling outside: `src/foobar` stays outside root `src/foo`. `T` is within the set if it is within at least one root. **Exception — top-level declared files:** a target `T` that exactly matches a declared top-level (no-`/`) `expected_files` entry is permitted by that declaration alone, independent of `allowed_edit_roots` membership; this exception authorizes only that literal path, never a sibling or any other relative target — it is not a root and contributes none. A target containing any `..` path segment, or an absolute path (leading `/`), is **outside all roots by definition** — reject it without prefix comparison. The guard never resolves `..`; it rejects it, which closes textual-prefix bypasses like `src/foo/../../etc`.
 
-**No empty-roots fallback on this route:** unlike the retired tasks.md-derived computation, a brief always declares roots; a brief without `allowed_edit_roots` is `brief-incomplete`.
+**No empty-roots fallback on this route:** unlike the retired tasks.md-derived computation, a brief always declares the `allowed_edit_roots` field; `allowed_edit_roots` itself may be the empty list only when every `expected_files` entry is a top-level file (each permitted by its own exact-path declaration above, per the Within-roots exception) — a brief with the field absent entirely is still `brief-incomplete` either way.
 
 ### Context Resolution Feedback
 

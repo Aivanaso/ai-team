@@ -142,7 +142,10 @@ that follows the model above.
 ## Persistence
 
 Every delegated worker is stateless: it reads its skill file and the delegation prompt, writes
-the files its brief declares, and returns one bounded result envelope. There is still no
+the files its brief declares, and returns one bounded result envelope (the scope-amendment
+channel's `paused` envelope is the sole non-terminal, mid-delegation exception — see
+`domain/skills/_shared/orchestrator-protocol.md` → "Synchronous delegation — no live-agent
+continuation"). There is still no
 `state.yaml` — phase tracking now lives in the orchestrator's Brief File checkboxes
 (see `domain/skills/_shared/orchestrator-protocol.md` → "Task Brief" → "Brief File (durable
 copy)"). A project accumulates these filesystem artifacts:

@@ -9,7 +9,7 @@ Every sub-agent MUST return results in this format. The orchestrator ingests ONL
 ## Format
 
 ```yaml
-status: ok | warning | blocked | failed
+status: ok | warning | needs_input | blocked | failed  # + paused, intermediate only — see "Intermediate envelope — paused"
 executive_summary: "1-3 sentence summary of what was done and key findings"
 artifacts:
   - name: "endpoint"
@@ -33,6 +33,10 @@ risks:
 | `needs_input` | Cannot proceed — user input is too vague or incomplete | Show questions to user, re-run agent with clarified input |
 | `blocked` | Cannot proceed — missing dependency or technical blocker | Ask user for resolution |
 | `failed` | Unrecoverable error | Report to user, suggest retry or alternative |
+
+These five are the only **terminal** values — every skill execution resolves to exactly one of
+them. One additional, non-terminal value, `paused`, exists solely for the scope-amendment
+channel a skill's own contract may authorize — see "Intermediate envelope — paused" below.
 
 ### `executive_summary` (REQUIRED)
 
@@ -105,6 +109,76 @@ SKILL.md) rather than reusing this base schema verbatim — bounded evidence (`c
 capped digests) instead of a raw-stdout evidence field, and `scope_report` instead of a
 structured deviation block. See that skill's Output Contract for its complete field set.
 
+## Intermediate envelope — paused
+
+Terminal statuses (`ok | warning | needs_input | blocked | failed`) are unchanged and remain
+terminal — every skill execution still resolves to exactly one of those five. A worker whose own
+skill contract authorizes it — currently only `organic-implementer` — may additionally emit ONE
+intermediate envelope kind, `status: paused`, when a scope gap surfaces mid-execution: not a
+sixth terminal value, but a request that keeps the delegation open for one orchestrator
+continuation message.
+
+```yaml
+status: paused                       # not terminal — the worker is waiting for one orchestrator continuation message
+artifacts:                           # REQUIRED — files already written before pausing (Execution Steps implement before the pause gate, so partial writes are certain, not merely possible) — CAP 25 entries, same shape/cap discipline as the terminal artifacts field
+  - { name: "<short label>", path: "<repo-relative path>" }
+artifacts_omitted: 0                 # >0 only when the cap was hit
+amendment_request:
+  kind: scope-amendment
+  reason: "<one sentence — which brief element the evidence outgrew>"
+  evidence: "<path:line / command + output digest that proves the gap>"
+  proposed_expected_files:           # CAP 10 entries — same shape/cap discipline as scope_report.needed_files — never a protected-class path, see denylist below
+    - { action: CREATE|MODIFY|REMOVE, path: "<repo-relative path>", evidence: "<path:line — why>" }
+  proposed_checks: []                # optional, same shape as acceptance_checks — each entry carries verified: "<how runnability was proven>" (organic-scout's proposed_checks discipline) PLUS an orchestrator content/safety gate before approval, side-effect-free and preferring project-declared tooling — refusal classes (network access, state mutation outside the target repo, privilege escalation, interpreter one-liners over remote/generated content) refused regardless of attestation; see orchestrator-protocol.md → Amendment ingestion
+  cost_of_denial: "<one line — what the objective loses if denied>"
+executive_summary: "1-2 sentences"
+model_used: "..."
+context_resolution: ...
+```
+
+**Protected-path denylist (authoritative — the single source both sides of the channel
+reference).** `proposed_expected_files` may never name a path matching one of these classes; a
+class match is disqualifying on its own, independent of how well-cited the entry's evidence is:
+
+- VCS internals (`.git/` and everything under it, including hooks)
+- CI/CD pipeline configs (`.github/`, `.gitlab-ci*`, `Jenkinsfile`, and equivalents)
+- Agent-config roots (`.claude/`, `.opencode/`, `.agents/`, `.ai-team/`)
+- Framework/tooling executable scripts — install and bootstrap scripts (`scripts/install.sh`,
+  `adapters/*/install.sh` and equivalents) and shared-protocol script directories
+  (`domain/skills/_shared/scripts/` and installed equivalents such as
+  `{install_dir}/_shared/scripts/`) — these include the BLOCKING citation-audit gate
+  (`orchestrator-protocol.md` → "Citation audit"); a worker writable there can neuter the review
+  plane
+- Every class `common-rules.md` → Principle 2 already names read-only for every delegated skill
+  (shared protocols, SKILL.md files, project config files, CI/CD pipelines)
+
+This denylist governs `proposed_expected_files` only — a worker-proposed widening of scope —
+never the original brief's own `expected_files`, which the orchestrator declares directly,
+outside this channel. `organic-implementer`'s matching Hard Rule and the orchestrator's Amendment
+ingestion (both in their own files) cross-reference this list rather than repeating it.
+
+**Rules:**
+- The cap is 2 `paused` envelopes **per objective**, not per delegation — the orchestrator
+  independently counts this objective's recorded `scope-amendment` entries and injects the
+  running total as `amendment_requests_used` into every delegation and re-engage/replay prompt
+  for the objective (`orchestrator-protocol.md` → Critical Context Forwarding); this skill's own
+  counter starts from that injected value, never from zero on a re-engage. A third scope gap for
+  the same objective, or a gap already denied — in this delegation or per the injected
+  `amendments_denied` — is a terminal `blocked` with `scope_report` (`kind: scope-exceeds-brief`
+  or `scope-large`) — never a third pause, and a denied gap never re-enters the pause condition.
+- The orchestrator's answer arrives as a single continuation message in the same delegation, not
+  a fresh delegation: `AMENDMENT APPROVED` (carrying the COMPLETE updated `expected_files` and
+  `allowed_edit_roots` verbatim, plus any approved `proposed_checks` — the worker adopts these
+  lists, never derives its own) or `AMENDMENT DENIED` (with the instruction to finish within the
+  original scope or return a terminal `blocked`).
+- An amendment request never asks a design question. A design question always remains
+  `status: needs_input` (terminal) — `scope-amendment` is scoped to file/root gaps the evidence
+  already proves, never to open decisions.
+- A `paused` envelope does not consume the shared re-brief budget (DD-14,
+  `orchestrator-protocol.md`) — see `orchestrator-protocol.md` → "Amendment ingestion" for the
+  orchestrator-side handling, including folding `artifacts` into `group_files` immediately on
+  receipt and the infra-death path for a worker that dies mid-pause.
+
 ## Review Receipt
 
 Produced by `organic-reviewer` for every candidate Evidence-Tier Review classifies as tier ≥ 1 (schema: `orchestrator-protocol.md` → "Evidence-Tier Review"). Consumed by `work-unit-commits` (commit gate) and the orchestrator (routing, Re-engage Routing on `failure_class`). An absent receipt for a tier ≥ 1 candidate is a hard block on commit — `work-unit-commits` refuses without it.
@@ -174,6 +248,26 @@ scope_report:
 next_recommended: ["extend expected_files and allowed_edit_roots, then re-brief"]
 risks:
   - "Objective may need a wider brief before implementation can proceed"
+model_used: "sonnet"
+context_resolution: "self-loaded"
+```
+
+### Paused — Scope Amendment Requested
+
+```yaml
+status: paused
+artifacts:
+  - { name: "endpoint (partial)", path: "services/billing/export.py" }
+artifacts_omitted: 0
+amendment_request:
+  kind: scope-amendment
+  reason: "Export totals require the tax module's rounding helper; not in expected_files."
+  evidence: "services/billing/export.py:88 calls Tax::round(), defined at services/billing/tax.py:12"
+  proposed_expected_files:
+    - { action: MODIFY, path: "services/billing/tax.py", evidence: "services/billing/export.py:88 calls the undeclared Tax::round() helper" }
+  proposed_checks: []
+  cost_of_denial: "Export totals round incorrectly; the billing-export objective fails its own acceptance check."
+executive_summary: "Billing-export implementation paused pending one file addition; awaiting the orchestrator's amendment decision."
 model_used: "sonnet"
 context_resolution: "self-loaded"
 ```
