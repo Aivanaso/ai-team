@@ -1,6 +1,6 @@
 # ai-team — Claude Code Adapter
 
-Install the ai-team SDD framework for use with Claude Code.
+Install the ai-team organic evidence-tiered delegation framework for use with Claude Code.
 
 ## Install
 
@@ -18,8 +18,8 @@ Claude Code must be installed and `~/.claude/` must exist. The installer aborts 
 
 ## What the install does
 
-1. **Copies skills** from `domain/skills/` to `~/.claude/skills/sdd-*/` and `~/.claude/skills/_shared/`
-2. **Rewrites skill paths** in `~/.claude/skills/_shared/sdd-orchestrator-protocol.md` — relative `skills/` references become absolute `~/.claude/skills/` paths so Claude can read them without knowing the repo location
+1. **Copies skills** from `domain/skills/` to `~/.claude/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits}/` and `~/.claude/skills/_shared/`
+2. **Rewrites skill paths** in `~/.claude/skills/_shared/orchestrator-protocol.md` — relative `skills/` references become absolute `~/.claude/skills/` paths so Claude can read them without knowing the repo location
 3. **Injects orchestrator content** from `adapters/claude-code/templates/CLAUDE.md` inline into `~/.claude/CLAUDE.md`, between `<!-- ai-team:orchestrator -->` and `<!-- /ai-team:orchestrator -->` markers
 
 User content outside the markers is never modified.
@@ -28,23 +28,17 @@ User content outside the markers is never modified.
 
 Safe to re-run after pulling new changes. The installer:
 - Replaces the existing orchestrator block between markers (marker-based injection, no drift)
-- Skips the path-rewrite sed if `~/.claude/skills/` is already in the protocol file (guard prevents double-prefixing)
+- Wipes and re-copies each skill directory (including `_shared/`) on every run, so stale files *inside* a still-shipped skill are cleared automatically
+- Writes `~/.claude/.ai-team-manifest` listing every installed path; on the next run, paths present in the previous manifest but gone from the source are pruned. Limitation: a pre-manifest install (no `.ai-team-manifest` yet) is never pruned on its first run — skills or agents that a newer framework version removed must be deleted manually once, or delete `~/.claude/skills/` + the framework's `~/.claude/agents/*.md` and re-install
 
-## Slash commands
+## No slash commands
 
-Claude Code users invoke the SDD pipeline as:
-
-```
-/ai-team new <change>      # Start a new SDD change
-/ai-team continue          # Resume an active change
-```
-
-These are implemented as slash commands in `~/.claude/CLAUDE.md` (via the injected orchestrator section). The commands route through the orchestrator to SDD sub-agents delegated via the `Agent` tool.
+The organic route has no pipeline entry commands. Delegation is conversational: the orchestrator stub in `~/.claude/CLAUDE.md` classifies every request (Small/Medium/Large) and delegates to `organic-implementer`, with review and commit gated by evidence tier — see `~/.claude/skills/_shared/orchestrator-protocol.md` for the full model.
 
 ## Note on adapters
 
-Claude Code slash commands use the `/ai-team` namespace (`/ai-team new`, `/ai-team continue`). OpenCode users invoke the same SDD pipeline via `/sdd-new`, `/sdd-continue`. The underlying pipeline and skill files are identical — only the invocation layer differs.
+Both adapters install the same `domain/skills/` source, so the delegation model and skill files are identical — only the invocation surface differs (Claude Code: conversational, via the `CLAUDE.md` stub; OpenCode: conversational, via `AGENTS.md` and the primary agent).
 
 ## Uninstall
 
-Remove the orchestrator block from `~/.claude/CLAUDE.md` (between the markers) and delete `~/.claude/skills/` (or just the `sdd-*` and `_shared` subdirectories). The installer does not provide an automated uninstall command.
+Remove the orchestrator block from `~/.claude/CLAUDE.md` (between the markers) and delete `~/.claude/skills/` (or just the `organic-*`, `work-unit-commits`, and `_shared` subdirectories) plus `~/.claude/agents/*.md`. The installer does not provide an automated uninstall command.

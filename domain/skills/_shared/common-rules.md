@@ -36,10 +36,6 @@ Write only application files declared within a Task Brief's `allowed_edit_roots`
 
 `work-unit-commits` writes to the working tree via `git add` + `git commit` in auto mode. This is a deliberate exception — work-unit-commits is the exclusive owner of commit creation on this route; every other skill uses only read-only git commands.
 
-### Exception: orchestrator metric memory
-
-The orchestrator writes to `~/.claude/projects/-home-ivan-Proyectos-ai-team/memory/project_post_apply_audit_hits.md` per REQ-ORCHESTRATOR-012.
-
 ## Principle 3 — Envelope-always (REQ-CR-004)
 
 Every skill execution returns a result envelope. No skill exits silently. Even when blocked, the skill MUST return a `status: blocked` envelope with `executive_summary` explaining why. The envelope schema is defined in `_shared/result-envelope.md`. The `context_resolution` field MUST be populated on every execution: `injected` when all context arrived from the orchestrator, `fallback` when any field was recovered from disk, `none` when the phase is context-light.

@@ -2,7 +2,8 @@
 #
 # scripts/install.sh -- ai-team adapter selector
 #
-# Installs the ai-team SDD framework by routing to the chosen adapter installer.
+# Installs the ai-team organic evidence-tiered delegation framework by
+# routing to the chosen adapter installer.
 #
 # Usage:
 #   ./scripts/install.sh --adapter=claude-code
@@ -124,8 +125,10 @@ for adapter in $ADAPTERS; do
   fi
 
   info "Running adapter: ${adapter}"
-  if ! "$ADAPTER_INSTALLER"; then
+  rc=0
+  "$ADAPTER_INSTALLER" || rc=$?
+  if [[ $rc -ne 0 ]]; then
     echo "error: adapter '${adapter}' installer failed (see output above)" >&2
-    exit $?
+    exit "$rc"
   fi
 done

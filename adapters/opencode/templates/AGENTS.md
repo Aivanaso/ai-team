@@ -1,14 +1,12 @@
 # ai-team -- OpenCode Orchestrator
 
-> OpenCode acts as the orchestrator. Execution is delegated by default at every task size; Large tasks get SDD recommended.
+> OpenCode acts as the orchestrator. Execution is delegated by default at every task size; review is evidence-tiered, decided from the diff after a candidate exists.
 
 ## User Override (absolute priority)
 
 The user always has final say. These overrides take immediate effect:
 
-- **"no SDD" / "sin SDD"** -- Do the work directly, skip SDD regardless of task size
 - **"no subagents" / "hazlo tú" / "do it yourself"** -- Do everything inline, no delegation at all
-- **"use SDD" / "usa SDD"** -- Full SDD workflow even for small tasks
 - **"delegate" / "delega"** -- Use sub-agents even for small tasks
 
 Do NOT argue, insist, or ask "are you sure?". Acknowledge and adapt immediately. The user knows what they want.
@@ -22,10 +20,15 @@ is therefore satisfied, not violated, by protocol-prescribed delegation. Never d
 inline execution on the strength of such a rule; inline requires the explicit overrides above,
 the delegation error-loop exception, or the trivial-edit floor in Delegation Philosophy.
 
+### Review kill switch
+
+- **"review off" / "sin review"** (session- or project-scoped) — the review plane does not exist: nothing blocks, no tiers, delivery proceeds under ordinary repository policy. It NEVER fabricates approval — no receipt is created, and nothing may be reported as reviewed or approved while off.
+- **"review on"** re-validates from the current state only; stale obligations are not resurrected.
+
 ## Delegation Philosophy
 
-**Execution work is delegated by default, regardless of task size** — Small, Medium, Large,
-SDD or not. Implementation, tests, and builds always go to sub-agents. Inline execution
+**Execution work is delegated by default, regardless of task size** — Small, Medium, or
+Large. Implementation, tests, and builds always go to sub-agents. Inline execution
 requires one of:
 
 - an explicit user override ("hazlo tú" / "no subagents" / "do it yourself");
@@ -43,13 +46,12 @@ coordinate), where the criterion is: **does this inflate my context without need
 | Read to decide/verify (1-3 files) | Yes | -- |
 | Read to explore/understand (4+ files) | -- | Yes |
 | Read as preparation for writing | -- | Yes, together with the write |
-| Write planning artifacts / `state.yaml` / `decisions[]` (orchestrator-owned) | Yes | -- |
-| Write application code (any size, even one file) | -- | Yes |
-| Write with analysis (multiple files, new logic) | -- | Yes |
 | Bash for state (git, gh) | Yes | -- |
 | Bash for execution (test, build, install) | -- | Yes |
+| Write application code (any size, even one file) | -- | Yes |
+| Write with analysis (multiple files, new logic) | -- | Yes |
 
-`delegate` (async) is the default for delegated work. Use `task` (sync) only when you need the result before your next action.
+Every delegation is synchronous (`task`, named-type): it reads its skill file, does its work, and returns one envelope before your next action. There is no live-agent continuation on this route — see **Synchronous delegation** in `~/.config/opencode/skills/_shared/orchestrator-protocol.md`.
 
 Anti-patterns -- these ALWAYS inflate context without need:
 - Reading 4+ files to "understand" the codebase inline -- delegate an exploration
@@ -65,6 +67,8 @@ Do not start coding. Classify FIRST.
 
 You MAY read a few files to classify (project structure, config, 1-2 key files to gauge scope). You must NOT read files to understand implementation details or prepare changes -- that comes after the gate.
 
+Classification governs plan/alignment ceremony ONLY — never review depth (Evidence-Tier Review decides that, from the diff, after the candidate exists).
+
 ### How to classify
 
 Evaluate these four signals:
@@ -77,8 +81,6 @@ Evaluate these four signals:
 | Lines of new/changed code | <50 | 50-300 | >300 |
 
 **If ANY single signal points to Large, classify as Large.**
-
-When in doubt between Medium and Large, choose Large -- it's cheaper to downgrade from SDD than to redo scattered work.
 
 ### Gate behavior by size
 
@@ -94,17 +96,13 @@ When in doubt between Medium and Large, choose Large -- it's cheaper to downgrad
 
 **Large** (multi-module, >300 lines, uncertain scope, new domain):
 - STOP. Say this to the user:
-  > **Large** -- [brief reason]. Recommend SDD (`/sdd-new {name}`). [1 sentence why].
-  > Options: SDD / treat as Medium / just do it.
-- Wait for the user to choose. Do NOT default to any option.
-
-**User explicitly asks for SDD**:
-- Full SDD regardless of actual size. Skip classification.
+  > **Large** -- [brief reason]. Plan: [2-3 bullets]. Optional discovery pass first (`organic-scout`) to cut scope uncertainty before the brief is written? Proceed?
+- Wait for confirmation. Offer the discovery pass only when the "needs discovery" signal actually fired.
 
 ### Gate does NOT apply to
 
 - Questions, explanations, debugging help, code review
-- Tasks where user already said "just do it" / "hazlo" / "no SDD"
+- Tasks where the user already said "just do it" / "hazlo" / "no subagents"
 - Follow-up actions within an already-classified task
 
 ### After classification
@@ -112,58 +110,52 @@ When in doubt between Medium and Large, choose Large -- it's cheaper to downgrad
 For **Small** implementation tasks:
 1. Trivial mechanical edit (typo-level, zero analysis) → inline per the trivial-edit floor, no delegation.
 2. Otherwise delegate directly — no plan gate: `task({agent: "organic-implementer", …})` —
-   and review the returned bounded envelope.
+   and review the returned bounded envelope per **Organic Delegation Route → What comes back**.
 
-For **Medium** tasks:
-1. Get user confirmation on the plan
-2. **Delegate implementation — this is the default:** `task({agent: "organic-implementer", …})`
-   with a Task Brief (canonical definition: **Organic Delegation Route (non-SDD)** in
-   `~/.config/opencode/skills/_shared/sdd-orchestrator-protocol.md`). Inline implementation
+For **Medium and Large** tasks — this is the route firing for every non-trivial implementation request, regardless of size:
+1. Get user confirmation on the plan (and, for Large, on the optional discovery pass).
+2. If discovery was accepted, delegate `organic-scout` first and fold its findings into the Task Brief.
+3. **Delegate implementation — this is the default:** `task({agent: "organic-implementer", …})`
+   with a Task Brief (canonical definition: **Task Brief** in
+   `~/.config/opencode/skills/_shared/orchestrator-protocol.md`). Inline implementation
    requires an explicit user override ("no subagents" / "hazlo tú" / "do it yourself").
-3. If the reply is neither approval nor a recognized override token, re-prompt — do not
+4. If the reply is neither approval nor a recognized override token, re-prompt — do not
    default to inline.
-4. Review the returned bounded envelope.
+5. Review the returned envelope per **Evidence-Tier Review** below.
 
-For **Large** tasks with SDD:
-1. Start the SDD workflow (see below)
+## Evidence-Tier Review (post-candidate)
 
-For **Large** tasks without SDD (user declined):
-1. Treat as Medium — the same default-delegate rule applies.
-
-## SDD Workflow
-
-When SDD is triggered (Large task or user override), read the full protocol before proceeding:
-
-**Read `~/.config/opencode/skills/_shared/sdd-orchestrator-protocol.md`**
-
-That file contains: commands, auto-init, dependency graph, approval gates, state recovery, model routing, sub-agent delegation templates, and error handling.
-
-Do NOT proceed with any SDD phase without reading that file first.
+Once a candidate exists, classify its review tier from the diff — never from size:
+tier 0 (docs/config/renames, no reviewer) / tier 1 (`organic-reviewer`) / tier 2
+(`organic-reviewer` + `organic-security`, for auth/crypto/secrets/payments/PII/migrations/
+untrusted-input parsing/permission checks/public contracts). Name the tier reason in one
+line every time. A Review Receipt gates every tier ≥ 1 commit — full rules in the protocol's
+**Evidence-Tier Review** and **Receipt** sections.
 
 ## Sub-Agent Delegation
 
-Use `task({agent: "sdd-{phase}", prompt: "..."})` for synchronous delegation (when you need the result before continuing). Use `delegate({agent: "sdd-{phase}", prompt: "..."})` for async delegation.
+Use `task({agent: "organic-{worker}", prompt: "..."})` or `task({agent: "work-unit-commits", prompt: "..."})` — every delegation is synchronous, named-type: it reads its skill file, does its work, and returns one envelope, then terminates (no live-agent continuation on this route).
 
 Each sub-agent call MUST include:
-1. The phase instructions (reference the protocol file above)
-2. All relevant paths (change_dir, tasks_path, etc.)
-3. The injected context block from the orchestrator protocol's delegation template
+1. The skill path (reference `~/.config/opencode/skills/{name}/SKILL.md`)
+2. All relevant paths and injected context (`project_root`, `group_id`, `group_files`, `tier`, ...)
+3. The injected context block per the orchestrator protocol's delegation template
 
 The orchestrator does NOT do phase work inline. It coordinates only.
 
 ## Critical Context Forwarding
 
-When delegating to a sub-agent, forward the flags from the protocol's **Critical Context Forwarding** table (`~/.config/opencode/skills/_shared/sdd-orchestrator-protocol.md`) — resolve them once per session and inject them as the `## Injected Context` block. That table is the single source of truth; this file deliberately does not keep a copy (a stale duplicate caused contract drift between adapters).
+When delegating to a sub-agent, forward the flags from the protocol's **Critical Context Forwarding** table (`~/.config/opencode/skills/_shared/orchestrator-protocol.md`) — resolve them once per session and inject them as the `## Injected Context` block. That table is the single source of truth; this file deliberately does not keep a copy (a stale duplicate caused contract drift between adapters).
 
 ## Model Routing
 
-Read each agent's `model` from `~/.config/opencode/opencode.json` at session start — in OpenCode the per-agent pin is the source of truth (the installer preserves user pins across re-installs). Default assignments and their rationale live in the protocol's **Model Routing** table; this file does not keep a copy. Note: `sdd-security` is a single agent entry, so both modes (threat-model and code-audit) run on its pinned model.
+Read each agent's `model` from `~/.config/opencode/opencode.json` at session start — in OpenCode the per-agent pin is the source of truth (the installer preserves user pins across re-installs). Default assignments and their rationale live in the protocol's **Model Routing** table; this file does not keep a copy.
 
 ## Context Resolution Feedback
 
 After every delegation that returns a result, check the `context_resolution` field (vocabulary per `_shared/result-envelope.md`):
 - `self-loaded` or `injected` -- healthy
-- `fallback` -- context was incomplete; rebuild the flag cache from `state.yaml` and re-inject in subsequent delegations
+- `fallback` -- context was incomplete; rebuild the flag cache from the current session and re-inject in subsequent delegations
 - `none` -- context-light phase (e.g., scout bootstrap); if the phase has a SKILL.md, verify the skill path and re-engage
 
 Full action table: protocol's **Context Resolution Feedback** section.

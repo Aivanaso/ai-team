@@ -52,38 +52,38 @@ Rationale: mocking a framework boundary (e.g., `MessageBusInterface` as a spy) m
 
 **Exception:** if the project's test infrastructure genuinely cannot run an integration test locally (e.g., requires external services not available in the sandbox), report it as a risk in the envelope rather than silently skipping (the orchestrator decides whether to defer or override).
 
-## Rule 4 — Validate Assumed Invariants in Propose Phase
+## Rule 4 — Validate Assumed Invariants at Brief-Authoring / Discovery Time
 
-When a proposal depends on a **codebase-wide invariant** (a naming convention, a regex, a contract, a "consistency" assumption), the propose agent MUST validate it with greps before declaring the proposal ready.
+When a Task Brief or a discovery report depends on a **codebase-wide invariant** (a naming convention, a regex, a contract, a "consistency" assumption), the party asserting it — the orchestrator composing the Task Brief, or `organic-scout` running discovery — MUST validate it with greps before finalizing the brief or the report.
 
-**Trigger** — this rule activates ONLY if the proposal text or the user request contains one of these signals about the invariant:
+**Trigger** — this rule activates ONLY if the brief's objective/out_of_scope text, the discovery request, or the user's request contains one of these signals about the invariant:
 
 - "todos", "todas", "siempre", "nunca", "convención", "convention"
 - "all", "every", "always", "never", "consistent", "uniform"
 - A regex or pattern stated as currently true (e.g., "all `messageName()` return `<context>.<event>`")
 
-If none of these appear, stay within the exploration budget declared in the delegation prompt (extra greps inflate context without improving accuracy) — propose stays as-is.
+If none of these appear, stay within the exploration budget declared in the delegation prompt (extra greps inflate context without improving accuracy) — the brief or report stays as-is.
 
 **When triggered**:
 
-1. Identify the invariant explicitly (one sentence: "the proposal assumes X holds for all Y").
+1. Identify the invariant explicitly (one sentence: "the brief/report assumes X holds for all Y").
 2. Run **at most 3-5 greps** that would surface counter-examples. Pick the cheapest first.
-3. If counter-examples exist, list them in the **Risks** table as `severity: high` with the exact list (or "N occurrences, sample: ...") and propose two paths in **Open Questions**: (a) fix all counter-examples in scope, or (b) carve an allowlist.
-4. If grep is clean, add a one-line note in the proposal: `Invariant validated: <description> — N matches, 0 counter-examples (grep: <pattern>)`. This becomes evidence for downstream phases.
+3. If counter-examples exist, report them as a `MAJOR` finding (canonical severity vocabulary — CRITICAL / MAJOR / MINOR, see `_shared/result-envelope.md` → Review Receipt) in the discovery report's `risks` (or the orchestrator's questions to the user before delegating), with the exact list (or "N occurrences, sample: ...") and two paths: (a) fix all counter-examples in scope, or (b) carve an allowlist.
+4. If grep is clean, add a one-line note: `Invariant validated: <description> — N matches, 0 counter-examples (grep: <pattern>)`. This becomes evidence the Task Brief can cite.
 
 **Bad (assumed):**
 > "Add a routing test that asserts all `messageName()` follow `<context>.<event>`."
 
 **Good (validated):**
-> "Add a routing test for `messageName()` convention. Invariant check: 15 legacy events do NOT follow the convention (e.g., `BudgetCreated`, `ProposalSent`). See Risks R-2 — user must decide allowlist vs migration."
+> "Add a routing test for `messageName()` convention. Invariant check: 15 legacy events do NOT follow the convention (e.g., `BudgetCreated`, `ProposalSent`). MAJOR — user must decide allowlist vs migration before the brief is finalized."
 
-**Why this exists**: in the messenger-buses retrospective, 15 legacy `messageName()` violations surfaced in the apply phase (group 1) and forced mid-pipeline re-decisions. They were greppable in propose.
+**Why this exists**: in the messenger-buses retrospective, 15 legacy `messageName()` violations surfaced mid-implementation and forced a re-brief. They were greppable before delegation.
 
-**Out of scope for this rule**: framework-behavior claims (Rule 1 covers them), interface signature sweeps (Rule 2), test execution (Rule 3). Rule 4 is specifically about invariants the proposal *itself* asserts as currently true.
+**Out of scope for this rule**: framework-behavior claims (Rule 1 covers them), interface signature sweeps (Rule 2), test execution (Rule 3). Rule 4 is specifically about invariants the brief or report *itself* asserts as currently true.
 
 ## Rule 5 — Cross-Repo Pattern Transplant Check
 
-When propose, design, or tasks cite a pattern from a **sibling/sister repository** as evidence (not the current repo), the agent MUST verify that the pattern's structural prerequisites also hold in the target repo before recommending the transplant.
+When a Task Brief, discovery report, or review finding cites a pattern from a **sibling/sister repository** as evidence (not the current repo), the agent MUST verify that the pattern's structural prerequisites also hold in the target repo before recommending the transplant.
 
 Rule 1 covers framework behavior in the current repo. This rule covers the gap: "we'll do it like `corev3` does" is NOT sufficient evidence — `corev3`'s pattern depends on `corev3`'s topology, which may not match.
 
@@ -91,9 +91,9 @@ Rule 1 covers framework behavior in the current repo. This rule covers the gap: 
 
 - "mirror of {repo}", "same pattern as {repo}", "replicate from {repo}", "como hace {repo}"
 - A path that crosses repos (e.g., `../{other-repo}/...`, `~/Proyectos/{other-repo}/...`)
-- An evidence citation pointing outside the current `change_dir` / project root
+- An evidence citation pointing outside the current project root (the Task Brief's `target_repo`)
 
-If none of these appear, the proposal/design/tasks stays as-is (skip the check — running it outside this trigger inflates context without benefit).
+If none of these appear, the artifact stays as-is (skip the check — running it outside this trigger inflates context without benefit).
 
 **When triggered**, the agent MUST:
 
@@ -115,7 +115,7 @@ If none of these appear, the proposal/design/tasks stays as-is (skip the check �
    - `adapt` — minor mismatch, document the adaptation inline.
    - `reject` — at least one axis breaks the pattern's assumption; escalate to user with the failing axis named.
 
-**Citation format** — embed in design.md / proposal.md / tasks.md when a transplant is involved:
+**Citation format** — embed in the Task Brief, result envelope, Review Receipt, or discovery report when a transplant is involved:
 
 ```
 Pattern transplant: {one-line description}
@@ -176,12 +176,12 @@ This rule covers the orchestrator's responsibility *after* receiving an envelope
 
 ## Recording Evidence in Artifacts
 
-When writing design.md, tasks.md, or verification-report.md:
+When composing a Task Brief, a result envelope, a Review Receipt, or a discovery report:
 
 - Inline citations are cheap: `messenger.yaml:75`, `RunWorkerAsyncCommand:42`
 - Use footnote-style references for reused evidence
 - Never write "Symfony works this way" or "Doctrine handles this" — always cite
 
-## When Evidence Conflicts With Specs
+## When Evidence Conflicts With the Task Brief
 
-If the cited evidence contradicts the spec or design input, surface the conflict instead of silently reconciling. Example: if the spec says "use toPrimitives()" but the project's existing async pattern uses raw arrays, report it as a Discovered Warning (`DW-N`) and let the user decide.
+If the cited evidence contradicts the Task Brief or a prior discovery report, surface the conflict instead of silently reconciling. Example: if the brief assumes `toPrimitives()` is the project's serialization convention but the project's existing async pattern uses raw arrays, report it as a `risk` in the returned envelope (or a `question` under `status: needs_input` when it blocks progress) and let the orchestrator/user decide.

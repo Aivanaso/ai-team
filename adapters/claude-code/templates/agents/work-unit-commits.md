@@ -1,7 +1,8 @@
 ---
 name: work-unit-commits
 description: "Atomic commits per logical group"
-category: sdd
+category: organic
+model: sonnet
 tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 

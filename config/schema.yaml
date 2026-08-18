@@ -1,72 +1,62 @@
-# Artifact Dependency Graph
+# config.yaml Field Reference
 #
-# Defines the DAG (Directed Acyclic Graph) of SDD phases.
-# The orchestrator uses this to determine which phases can run
-# and what artifacts must exist before starting a phase.
+# Documents every top-level key the organic evidence-tiered delegation route
+# reads from a target project's .ai-team/config.yaml, and which worker reads
+# it. The canonical, annotated template lives at
+# domain/skills/organic-scout/references/config-template.md — organic-scout
+# writes only a subset of it verbatim on first bootstrap (project / stack /
+# conventions / structure / architecture / commit_strategy; see the next
+# entry below). The remaining keys in that template (strict_tdd,
+# test_commands, model_overrides, rules) are optional and safe-absent: added
+# by hand, or accepted via the orchestrator's Config Refresh Check. This file
+# is the flat schema reference layered on top: keys the orchestrator and
+# work-unit-commits read but organic-scout does not itself write.
 #
-# Model Routing
-#
-# Each phase specifies a model tier that defines the capability level needed.
-# Adapters resolve tiers to concrete models for the target AI provider.
-#
-# Tiers:
-#   reasoning — Complex analysis, architectural decisions, high-stakes judgment
-#   balanced  — Structured execution, spec writing, code generation
-#   fast      — Simple operations, copying, formatting
+# Model routing defaults and rationale are NOT duplicated here — read
+# domain/skills/_shared/orchestrator-protocol.md -> "Model Routing" (a
+# stale duplicate of that table here previously caused contract drift
+# between adapters; see adapters/opencode/templates/AGENTS.md for the same
+# discipline applied to the OpenCode adapter).
 
-artifacts:
-  - id: proposal
-    description: "Problem statement, scope, and high-level approach"
-    path: "proposal.md"
-    agent: sdd-propose
-    model: reasoning
-    requires: []
+# project / stack / conventions / structure / architecture
+#   Detected and written by organic-scout on first bootstrap (mode:
+#   bootstrap). Read by every delegated worker via
+#   _shared/context-protocol.md Step 1 ("Load Project Config") as project
+#   conventions and declared commands.
 
-  - id: specs
-    description: "Delta specs with requirements and Given/When/Then scenarios"
-    path: "specs/{domain}/spec.md"
-    agent: sdd-spec
-    model: balanced
-    requires: [proposal]
+# commit_strategy: auto | manual
+#   Written by organic-scout on first bootstrap (default: auto). Read by
+#   work-unit-commits (Decision Gates — default: auto if absent, WARNING
+#   emitted) and by the orchestrator when composing the work-unit-commits
+#   invocation (orchestrator-protocol.md -> "work-unit-commits Invocation").
 
-  - id: design
-    description: "Technical design: components, interfaces, data flow"
-    path: "design.md"
-    agent: sdd-design
-    model: reasoning
-    requires: [proposal]
+# model_overrides:
+#   {worker-name}: {model-alias}
+#   e.g.
+#   model_overrides:
+#     organic-reviewer: sonnet   # downgrade from the opus default
+#   Project-level override of the Model Routing table's per-worker
+#   defaults. Read by the orchestrator (orchestrator-protocol.md ->
+#   "Model Routing" -> "Project Override"). Worker names: organic-implementer
+#   | organic-reviewer | organic-security | organic-scout | work-unit-commits.
 
-  - id: tasks
-    description: "Implementation task breakdown with file-level changes"
-    path: "tasks.md"
-    agent: sdd-tasks
-    model: balanced
-    requires: [specs, design]
+# strict_tdd: true | false
+#   Read by the orchestrator before delegating organic-implementer
+#   (orchestrator-protocol.md -> "Sub-Agent Delegation" step 5); when true,
+#   the delegation prompt is appended with the STRICT TDD MODE directive.
 
-# Post-artifact phases (operate on code, not documents)
+# test_commands:
+#   unit: "<command>"       # the strict_tdd test runner the orchestrator cites
+#   security: "<command>"   # dependency auditor, read by organic-security in
+#                            # code-audit mode (organic-security/SKILL.md step 3);
+#                            # absent -> "Dependency auditor: not configured (skipped)"
+#   Additional project-declared build/lint commands are re-run by
+#   organic-reviewer's verification lens when the Task Brief's
+#   acceptance_checks do not already cover them.
 
-apply:
-  description: "Implement the tasks — write actual code"
-  agent: sdd-apply
-  model: balanced
-  requires: [tasks]
-
-verify:
-  description: "Run tests, lint, type-check — validate the implementation"
-  agent: sdd-verify
-  model: balanced
-  requires: [tasks]
-
-archive:
-  description: "Merge delta specs, move change to archive"
-  agent: orchestrator
-  model: fast
-  requires: [verify]
-
-# Utility agents (not part of the DAG, invoked directly by orchestrator)
-
-utility_agents:
-  - id: scout
-    description: "Bootstrap, explore, and baseline — codebase discovery"
-    agent: sdd-scout
-    model: balanced
+# rules:
+#   - "<constraint>"
+#   Optional, safe-absent. Free-text custom rules for AI agents, added by
+#   hand (not written by scout bootstrap). Read by every delegated worker
+#   via _shared/context-protocol.md Step 1 ("Load Project Config") alongside
+#   `conventions`.

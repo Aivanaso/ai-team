@@ -2,7 +2,8 @@
 #
 # adapters/claude-code/install.sh -- Claude Code adapter for ai-team
 #
-# Installs the ai-team SDD framework into ~/.claude/ for use with Claude Code.
+# Installs the ai-team organic evidence-tiered delegation framework into
+# ~/.claude/ for use with Claude Code.
 #
 # Usage:
 #   ./adapters/claude-code/install.sh
@@ -11,9 +12,9 @@
 #   ./scripts/install.sh --adapter=claude-code
 #
 # What it does:
-#   1. Copies SDD skills to ~/.claude/skills/
-#   2. Copies SDD agent files to ~/.claude/agents/
-#   3. Rewrites skill paths in sdd-orchestrator-protocol.md (idempotency-safe)
+#   1. Copies skills to ~/.claude/skills/
+#   2. Copies agent files to ~/.claude/agents/
+#   3. Rewrites skill paths in orchestrator-protocol.md (idempotency-safe)
 #   4. Injects orchestrator stub into ~/.claude/CLAUDE.md
 #      between <!-- ai-team:orchestrator --> markers
 #
@@ -41,6 +42,32 @@ info() { echo -e "${GREEN}[ai-team]${NC} $1"; }
 warn() { echo -e "${YELLOW}[ai-team]${NC} $1"; }
 die()  { echo -e "${RED}[ai-team]${NC} $1" >&2; exit 1; }
 
+# Manifest-based pruning: remove target paths this framework installed on a
+# prior run but no longer ships, without touching anything it never listed
+# (user-owned skills/agents are never in the manifest, so they are never a
+# pruning candidate). No literal retired-name list — driven entirely by the
+# diff between the previous manifest and the current source set.
+MANIFEST_FILE="$CLAUDE_DIR/.ai-team-manifest"
+
+prune_stale_manifest_entries() {
+  local target_dir="$1" manifest_file="$2"; shift 2
+  local -a current_set=("$@")
+  [[ -f "$manifest_file" ]] || return 0
+  local entry still_present cur
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    [[ "$entry" == /* || "$entry" == *..* ]] && continue
+    still_present=0
+    for cur in "${current_set[@]}"; do
+      if [[ "$cur" == "$entry" ]]; then still_present=1; break; fi
+    done
+    if [[ "$still_present" -eq 0 ]]; then
+      rm -rf "${target_dir:?}/${entry:?}"
+      info "  -> pruned stale $entry (no longer shipped by this framework)"
+    fi
+  done < "$manifest_file"
+}
+
 verify_install() {
   local missing=0
   local target_dir="$1"
@@ -65,6 +92,20 @@ verify_install() {
 # installed but never run) and smoke tests against temp HOME directories.
 mkdir -p "$CLAUDE_DIR"
 
+# --- 0. Prune stale framework-managed paths ---
+
+# The current source set this run will install: skill dirs + agent files.
+# Computed before any copy so pruning runs against last run's manifest, not this one.
+CURRENT_MANAGED_SET=()
+for dir in "$REPO_ROOT/domain/skills/"*/; do
+  CURRENT_MANAGED_SET+=("skills/$(basename "$dir")")
+done
+for agent_file in "$REPO_ROOT/adapters/claude-code/templates/agents/"*.md; do
+  CURRENT_MANAGED_SET+=("agents/$(basename "$agent_file")")
+done
+
+prune_stale_manifest_entries "$CLAUDE_DIR" "$MANIFEST_FILE" "${CURRENT_MANAGED_SET[@]}"
+
 # --- 1. Skills ---
 
 info "Installing skills..."
@@ -83,25 +124,24 @@ for dir in "$REPO_ROOT/domain/skills/"*/; do
   fi
 done
 
-skill_count=$(find "$CLAUDE_DIR/skills/sdd-"* -maxdepth 0 -type d 2>/dev/null | wc -l)
-info "  -> ~/.claude/skills/ ($skill_count phases + _shared)"
+skill_count=$(find "$CLAUDE_DIR/skills" -mindepth 1 -maxdepth 1 -type d -not -name '_shared' 2>/dev/null | wc -l)
+info "  -> ~/.claude/skills/ ($skill_count skills)"
 
 # Verify every source file landed at the corresponding destination.
 verify_install "$CLAUDE_DIR/skills"
 
 # Rewrite skill paths in the orchestrator protocol for installed location.
-# Anchored patterns (command `bash skills/...` and inline-code `` `skills/sdd-... ``) are
-# idempotent by construction — after one rewrite neither pattern matches again — and they
-# leave `{install_dir}/skills/...` references and prose mentioning skill roots untouched.
+# Anchored patterns (command `bash skills/...`) are idempotent by construction —
+# after one rewrite the pattern no longer matches — and they leave
+# `{install_dir}/skills/...` references and prose mentioning skill roots untouched.
 # (The old broad guard `grep -q '~/.claude/skills/'` skipped the whole sed once the source
 # protocol legitimately mentioned that path in prose, leaving command lines unrewritten.)
-SDD_PROTOCOL="$CLAUDE_DIR/skills/_shared/sdd-orchestrator-protocol.md"
-if [[ -f "$SDD_PROTOCOL" ]]; then
+ORCHESTRATOR_PROTOCOL="$CLAUDE_DIR/skills/_shared/orchestrator-protocol.md"
+if [[ -f "$ORCHESTRATOR_PROTOCOL" ]]; then
   sed -i \
     -e 's|bash skills/_shared/|bash ~/.claude/skills/_shared/|g' \
-    -e 's|`skills/sdd-|`~/.claude/skills/sdd-|g' \
-    "$SDD_PROTOCOL"
-  info "  -> Rewrote skill paths in sdd-orchestrator-protocol.md"
+    "$ORCHESTRATOR_PROTOCOL"
+  info "  -> Rewrote skill paths in orchestrator-protocol.md"
 fi
 
 # --- 2. Agents ---
@@ -116,6 +156,11 @@ done
 
 agent_count=$(ls "$REPO_ROOT/adapters/claude-code/templates/agents/"*.md 2>/dev/null | wc -l)
 info "  -> ~/.claude/agents/ ($agent_count agent files)"
+
+# --- 2b. Write install manifest (for next run's pruning) ---
+
+printf '%s\n' "${CURRENT_MANAGED_SET[@]}" > "$MANIFEST_FILE"
+info "  -> wrote $MANIFEST_FILE (${#CURRENT_MANAGED_SET[@]} managed paths)"
 
 # --- 3. Prepare orchestrator content ---
 
@@ -201,10 +246,10 @@ info "  -> ${WRITE_TARGET}"
 echo ""
 info "Installation complete! (Claude Code adapter)"
 echo ""
-echo "  Skills:       ~/.claude/skills/sdd-*/"
-echo "  Agents:       ~/.claude/agents/sdd-*.md"
+echo "  Skills:       ~/.claude/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits}/"
+echo "  Agents:       ~/.claude/agents/*.md"
 echo "  Protocols:    ~/.claude/skills/_shared/"
 echo "  Orchestrator: stub in CLAUDE.md (between markers)"
 echo ""
-echo "  Slash commands: /ai-team new <change>, /ai-team continue, etc."
+echo "  No slash commands — delegation is conversational, driven by the orchestrator stub."
 echo "  Re-run this script to update after pulling new changes."

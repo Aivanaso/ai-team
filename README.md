@@ -1,28 +1,54 @@
 # ai-team
 
-A tool-agnostic framework for spec-driven development with AI agents.
+A tool-agnostic framework for organic, evidence-tiered AI agent delegation.
 
-## Architecture
+## How It Works
 
-Each supported AI coding tool runs an **orchestrator** agent: execution is delegated to sub-agents by default at every task size; large tasks go through the full SDD pipeline. Classification governs ceremony (plan gate, SDD recommendation), never inline-vs-delegate.
+One execution model for every task size. The orchestrator (your AI coding tool's main
+conversation) classifies each request, delegates implementation to `organic-implementer`,
+and lets the evidence in the resulting diff — not the task's size — decide how much review
+runs before commit.
 
 ```
-User ↔ Claude Code (orchestrator)          User ↔ OpenCode (sdd-orchestrator agent)
+User ↔ Claude Code (orchestrator)          User ↔ OpenCode (orchestrator agent)
            │                                             │
            ├── Small: delegate (no gate)                 ├── Small: delegate (no gate)
-           ├── Medium: plan + delegate                   ├── Medium: plan + delegate
-           └── Large: full SDD pipeline                  └── Large: full SDD pipeline
+           ├── Medium: plan + delegate                    ├── Medium: plan + delegate
+           └── Large: plan + optional discovery pass       └── Large: plan + optional discovery pass
                          ↓                                             ↓
                     domain/skills/    ←─── shared skills ───→    domain/skills/
 ```
 
-### Core Principles
+### Classification (plan ceremony only)
 
-- **Classification gate** -- Every task is classified (Small/Medium/Large) before execution
-- **Specs as source of truth** -- Committed to git, living documentation
-- **Filesystem-only persistence** -- Human-readable, version-controllable, no external services
-- **Named agent types** -- Sub-agents use dedicated agent files with tool restrictions; instructions read from disk (JIT)
-- **Tool-agnostic skills** -- Skills in `domain/skills/` are adapter-independent
+| Size | Signals | Ceremony |
+|------|---------|----------|
+| **Small** | 1 file, <50 lines, fully clear scope | Delegate directly, no gate (trivial mechanical edits run inline) |
+| **Medium** | 2-5 files, 50-300 lines | Present a plan, wait for confirmation, then delegate |
+| **Large** | 6+ files, crosses modules, needs discovery | Present a plan, offer an optional `organic-scout` discovery pass, wait, then delegate |
+
+Classification never decides review depth — only how much planning precedes delegation.
+
+### Evidence-tiered review (post-candidate)
+
+Once `organic-implementer` returns a candidate, the orchestrator classifies its diff into a
+review tier and names the reason:
+
+| Tier | Trigger | Review |
+|------|---------|--------|
+| **0** | Docs, comments, non-runtime config, renames | Result envelope only — no reviewer |
+| **1** | Standard code change | `organic-reviewer` (correctness + verification) |
+| **2** | Auth/authz, crypto, secrets, payments, PII, migrations, untrusted-input parsing, permission checks, public contracts | `organic-reviewer` + `organic-security` |
+
+A tier ≥ 1 candidate produces a **Review Receipt**; `work-unit-commits` refuses to commit
+tier ≥ 1 work without one. The user can accept-and-proceed over a finding instead of
+re-engaging the worker (recorded in the receipt's `overrides` field).
+
+### Review kill switch
+
+"review off" / "sin review" turns the review plane off entirely — no tiers, nothing ever
+reported as reviewed or approved while off. "review on" re-validates from the current state
+only; nothing is retroactively resurrected.
 
 ## Project Structure
 
@@ -30,41 +56,36 @@ User ↔ Claude Code (orchestrator)          User ↔ OpenCode (sdd-orchestrator
 ai-team/
 ├── domain/
 │   └── skills/
-│       ├── _shared/                  # Protocols shared by all skills
+│       ├── _shared/                  # Protocols shared by every skill
 │       │   ├── context-protocol.md
 │       │   ├── persistence-contract.md
 │       │   ├── result-envelope.md
-│       │   ├── spec-convention.md
 │       │   ├── evidence-protocol.md
-│       │   └── sdd-orchestrator-protocol.md  # DAG, model routing, delegation
-│       ├── sdd-scout/
-│       ├── sdd-propose/
-│       ├── sdd-spec/
-│       ├── sdd-design/
-│       ├── sdd-tasks/
-│       ├── sdd-apply/
-│       ├── sdd-verify/
-│       ├── sdd-archive/
-│       ├── sdd-security/
-│       └── work-unit-commits/
+│       │   ├── common-rules.md
+│       │   └── orchestrator-protocol.md   # classification, tiers, delegation, model routing
+│       ├── organic-implementer/      # Task Brief → code
+│       ├── organic-reviewer/         # correctness + verification review gate
+│       ├── organic-security/         # threat-model / code-audit security lens
+│       ├── organic-scout/            # bootstrap config.yaml / pre-brief discovery
+│       └── work-unit-commits/        # atomic commits per logical group
 ├── adapters/
 │   ├── claude-code/                  # Claude Code adapter
 │   │   ├── install.sh
 │   │   ├── templates/
 │   │   │   ├── CLAUDE.md             # Stub injected into ~/.claude/CLAUDE.md
-│   │   │   └── agents/              # Agent files → ~/.claude/agents/sdd-*.md
+│   │   │   └── agents/               # Agent files → ~/.claude/agents/
 │   │   └── README.md
 │   └── opencode/                     # OpenCode adapter
 │       ├── install.sh
 │       ├── templates/
 │       │   ├── AGENTS.md             # Copied to ~/.config/opencode/AGENTS.md
-│       │   ├── opencode.json         # Merged into ~/.config/opencode/opencode.json
-│       │   └── commands/             # Slash commands (sdd-new, sdd-continue, etc.)
+│       │   └── opencode.json         # Merged into ~/.config/opencode/opencode.json
 │       └── README.md
 ├── scripts/
 │   └── install.sh                    # Adapter selector (routes to adapters/<name>/install.sh)
 └── config/
-    └── project-config.template.yaml
+    ├── schema.yaml                   # .ai-team/config.yaml field reference
+    └── project-config.template.yaml  # Annotated illustration of every config.yaml key (same key set as organic-scout's config-template.md)
 ```
 
 ## Installation
@@ -83,7 +104,7 @@ Copies skills to `~/.claude/skills/`, agent files to `~/.claude/agents/`, and in
 ./scripts/install.sh --adapter=opencode
 ```
 
-Requires `jq`. Copies skills to `~/.config/opencode/skills/`, installs `AGENTS.md`, merges agent definitions into `opencode.json`, and copies slash commands to `~/.config/opencode/commands/`.
+Requires `jq`. Copies skills to `~/.config/opencode/skills/`, installs `AGENTS.md`, and merges agent definitions into `opencode.json`.
 
 ### Both adapters
 
@@ -101,7 +122,7 @@ Re-run after pulling updates to refresh skills and adapter templates.
 
 ## Choosing an Adapter
 
-Each adapter installs an independent copy of the framework into its tool's config directory. Multi-adapter install is supported via `--adapter=both`. Adapters do not share installed files — `~/.claude/` and `~/.config/opencode/` are completely separate. Both adapters use the same `domain/skills/` source, so the SDD pipeline logic is identical regardless of which tool you use.
+Each adapter installs an independent copy of the framework into its tool's config directory. Multi-adapter install is supported via `--adapter=both`. Adapters do not share installed files — `~/.claude/` and `~/.config/opencode/` are completely separate. Both adapters use the same `domain/skills/` source, so the delegation logic is identical regardless of which tool you use.
 
 ## Adapters
 
@@ -112,122 +133,43 @@ Each adapter installs an independent copy of the framework into its tool's confi
 
 Contributions for other tools welcome — see `adapters/claude-code/` or `adapters/opencode/` as reference implementations.
 
-## How It Works
+## No pipeline entry commands
 
-### Size Classification
+There is no multi-phase pipeline and no slash-command entry point. Delegation is
+conversational: describe the change, the orchestrator classifies it, and everything after
+that follows the model above.
 
-The orchestrator classifies every feature/change request before acting:
+## Persistence
 
-| Size | Signals | Workflow |
-|------|---------|----------|
-| **Small** | 1 file, <50 lines, fully clear scope | Inline -- no delegation |
-| **Medium** | 2-5 files, 50-300 lines | Plan, confirm with user, delegate |
-| **Large** | 6+ files, crosses domains, needs discovery | Recommend SDD pipeline |
+Every delegated worker is stateless: it reads its skill file and the delegation prompt, writes
+the files its brief declares, and returns one bounded result envelope. There is no phase
+tracking and no `state.yaml`. A project accumulates these filesystem artifacts:
 
-### SDD Pipeline
+- `.ai-team/config.yaml` — project stack, conventions, structure, architecture, and
+  `commit_strategy` (default `auto`), written once by `organic-scout` on first bootstrap, then
+  read by every worker. Optional keys (`strict_tdd`, `test_commands`, `model_overrides`,
+  `rules`) are not written by bootstrap — they default safely when absent, and are added later
+  by hand or via the orchestrator's Config Refresh Check.
+- `.ai-team/skill-registry.md` and `.ai-team/.skill-registry.cache` — the stack/convention
+  skill index and its freshness fingerprint, refreshed once per session (see the orchestrator
+  protocol's Session Init → "Skill Registry Refresh").
+- An on-disk report copy, only when a reviewer or security pass runs with a
+  `report_destination` injected.
 
-For large changes, the full Spec-Driven Development pipeline:
+## Model Routing
 
-```
-propose → spec ──→ tasks → apply → verify → review → archive
-        → design ↗
-```
+Read `domain/skills/_shared/orchestrator-protocol.md` → "Model Routing" for the default model
+per worker and the project-level `model_overrides` override mechanism.
 
-| Phase | Skill | Model | What it does |
-|-------|-------|-------|--------------|
-| propose | sdd-propose | opus | Feature → proposal with scope, ACs, risks |
-| spec | sdd-spec | sonnet | Proposal → domain delta specs (Given/When/Then) |
-| design | sdd-design | opus | Specs → technical design grounded in codebase |
-| tasks | sdd-tasks | sonnet | Design → ordered, grouped implementation plan |
-| apply | sdd-apply | sonnet | Tasks → actual code, one task at a time |
-| verify | sdd-verify | sonnet | Two-layer validation: static + behavioral |
-| archive | sdd-archive | sonnet | Merge delta specs into base, archive artifacts |
-| security | sdd-security | opus | Threat-model (shift-left) and code-audit (post-apply) |
-| review | sdd-reviewer | opus | Code-correctness gate: reviews the group's changed files, blocking verdict |
+## Skills
 
-Approval gates pause after **propose** and before **apply**. Security gates (threat-model and code-audit) fire when the change touches sensitive surfaces.
-
-### Fast-Forward
-
-For straightforward changes you can chain the planning phases (propose → spec → design → tasks) in a single invocation:
-
-```
-/ai-team ff <change-name>
-```
-
-Default mode is `interactive` (pause with a summary after each phase). Switch to `auto` for back-to-back execution that only pauses at blocking gates. Apply, verify and archive remain manual.
-
-### Verify: Two-Layer Compliance
-
-The verify phase validates applied code through two complementary layers:
-
-- **Static correctness** -- Code review: does the code structurally handle each spec scenario?
-- **Behavioral compliance** -- Test execution: does a passing test prove each scenario works?
-
-A scenario is only COMPLIANT when both layers pass.
-
-### Persistence
-
-All SDD artifacts live in `.ai-team/` within the target project:
-
-```
-.ai-team/
-├── config.yaml                  # Project stack, conventions, rules
-├── specs/{domain}/spec.md       # Base specs (committed to git)
-├── changes/{change-name}/       # Active change artifacts (gitignored)
-│   ├── state.yaml               # Phase tracking (source of truth)
-│   ├── proposal.md
-│   ├── specs/{domain}/spec.md   # Delta specs
-│   ├── design.md
-│   ├── tasks.md
-│   └── verification-report.md
-└── changes/archive/             # Completed changes (committed)
-```
-
-## Commands
-
-### Claude Code
-
-```
-/ai-team new <change-name>       # Start a new SDD change
-/ai-team ff <change-name>        # Fast-forward planning (propose → spec → design → tasks)
-/ai-team continue [change-name]  # Resume an active change
-/ai-team status [change-name]    # Show change progress
-/ai-team explore <topic>         # Investigate without starting SDD
-/ai-team baseline <domain>       # Document existing code as a spec
-```
-
-### OpenCode
-
-OpenCode users invoke these as slash commands routed to the `sdd-orchestrator` agent:
-
-```
-/sdd-new <change-name>     Start a new SDD change
-/sdd-continue [change]     Resume an active change
-/sdd-status [change]       Show change progress
-/sdd-explore <topic>       Investigate without starting SDD
-/sdd-baseline <domain>     Document existing code as a spec
-```
-
-OpenCode uses `/sdd-new`, Claude Code uses `/ai-team new`. The underlying SDD pipeline is identical.
-
-## Status
-
-All SDD pipeline phases are implemented:
-
-| Skill | Status |
-|-------|--------|
-| sdd-scout | Done |
-| sdd-propose | Done |
-| sdd-spec | Done |
-| sdd-design | Done |
-| sdd-tasks | Done |
-| sdd-apply | Done |
-| sdd-verify | Done |
-| sdd-archive | Done |
-| sdd-security | Done |
-| work-unit-commits | Done |
-| sdd-reviewer | Done |
+| Skill | Role |
+|-------|------|
+| `organic-implementer` | Task Brief → code, bounded by declared edit roots |
+| `organic-reviewer` | Correctness + verification review gate (tier ≥ 1) |
+| `organic-security` | Threat-model and code-audit security lens (tier 2, or standalone) |
+| `organic-scout` | Bootstrap `config.yaml`, or run pre-brief discovery |
+| `work-unit-commits` | Atomic commit per logical group; enforces the receipt gate |
 
 ## License
 

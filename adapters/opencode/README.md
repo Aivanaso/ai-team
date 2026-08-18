@@ -1,6 +1,6 @@
 # ai-team — OpenCode Adapter
 
-Installs the ai-team SDD framework into OpenCode (`~/.config/opencode/`).
+Installs the ai-team organic evidence-tiered delegation framework into OpenCode (`~/.config/opencode/`).
 
 ## Prerequisites
 
@@ -23,42 +23,26 @@ Installs the ai-team SDD framework into OpenCode (`~/.config/opencode/`).
 |----------|----------|
 | Orchestrator instructions | `~/.config/opencode/AGENTS.md` |
 | Agent definitions | `~/.config/opencode/opencode.json` (merged) |
-| SDD phase skills | `~/.config/opencode/skills/sdd-*/` |
+| Skills | `~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits}/` |
 | Shared protocols | `~/.config/opencode/skills/_shared/` |
-| Slash commands | `~/.config/opencode/commands/sdd-*.md` |
 
 ## Usage
 
-1. Select the **`sdd-orchestrator`** agent in OpenCode
-2. Use slash commands to drive the SDD pipeline:
-
-```
-/sdd-new <change-name>     Start a new SDD change (scout → propose → approval gate)
-/sdd-continue [change]     Resume an active change (runs next dependency-ready phase)
-/sdd-explore <topic>       Investigate a topic without starting SDD
-/sdd-baseline <domain>     Document existing code as a baseline spec
-/sdd-status [change]       Show change progress
-```
-
-## Slash Command Naming
-
-OpenCode adapter uses `/sdd-new`, `/sdd-continue`, etc. The Claude Code adapter uses `/ai-team new`, `/ai-team continue`. The underlying SDD pipeline is identical — only the command prefix differs.
-
-## No Plan Mode
-
-The OpenCode adapter does not implement Claude Code's plan-mode safety net. The mandatory classification gate is the only gate before implementation begins.
+1. Select the **`orchestrator`** agent in OpenCode
+2. Talk to it directly — there are no slash commands. It classifies every feature/change request (Small/Medium/Large), delegates implementation to `organic-implementer`, and gates review and commit by evidence tier (see `~/.config/opencode/skills/_shared/orchestrator-protocol.md` for the full model)
 
 ## opencode.json Merge Behavior
 
 On each install run, the adapter deep-merges its `agent` definitions into your existing `opencode.json`. Rules:
 
-- All `sdd-*` agent entries are replaced (latest definitions win)
+- All of this framework's own agent entries are replaced (latest definitions win)
 - Other agents in your `opencode.json` are preserved
-- `permission.task` stale `allow` entries may persist from previous installs — this is safe for ai-team re-installs because the overlay always writes all 8 allows
+- `agent.orchestrator.permission.task` (the orchestrator's sub-agent allow-list) is replaced wholesale on every install — a stale `allow` entry from a retired framework agent never persists
+- Everything else under `agent.*` is additive-only — an agent key from a retired framework version (e.g. a name no longer in the overlay) is never auto-removed; a version migration that renames or drops agents needs a one-time manual `jq` cleanup of the stale keys
 
 ## Idempotency
 
-Safe to re-run. Re-running after a `git pull` updates all skills, AGENTS.md, opencode.json, and slash commands. No manual cleanup needed.
+Safe to re-run. Re-running after a `git pull` updates all skills, AGENTS.md, and opencode.json. Manifest-based pruning (`~/.config/opencode/.ai-team-manifest`) removes framework artifacts dropped by newer versions — with one blind spot: a pre-manifest install is never pruned on its first run; remove retired skill/command files manually once (or wipe the framework dirs and re-install).
 
 ## Uninstall
 
@@ -66,8 +50,8 @@ Remove manually:
 
 ```bash
 rm -f ~/.config/opencode/AGENTS.md
-rm -rf ~/.config/opencode/skills/sdd-*
-rm -rf ~/.config/opencode/skills/_shared
-rm -f ~/.config/opencode/commands/sdd-*.md
-# Edit ~/.config/opencode/opencode.json to remove sdd-* agent entries
+rm -rf ~/.config/opencode/skills/organic-implementer ~/.config/opencode/skills/organic-reviewer \
+       ~/.config/opencode/skills/organic-scout ~/.config/opencode/skills/organic-security \
+       ~/.config/opencode/skills/work-unit-commits ~/.config/opencode/skills/_shared
+# Edit ~/.config/opencode/opencode.json to remove this framework's agent entries
 ```
