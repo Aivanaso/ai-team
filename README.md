@@ -50,6 +50,16 @@ re-engaging the worker (recorded in the receipt's `overrides` field).
 reported as reviewed or approved while off. "review on" re-validates from the current state
 only; nothing is retroactively resurrected.
 
+### Execution gears
+
+| Gear | Behavior |
+|------|----------|
+| `normal` (default) | Ceremony per task size, exactly as above |
+| `fast-forward` | One plan confirmation, then every phase chains to completion — review plane stays fully intact, pausable at any group boundary |
+| `unattended` | Fast-forward, plus never self-approves — pauses with the pending question recorded for the next session |
+
+Set via the Brief File's `mode:` field; any non-`normal` gear — at task start or mid-task — requires explicit user instruction.
+
 ## Project Structure
 
 ```

@@ -97,13 +97,51 @@ For **Medium and Large** tasks — this is the route firing for every non-trivia
 5. If the user's reply is neither an approval nor a recognized override token, re-prompt for an explicit choice — do NOT silently fall back to inline.
 6. Review the returned envelope per **Organic Delegation Route → What comes back**.
 
+### Execution gears
+
+Three gears govern how much per-phase ceremony a classified task pays, recorded in the Brief
+File frontmatter's `mode:` field (see **Task Brief → Brief File (durable copy)** below). A gear
+never changes review depth, roots, or the Task Brief contract — only how often the orchestrator
+stops for the user.
+
+- **`normal`** (default): exactly the ceremony above — `### Gate behavior by size` decides where
+  the user stops, per size. No rule changes; this only names the default gear.
+- **`fast-forward`**: entered ONLY on explicit user request ("fast-forward", "tira hasta el
+  final") or a one-time confirmation of a well-structured ticket. After ONE plan confirmation,
+  every phase/logical group of the task executes chained to completion — no per-phase stop, no
+  contract-approval pause. Unchanged: the review plane runs FULLY intact (Evidence-Tier Review,
+  receipts, re-briefs, the amendment channel, every budget); public contracts and the Scope
+  Verification Checklist still apply at composition; Brief File checkboxes are still marked per
+  group, so the user can interrupt at any group boundary and the task pauses cleanly.
+  On `review-blocked`, fast-forward re-briefs automatically while the shared budget lasts;
+  accept-and-proceed is never automatic in any gear — it remains a user decision (in
+  `unattended`, a stop-on-question event). Fast-forward trades ceremony, never quality.
+- **`unattended`** (cron/autonomous profile): fast-forward PLUS the stop-on-question policy — at
+  any point this protocol prescribes asking or escalating the user (scope-large, review-blocked
+  options, accepting a finding, re-brief budget exhaustion, a
+  second consecutive infra-death, review kill-switch questions), the orchestrator never
+  self-approves or fabricates consent: it sets the Brief File `status: paused`, records the
+  pending decision in `pending_question:` (one line: what is being asked and the options),
+  finishes writing the ledger, and ends the run with a report. The next attended session's Brief
+  Resume Check (below) surfaces the pending question first. The pause never pre-empts an owed
+  continuation message: a third amendment request is auto-denied per Amendment ingestion — the
+  paused worker receives its `AMENDMENT DENIED` message and returns a terminal envelope before
+  any task-level pause. In an unattended run the single plan confirmation is the standing
+  instruction that scheduled the task (the cron job's task description); work requiring a plan
+  decision beyond that instruction pauses with the decision as `pending_question` instead of
+  starting.
+
+**Gear switching mid-task**: only by explicit user instruction, recorded as a one-line entry in
+the Brief File's `## Amendments` log — a mode change is an audit event, not a scope amendment,
+and is labeled as such in that entry.
+
 ## Session Init
 
 Run once per session, before the first delegation.
 
 ### Brief Resume Check (every session)
 
-Once per session, before classifying new work: scan `.ai-team/briefs/*.md` frontmatter. If any brief has `status: active` or `status: paused`, surface it and offer resume — e.g. "Found an in-progress task: {task} ({status}, phases: {checked}/{total}). Resume?" — before the Mandatory Classification Gate fires on new work. Zero briefs, or every brief `status: done` → no-op, say nothing.
+Once per session, before classifying new work: scan `.ai-team/briefs/*.md` frontmatter. If any brief has `status: active` or `status: paused`, surface it and offer resume — e.g. "Found an in-progress task: {task} ({status}, phases: {checked}/{total}). Resume?" — before the Mandatory Classification Gate fires on new work. When the resumed brief carries a non-null `pending_question:`, present that question and its recorded options FIRST, ahead of the resume offer itself — this is exactly what the `unattended` gear (**Execution gears** above) leaves behind when it pauses instead of self-approving. On the user's answer, resolve it exactly as the pending decision names (Amendment ingestion, Apply-Blocked routing, or whichever gate raised it), then clear `pending_question:` to `null` and flip `status: active`. Zero briefs, or every brief `status: done` → no-op, say nothing.
 
 ### Config Refresh Check (existing projects)
 
@@ -205,20 +243,23 @@ One brief = one repo = one worker. For a change spanning more than one repositor
 
 #### Brief File (durable copy)
 
-The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the target project. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
+The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the SESSION project root (the repo the orchestrator session opened in), never one per target repo. A cross-repo task (**Multi-repo lane rule** above) still keeps exactly one Brief File there: each per-repo Task Brief block already records its own `target_repo`, and gains its own `base_ref` line whenever it differs from the frontmatter's (frontmatter `base_ref` names the primary/first repo's). Brief Resume Check (Session Init) scans only the session project root. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
 
 ```markdown
 ---
 task: "<title>"
 created_at: "<ISO-8601 UTC>"
 status: active | paused | done
-mode: normal            # reserved field; gear semantics arrive in a later change
+mode: normal            # normal | fast-forward | unattended — see "Execution gears" above (distinct from the `mode` flag injected into work-unit-commits, which carries commit_strategy auto|manual)
+pending_question: null  # unattended only — set when paused on a stop-on-question event; cleared on resume
 base_ref: "<branch or commit the work builds on>"
 created_by: { tool: "<harness>", model: "<orchestrator model>" }
 ---
 ## Task Brief
 (verbatim copy of every six-element YAML block delegated for this task; one block per
-objective, appended as the task progresses)
+objective, appended as the task progresses; a cross-repo objective's block is preceded by a
+`base_ref:` annotation line, outside the six-element block itself, only when that repo's base
+differs from the frontmatter's)
 ## Phases
 (checkbox list of the task's logical groups; the orchestrator checks items as groups
 complete — this is the pause/resume state)
@@ -238,13 +279,15 @@ captured from the paused envelope at pause time, and, when approved, the `expect
 it added, the recomputed `allowed_edit_roots`, any approved `proposed_checks`, and the running
 amendment count for that objective; when denied, the denied paths or gap ids — the source the
 orchestrator resolves the forwarded `amendments_denied` flag from (Critical Context Forwarding
-below) — see "Amendment ingestion" below. "none" until the first entry of either kind.)
+below) — see "Amendment ingestion" below; plus, separately, any mid-task gear (`mode`) change,
+logged as a one-line audit event rather than a scope amendment (**Execution gears** above).
+"none" until the first entry of any of these kinds.)
 ## Close
 (written when status flips to done: totals — agents, tokens; re-brief count with causes;
 receipt reference(s); commit hashes)
 ```
 
-Created at the task's first delegation; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption or session end mid-task) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
+Created at the task's first delegation; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption, session end mid-task, or an `unattended`-gear pending question) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
 
 ## Organic Delegation Route
 
@@ -275,8 +318,8 @@ On `status: paused` with `amendment_request.kind: scope-amendment` (schema:
 `result-envelope.md` → "Intermediate envelope — paused"): first, fold the envelope's `artifacts`
 into `group_files` immediately, before answering — an abandoned or later-denied pause still
 leaves its pre-pause writes visible to any lens or `work-unit-commits` invocation for this
-candidate. (Disambiguation: the Brief File's frontmatter `status: paused`, task-level — interrupted
-or session ended mid-task — and the envelope's `status: paused`, delegation-level — this worker
+candidate. (Disambiguation: the Brief File's frontmatter `status: paused`, task-level — interrupted,
+session ended mid-task, or an `unattended` stop-on-question — and the envelope's `status: paused`, delegation-level — this worker
 is waiting on one continuation message — are distinct states; the Brief File's `status` does not
 change while an amendment is pending.)
 
