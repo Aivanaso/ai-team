@@ -77,7 +77,8 @@ ai-team/
 │       ├── organic-reviewer/         # correctness + verification review gate
 │       ├── organic-security/         # threat-model / code-audit security lens
 │       ├── organic-scout/            # bootstrap config.yaml / pre-brief discovery
-│       └── work-unit-commits/        # atomic commits per logical group
+│       ├── work-unit-commits/        # atomic commits per logical group
+│       └── organic-retro/            # post-task retrospective + convention-capture proposals
 ├── adapters/
 │   ├── claude-code/                  # Claude Code adapter
 │   │   ├── install.sh
@@ -163,16 +164,19 @@ copy)"). A project accumulates these filesystem artifacts:
 - `.ai-team/config.yaml` — project stack, conventions, structure, architecture, and
   `commit_strategy` (default `auto`), written once by `organic-scout` on first bootstrap, then
   read by every worker. Optional keys (`strict_tdd`, `test_commands`, `review_gates`,
-  `model_overrides`, `rules`) are not written by bootstrap — they default safely when absent,
-  and are added later by hand or via the orchestrator's Config Refresh Check.
+  `model_overrides`, `rules`, `retro`) are not written by bootstrap — they default safely when
+  absent, and are added later by hand or via the orchestrator's Config Refresh Check.
 - `.ai-team/skill-registry.md` and `.ai-team/.skill-registry.cache` — the stack/convention
   skill index and its freshness fingerprint, refreshed once per session (see the orchestrator
   protocol's Session Init → "Skill Registry Refresh").
 - `.ai-team/briefs/` — one durable Brief File per task, orchestrator-authored only: audit
   trail, cost ledger, and pause/resume state. Session Init → "Brief Resume Check" offers to
   resume any `active`/`paused` brief at the start of the next session.
-- `.ai-team/retros/` — per-task retrospectives; format and generation defined by a later
-  change.
+- `.ai-team/retros/` — per-task retrospectives, written by `organic-retro` (mode: `retro`) at
+  an orchestrator-injected `report_destination` when a task's Brief File closes (format:
+  `domain/skills/organic-retro/references/retro-format.md`). Delegated per the `retro:`
+  config key (`always | on-signal | off`, safe-absent default `on-signal`) — see the
+  orchestrator protocol's "Retro trigger".
 - An on-disk report copy, only when a reviewer or security pass runs with a
   `report_destination` injected.
 
@@ -190,6 +194,7 @@ per worker and the project-level `model_overrides` override mechanism.
 | `organic-security` | Threat-model and code-audit security lens (tier 2, or standalone) |
 | `organic-scout` | Bootstrap `config.yaml`, or run pre-brief discovery |
 | `work-unit-commits` | Atomic commit per logical group; enforces the receipt gate |
+| `organic-retro` | Post-task retrospective + convention-capture proposals, from durable evidence |
 
 ## License
 

@@ -6,8 +6,8 @@
 # mandatory `commit_strategy` (default auto) the first time the orchestrator
 # runs in a project with no config.yaml yet — there is no separate init
 # command in the organic route. The remaining keys below (`strict_tdd`,
-# `test_commands`, `review_gates`, `model_overrides`, `rules`) are optional
-# and safe-absent: add them by hand, or accept them via the orchestrator's
+# `test_commands`, `review_gates`, `model_overrides`, `rules`, `retro`) are
+# optional and safe-absent: add them by hand, or accept them via the orchestrator's
 # Config Refresh Check. Canonical annotated source (same key set):
 # domain/skills/organic-scout/references/config-template.md.
 
@@ -56,6 +56,11 @@ commit_strategy: auto  # commit strategy for work-unit-commits: auto | manual
 #     blocking: true          # optional, default true
 #   Optional, safe-absent. Objective review gates executed by organic-reviewer (verification
 #   lens). See config/schema.yaml for full semantics.
+
+# retro: on-signal
+#   Optional, safe-absent default: on-signal. always | on-signal | off — controls whether the
+#   orchestrator delegates organic-retro when a task's Brief File flips to status: done. See
+#   domain/skills/organic-scout/references/config-template.md for full semantics.
 
 structure:
   source: "{src-dir}/"           # e.g., src/, app/, lib/

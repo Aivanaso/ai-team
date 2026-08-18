@@ -66,12 +66,24 @@ commit_strategy: auto  # commit strategy for work-unit-commits skill: auto | man
 #   Optional, safe-absent. Objective review gates executed by organic-reviewer's verification
 #   lens (SKILL.md Step 4) alongside the Task Brief's acceptance_checks re-run — exit code
 #   only. A failing gate lands in `lenses.correctness.findings[]` citing this gate's own
-#   declaration line, so the confidence threshold and the citation-suppression rule never
-#   apply to it (no exemption: the citation is always present). A failing blocking gate (blocking: true,
-#   or blocking absent) is a CRITICAL finding (verdict: review-blocked); blocking: false is a
-#   MAJOR finding that documents but does not block. An unrunnable gate is omitted from
-#   `verification` and noted in `risks` — never fabricated pass/fail. See config/schema.yaml
-#   for the full field reference.
+#   declaration line — always a resolvable citation. Findings carry their own per-finding
+#   `confidence`; the orchestrator's downstream triage is the filter, never a suppression rule
+#   at the lens (see `_shared/result-envelope.md` → Review Receipt). A failing blocking gate
+#   (blocking: true, or blocking absent) is a CRITICAL finding (verdict: review-blocked);
+#   blocking: false is a MAJOR finding that documents but does not block. An unrunnable gate is
+#   omitted from `verification` and noted in `risks` — never fabricated pass/fail. See
+#   config/schema.yaml for the full field reference.
+
+# retro: on-signal
+#   Optional, safe-absent default: on-signal. Read by the orchestrator when a task's Brief File
+#   flips to `status: done` (orchestrator-protocol.md -> "Retro trigger"), to decide whether to
+#   delegate organic-retro:
+#     always     -> delegate organic-retro (mode: retro) unconditionally at task close
+#     on-signal  -> delegate only when >=1 signal fired this task: any re-brief, an infra-death,
+#                   a red blocking review_gates gate, or a single delegation reporting >300k
+#                   tokens
+#     off        -> never delegate organic-retro
+#   Absent from config.yaml behaves exactly like an explicit on-signal.
 
 structure:
   source: "src/"
@@ -110,7 +122,7 @@ architecture:
 #   Routing"). Project-level override of the default model per delegated worker.
 #   organic-reviewer: sonnet   # e.g. downgrade from the opus default
 #   Worker names: organic-implementer | organic-reviewer | organic-security |
-#   organic-scout | work-unit-commits.
+#   organic-scout | work-unit-commits | organic-retro.
 
 # rules:
 #   Optional, safe-absent. Free-text custom rules for AI agents, added by hand

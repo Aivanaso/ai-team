@@ -145,7 +145,7 @@ Once per session, before classifying new work: scan `.ai-team/briefs/*.md` front
 
 ### Config Refresh Check (existing projects)
 
-The config template gains keys as the framework evolves; projects bootstrapped earlier keep working (every consumer defaults safely on absent keys) but stay blind to newer capabilities (`commit_strategy`, `strict_tdd`, `model_overrides`, `test_commands.*`, `review_gates`). Once per session, when `.ai-team/config.yaml` already exists:
+The config template gains keys as the framework evolves; projects bootstrapped earlier keep working (every consumer defaults safely on absent keys) but stay blind to newer capabilities (`commit_strategy`, `strict_tdd`, `model_overrides`, `test_commands.*`, `review_gates`, `retro`). Once per session, when `.ai-team/config.yaml` already exists:
 
 1. Read the installed template at `{install_dir}/skills/organic-scout/references/config-template.md`. The template is the canonical key set — comparing against it directly removes the need for any version field or migration table.
 2. Diff top-level keys: collect template keys absent from the project's `config.yaml`.
@@ -255,7 +255,7 @@ The orchestrator's durable, on-disk copy of one task — audit trail, cost ledge
 task: "<title>"
 created_at: "<ISO-8601 UTC>"
 status: active | paused | done
-mode: normal            # normal | fast-forward | unattended — see "Execution gears" above (distinct from the `mode` flag injected into work-unit-commits, which carries commit_strategy auto|manual)
+mode: normal            # normal | fast-forward | unattended — see "Execution gears" above (distinct from the `mode` flag injected into work-unit-commits, which carries commit_strategy auto|manual, and from organic-retro's `mode: retro | conventions`)
 pending_question: null  # unattended only — set when paused on a stop-on-question event; cleared on resume
 base_ref: "<branch or commit the work builds on>"
 created_by: { tool: "<harness>", model: "<orchestrator model>" }
@@ -295,6 +295,28 @@ receipt reference(s); commit hashes)
 ```
 
 Created at the task's first delegation; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption, session end mid-task, or an `unattended`-gear pending question) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
+
+### Retro trigger
+
+When a task's Brief File flips to `status: done`, the orchestrator writes the `## Close`
+footer (above) first, then consults `.ai-team/config.yaml` → `retro` (canonical key and full
+semantics: `organic-scout/references/config-template.md`):
+
+| Value | Action |
+|---|---|
+| `always` | Delegate `organic-retro` (mode: `retro`) unconditionally. |
+| `on-signal` (default, safe-absent) | Delegate only when the task raised ≥1 signal: any re-brief (DD-14-counted or amendment-exempt), an infra-death, a red blocking `review_gates` gate, or a single delegation whose Cost Ledger row reports >300k tokens. No signal fired → skip silently, no delegation. |
+| `off` | Never delegate `organic-retro`. |
+
+Delegating composes an `organic-retro` delegation: `## Injected Context` carries `mode:
+retro`, `brief_file` (this task's Brief File path), `report_destination`
+(`.ai-team/retros/YYYY-MM-DD-<slug>.md`, the same slug as the Brief File), and every
+review-report path this task's Cost Ledger recorded (`organic-reviewer`/`organic-security`
+`report_destination` values). Model: sonnet (Model Routing below). The returned
+`conventions_proposed` entries are proposals only — the orchestrator applies a user-accepted one
+as a trivial-floor edit to the target file+section the proposal names (Delegation Philosophy
+above), or leaves it for the user; `organic-retro` itself never writes `CLAUDE.md`,
+`AGENTS.md`, or any config file (Principle 2, `common-rules.md`).
 
 ## Organic Delegation Route
 
@@ -562,6 +584,7 @@ Model routing only applies to **delegated sub-agents**. Inline work runs at what
 | organic-security | sonnet | Pattern matching over the diff for security-sensitive surfaces |
 | organic-scout | sonnet | Optional discovery pass; codebase exploration, structured output |
 | work-unit-commits | sonnet | — |
+| organic-retro | sonnet | Retrospective + convention-capture from durable evidence |
 | default | sonnet | Fallback for any delegation with no row above |
 
 ### Project Override
@@ -570,7 +593,7 @@ Check `.ai-team/config.yaml` for `model_overrides` -- project-level overrides ta
 
 ## Sub-Agent Delegation
 
-Use `subagent_type` matching the skill name (`organic-implementer`, `organic-reviewer`, `organic-security`, `organic-scout`, `work-unit-commits`). Each maps to an agent file at `{install_dir}/agents/{name}.md` (Claude Code: `~/.claude/agents/`) or an agent entry in `opencode.json` (OpenCode). The agent file provides identity and tool restrictions; the SKILL.md provides instructions.
+Use `subagent_type` matching the skill name (`organic-implementer`, `organic-reviewer`, `organic-security`, `organic-scout`, `work-unit-commits`, `organic-retro`). Each maps to an agent file at `{install_dir}/agents/{name}.md` (Claude Code: `~/.claude/agents/`) or an agent entry in `opencode.json` (OpenCode). The agent file provides identity and tool restrictions; the SKILL.md provides instructions.
 
 **Delegation pattern (applies to every worker):**
 1. Pass the path to `skills/{name}/SKILL.md` in the delegation prompt. The sub-agent reads it as its first action (the orchestrator passes paths, not content).
@@ -664,7 +687,10 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `group_files` | the union of the brief's `expected_files` paths and the implementer envelope's `artifacts` paths (canonical definition: `common-rules.md` → "Logical group") | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits — makes the receipt gate fireable and restores scoped staging |
 | `prior_report` | the prior pass's on-disk review report path (that pass's own `report_destination`) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
 | `delta_scope` | orchestrator-composed from the remediation diff and the prior receipt; single shape defined ONCE in Evidence-Tier Review → Delta re-validation (chain custody included) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
-| `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit |
+| `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security, organic-retro (retro mode — path convention `.ai-team/retros/`) | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit |
+| `brief_file` | the closed task's Brief File path under `.ai-team/briefs/` | organic-retro (retro mode) | always in retro mode — the skill's primary evidence source (sole authorized Brief File READ) |
+| `review_reports` | the task's on-disk review-report paths, read from the Brief File's receipt records | organic-retro (retro mode) | always in retro mode (may be an empty list; unreadable entries are noted in the skill's `risks`) |
+| `source_material` | the correction/friction context conventions are drawn from | organic-retro (conventions mode) | always in conventions mode — absent → the skill returns `needs_input` |
 | `tier` / `tier_reason` | Evidence-Tier Review classifier | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits |
 | Review Receipt | `organic-reviewer`'s returned receipt (schema: `result-envelope.md` → Review Receipt) | work-unit-commits | verbatim, when `tier >= 1` — the receipt gate `work-unit-commits` enforces reads this injection |
 
