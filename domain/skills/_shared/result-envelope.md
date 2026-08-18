@@ -88,9 +88,9 @@ The orchestrator inspects this field on every return. See `orchestrator-protocol
 
 **Rule for sub-agents**: do not lie. If you read a path that the orchestrator should have given you, report `fallback` and list which inputs were missing in `risks`. Silent fallback defeats the canary.
 
-### `skill_resolution` (REQUIRED for delegated workers that consume stack skills, e.g. `organic-implementer`, `organic-scout`)
+### `skill_resolution` (REQUIRED for `organic-implementer`)
 
-Skill-injection canary for workers that consume stack skills. The orchestrator forwards matching SKILL.md paths from `.ai-team/skill-registry.md` as a `## Skills to load before work` block; this field reports what actually happened:
+Skill-injection canary for the one worker that consumes stack skills. The orchestrator forwards matching SKILL.md paths from `.ai-team/skill-registry.md` as a `## Skills to load before work` block to `organic-implementer` only (Critical Context Forwarding, `orchestrator-protocol.md`); this field reports what actually happened:
 
 | Value | Meaning |
 |-------|---------|
@@ -112,6 +112,7 @@ Produced by `organic-reviewer` for every candidate Evidence-Tier Review classifi
 ```yaml
 tier: 0 | 1 | 2
 tier_reason: "<one line, mandatory — e.g. 'tier 2: modifies session auth middleware'>"
+verdict: review-clear | review-blocked
 lenses:
   correctness:
     status: pass | findings
@@ -129,6 +130,7 @@ overrides:                 # user-accepted findings, if any — omit entirely wh
 
 **Rules:**
 - `tier_reason` is REQUIRED and non-empty for tier 1 and tier 2 — review cost is never unexplained.
+- `verdict` is REQUIRED for tier ≥ 1: `review-blocked` when ≥ 1 CRITICAL finding exists in `organic-reviewer`'s own lenses; `review-clear` otherwise (MAJOR/MINOR findings alone do not block). `organic-reviewer` alone computes and emits this field (`organic-reviewer/SKILL.md` → Hard Rules); `work-unit-commits` gates its commit on it (see `work-unit-commits/SKILL.md` → Decision Gates).
 - `lenses.security` is present only when Evidence-Tier Review activated `organic-security` (tier 2); omit it entirely for tier 1.
 - Every `findings[]` entry's `claim` MUST resolve to a `file:line` citation — this is the receipt-side half of the Citation audit in `orchestrator-protocol.md` → "Evidence-Tier Review"; a claim without a resolvable citation is a contract violation.
 - `overrides` is populated only when the user accepted-and-proceeded over a finding instead of re-engaging the worker; omit the field entirely when no override occurred.

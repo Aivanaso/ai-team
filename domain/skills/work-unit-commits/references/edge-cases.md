@@ -63,3 +63,16 @@
 **After user commits:**
 - The user is responsible for running the provided `commands` in the listed order.
 - Tracking that the manual commit landed is the orchestrator's or user's responsibility (e.g., a follow-up `git log` check) — work-unit-commits has no on-disk record to reconcile against.
+
+## Edge Case 7 — Receipt gate outcomes
+
+**Scenario:** the delegation prompt's tier/receipt context determines whether the gate blocks before any git command runs (Hard Rules, Decision Gates). Four outcomes, all evaluated at Step 2 before Step 3 ever reads `config.yaml`:
+
+| Injected context | Behaviour |
+|---|---|
+| `tier >= 1` declared, no Review Receipt present | `status: blocked`, reason: "tier {N} candidate missing its review receipt". No git command runs. |
+| Neither a `tier` nor a "review off" declaration present | `status: blocked`, reason: "no tier declaration and no review-off declaration — cannot determine the commit gate". An undeclared tier never defaults to tier 0. |
+| Review Receipt present with `verdict: review-blocked` and no entry in `overrides` | `status: blocked`, reason: "review-blocked with no recorded override". A receipt with a recorded override clears the gate normally. |
+| `tier: 0`, or an explicit "review off" declaration | Proceed to commit under ordinary policy — no receipt required, no gate evaluation beyond confirming the declaration itself. |
+
+**Resolution for the three blocked rows:** the orchestrator either supplies the missing declaration/receipt and re-invokes, or the user records an override in the receipt and the orchestrator re-invokes with it. work-unit-commits never infers a tier or a receipt on its own — see [references/envelope-examples.md](references/envelope-examples.md) for the exact envelope shape of each outcome.

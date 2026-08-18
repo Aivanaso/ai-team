@@ -1,6 +1,7 @@
 # Envelope Examples — work-unit-commits
 
-> Load-on-demand reference for Step 8. Four envelope variants covering the main outcomes.
+> Load-on-demand reference for Step 8. Eight envelope variants covering the main outcomes,
+> including the four receipt-gate outcomes from the Decision Gates table.
 
 ## ok (auto mode)
 
@@ -64,6 +65,69 @@ group_id: null
 artifacts: []
 risks:
   - "Expected .ai-team/config.yaml at project root; file not found"
+model_used: "sonnet"
+context_resolution: "self-loaded"
+```
+
+## blocked (tier >= 1, receipt missing)
+
+**Scenario:** the delegation prompt declares `tier: 1` (or 2) but no Review Receipt was injected.
+
+```yaml
+status: blocked
+executive_summary: "tier 1 candidate missing its review receipt — no commit created for billing-export"
+group_id: "billing-export"
+artifacts: []
+risks:
+  - "tier 1 candidate missing its review receipt"
+model_used: "sonnet"
+context_resolution: "self-loaded"
+```
+
+## blocked (no tier declaration, no review-off declaration)
+
+**Scenario:** the delegation prompt carries neither a `tier` value nor an explicit "review off" declaration — the commit gate cannot be evaluated.
+
+```yaml
+status: blocked
+executive_summary: "no tier declaration and no review-off declaration — cannot determine the commit gate for billing-export"
+group_id: "billing-export"
+artifacts: []
+risks:
+  - "no tier declaration and no review-off declaration — cannot determine the commit gate"
+model_used: "sonnet"
+context_resolution: "self-loaded"
+```
+
+## blocked (review-blocked verdict, no recorded override)
+
+**Scenario:** the injected Review Receipt carries `verdict: review-blocked` and its `overrides` field is absent or empty — the user has not accepted the finding.
+
+```yaml
+status: blocked
+executive_summary: "review-blocked with no recorded override — no commit created for billing-export"
+group_id: "billing-export"
+artifacts: []
+risks:
+  - "review-blocked with no recorded override"
+model_used: "sonnet"
+context_resolution: "self-loaded"
+```
+
+## ok (tier 0 / review off — ordinary policy, no receipt required)
+
+**Scenario:** the delegation prompt declares `tier: 0` (or an explicit "review off" declaration) — no Review Receipt is required, and the commit proceeds under ordinary policy.
+
+```yaml
+status: ok
+executive_summary: "Committed docs-typo-fix (1 file) under tier 0 — no review receipt required — SHA def5678ab"
+mode: auto
+commit_sha: "def5678ab"
+group_id: "docs-typo-fix"
+artifacts:
+  - name: "docs-typo-fix commit"
+    path: "git:def5678ab"
+risks: []
 model_used: "sonnet"
 context_resolution: "self-loaded"
 ```

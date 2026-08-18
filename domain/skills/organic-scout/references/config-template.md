@@ -45,6 +45,19 @@ conventions:
 
 commit_strategy: auto  # commit strategy for work-unit-commits skill: auto | manual
 
+# strict_tdd: true
+#   Optional, safe-absent default: false. When true, the orchestrator appends the
+#   STRICT TDD MODE directive to organic-implementer delegations
+#   (red -> green -> triangulate -> refactor).
+
+# test_commands:
+#   unit: "{command}"       # e.g. "npm test" | "pytest" | "phpunit"
+#   security: "{command}"   # e.g. "npm audit" | "composer audit"
+#   Optional. `unit` is the strict_tdd test runner the orchestrator cites, also re-run by
+#   organic-reviewer's verification lens when acceptance_checks don't already cover it.
+#   `security` is the dependency auditor organic-security reads in code-audit mode; omit
+#   if not configured.
+
 structure:
   source: "src/"
   tests: "src/**/*.test.ts"
@@ -76,6 +89,19 @@ architecture:
     # Values: cqrs | repository-pattern | event-driven | event-sourcing |
     #         mediator | factory-pattern | role-based-access | saga
     # Empty list [] when no patterns detected
+
+# model_overrides:
+#   Optional, safe-absent (defaults live in _shared/orchestrator-protocol.md -> "Model
+#   Routing"). Project-level override of the default model per delegated worker.
+#   organic-reviewer: sonnet   # e.g. downgrade from the opus default
+#   Worker names: organic-implementer | organic-reviewer | organic-security |
+#   organic-scout | work-unit-commits.
+
+# rules:
+#   Optional, safe-absent. Free-text custom rules for AI agents, added by hand
+#   (not written by scout bootstrap).
+#   - "{rule}"
+#   Examples: "Never use default exports", "Database queries go through repository pattern".
 ```
 
 ## Detection Heuristics Summary

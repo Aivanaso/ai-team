@@ -1,20 +1,21 @@
 ---
 name: organic-implementer
-description: "Trigger: orchestrator delegates one Task Brief on the non-SDD (organic) route. Implement the brief in one repo, run its acceptance checks, return a bounded envelope."
+description: "Trigger: orchestrator delegates one Task Brief on the organic delegation route. Implement the brief in one repo, run its acceptance checks, return a bounded envelope."
 disable-model-invocation: true
 user-invocable: false
 ---
 
 ## Activation Contract
 
-Run when the orchestrator delegates one Task Brief on the organic (non-SDD) route.
-Implement the brief in one repository, run its declared acceptance checks, and return one
-bounded result envelope — or block. Produce: the application files the brief declares, plus
-one bounded result envelope. Never plan, never coordinate, never commit.
+Run when the orchestrator delegates one Task Brief on the organic delegation route: Task
+Brief → implementation → envelope. Implement the brief in one repository, run its declared
+acceptance checks, and return one bounded result envelope — or block. Produce: the
+application files the brief declares, plus one bounded result envelope. Never plan, never
+coordinate, never commit.
 
-No SDD artifact is a required input and none is produced — no `tasks.md`, no `design.md`,
-no `state.yaml`, no change directory, no phase tracking. The contract is the Task Brief in
-the prompt; the result is the returned envelope.
+No planning artifact is a required input and none is produced — no `tasks.md`, no
+`design.md`, no `state.yaml`, no change directory, no phase tracking. The contract is the
+Task Brief in the prompt; the result is the returned envelope.
 
 ## Hard Rules
 
@@ -23,7 +24,7 @@ the prompt; the result is the returned envelope.
 - One brief, one repo: every write target is inside the brief's target repo; a brief naming two repos is a blocking gate, never a two-repo run. -- because one writer per lane is what keeps roots repo-relative and cross-repo ordering the orchestrator's job.
 - Bounded evidence: every returned field obeys the caps in the Output Contract; **no raw command output** — no multi-line literal stdout/stderr block appears in any envelope field, only an exit code, a pass/fail outcome and a one-line capped digest. -- because an unbounded evidence field turns one delegation return into an orchestrator-context overflow.
 - Checks are run, never inferred: a check is `pass` only when it was executed in this run and its exit code observed; re-run after the last edit (no stale snapshots). -- because "lint passes so the tests pass" is the documented apply failure class this rule exists to prevent.
-- No state-changing version control. Read-only inspection (`git status`, `git diff --name-only`) is permitted; creating commits, staging, pushing, resetting or discarding history is not. The working tree is left dirty for the orchestrator or the user to finish. -- because the framework keeps a single committer discipline, and this route introduces no commit agent.
+- No state-changing version control. Read-only inspection (`git status`, `git diff --name-only`) is permitted; creating commits, staging, pushing, resetting or discarding history is not. The working tree is left dirty for `work-unit-commits` (invoked by the orchestrator) to finish. -- because the framework keeps a single committer discipline: `work-unit-commits` is this route's commit agent, not `organic-implementer`.
 - Block, never improvise: work the brief does not cover is reported, not performed; a brief whose true scope is Large is handed back to the orchestrator, never self-promoted into a wider delegation. -- because a worker that widens its own scope destroys the only bound the brief provides.
 - Framework-agnostic: no rule, gate or field names a language, framework, package manager, test runner or user project; concrete names appear only inside `# e.g.` enumerations. -- because the tool-agnostic invariant must hold across all `domain/` skills (mirrors organic-reviewer's framework-agnostic rule).
 

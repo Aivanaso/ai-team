@@ -66,9 +66,9 @@ left unstaged outside `group_files`, truncated subject, missing commit_strategy)
 
 ## References
 
-- [references/envelope-examples.md](references/envelope-examples.md) — ok (auto), ok (manual), failed (hook reject), blocked (config missing) variants.
+- [references/envelope-examples.md](references/envelope-examples.md) — ok (auto), ok (manual), failed (hook reject), blocked (config missing), blocked (receipt missing), blocked (no tier/review-off declaration), blocked (review-blocked, no override), ok (tier 0 / review off) variants.
 - [references/commit-message-examples.md](references/commit-message-examples.md) — pure feat, mixed feat+fix, project-skill override worked examples.
-- [references/edge-cases.md](references/edge-cases.md) — pre-commit hook reject, file missing, merge conflict, undeclared file, skill contradiction, manual mode pending.
+- [references/edge-cases.md](references/edge-cases.md) — pre-commit hook reject, file missing, merge conflict, undeclared file, skill contradiction, manual mode pending, receipt gate outcomes.
 - `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always).
 - `../_shared/context-protocol.md` — startup sequence.
 - `../_shared/persistence-contract.md` — write rules (loaded per common-rules Principle 5; this route writes no persistent artifact).

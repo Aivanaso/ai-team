@@ -41,7 +41,7 @@ The table below governs the orchestrator's own auxiliary actions (classify, veri
 | Write planning notes shown to the user (plan-mode summaries) | Yes | -- |
 | Write application code (any size, even one file) | -- | Yes |
 | Write with analysis (multiple files, new logic) | -- | Yes |
-| Bash for state (git, gh) | Yes | -- |
+| Bash for state (git status/log/diff, gh) — never commit creation, which `work-unit-commits` owns exclusively | Yes | -- |
 | Bash for execution (test, build, install) | -- | Yes |
 
 Anti-patterns -- reading 4+ files or writing/testing multi-file changes inline, or reading files as prep and then editing inline instead of delegating the whole thing together -- ALWAYS inflate context without need.
@@ -120,7 +120,7 @@ bash skills/_shared/scripts/refresh-skill-registry.sh --project-root {project_ro
 
 (The installer rewrites `skills/_shared/` to the adapter's absolute install path.)
 
-- The script scans project skill roots first (`skills/`, `.claude/skills/`, `.opencode/skills/`, `.agents/skills/` — project wins name collisions), then user roots (`~/.claude/skills/`, `~/.config/opencode/skills/`, `~/.agents/skills/`), and writes `.ai-team/skill-registry.md`: an INDEX of stack/convention skills (name, full trigger description, scope, exact path). Pipeline skills (`organic-implementer`, `work-unit-commits`, `_shared`) stay out — route workers are delegated by name, never matched by stack.
+- The script scans project skill roots first (`skills/`, `.claude/skills/`, `.opencode/skills/`, `.agents/skills/` — project wins name collisions), then user roots (`~/.claude/skills/`, `~/.config/opencode/skills/`, `~/.agents/skills/`), and writes `.ai-team/skill-registry.md`: an INDEX of stack/convention skills (name, full trigger description, scope, exact path). Pipeline skills (`organic-implementer`, `organic-reviewer`, `organic-scout`, `organic-security`, `work-unit-commits`, `_shared`) stay out — route workers are delegated by name, never matched by stack.
 - Freshness needs zero bookkeeping: a fingerprint cache (`.ai-team/.skill-registry.cache`, mtime+size of every SKILL.md found) makes the repeat run a millisecond "cache-hit" no-op, so adding/editing/removing any skill is picked up on the next session automatically.
 - Script missing at the install dir → proceed without a registry, tell the user once ("skill registry unavailable — run `scripts/install.sh`"), and delegate without skills blocks (sub-agents report `skill_resolution: none`).
 
@@ -189,7 +189,7 @@ The only execution route: the orchestrator composes a Task Brief (above) and del
 
 #### What comes back
 
-One bounded result envelope — never a prose summary. `organic-implementer` creates no commits: the orchestrator or the user commits afterward, using ordinary inline git (see the Delegation Philosophy row "Bash for state (git, gh) | Inline: Yes" above). When a skills block was forwarded, the envelope also reports `skill_resolution`.
+One bounded result envelope — never a prose summary. `organic-implementer` creates no commits: the orchestrator invokes `work-unit-commits` (the route's exclusive owner of commit creation, see Receipt and **work-unit-commits Invocation** below) with the injected context assembled per Critical Context Forwarding — a tier 0 candidate (or "review off") commits under ordinary policy, a tier ≥ 1 candidate requires the Review Receipt. When a skills block was forwarded, the envelope also reports `skill_resolution`.
 
 Route the return by its `status`:
 
