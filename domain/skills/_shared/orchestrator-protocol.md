@@ -229,7 +229,12 @@ Each item names its evidence; none may be skipped silently. **Failure consequenc
 
 #### Specialist Activation Matrix
 
-Activation previews the tier decision at brief-authoring time, before any cost is spent — the authoritative tier decision happens post-candidate, on the diff, per **Evidence-Tier Review** below. Evaluated twice: (1) **at brief-authoring time** — from `objective` + `expected_files` + `out_of_scope`, against the Tier 2 surface list (Evidence-Tier Review) and the reviewer's correctness lenses (business logic, state transitions, concurrency, resource lifecycle, error-handling), so the user sees the predicted tier before delegating; (2) **after the worker returns** — against the envelope's `artifacts`, the authoritative evidence, since a worker may touch a surface the brief did not predict — a surface appearing only here reclassifies the tier before the route reports done.
+Activation previews the tier decision at brief-authoring time — this preview is **orientative
+only**: cost information shown to the user before delegating, never a commitment. It is never
+cited as the tier decision; only the post-candidate classification on the actual diff, per
+**Evidence-Tier Review** below, is authoritative. A mismatch between the brief-time preview and
+the final tier is normal, not an error — a worker may touch a surface the objective did not
+predict. Evaluated twice: (1) **at brief-authoring time** — from `objective` + `expected_files` + `out_of_scope`, against the Tier 2 surface list (Evidence-Tier Review) and the reviewer's correctness lenses (business logic, state transitions, concurrency, resource lifecycle, error-handling), so the user sees the predicted tier before delegating; (2) **after the worker returns** — against the envelope's `artifacts`, the authoritative evidence, since a worker may touch a surface the brief did not predict — a surface appearing only here reclassifies the tier before the route reports done.
 
 **Name every reason (no silent skip).** Before delegating a lens — and before *not* delegating one — show one line per lens: `"Tier: 2 — organic-security ACTIVATED (permission check at {path}); organic-reviewer ACTIVATED (same diff)."`
 
@@ -265,7 +270,9 @@ differs from the frontmatter's)
 complete — this is the pause/resume state)
 ## Cost Ledger
 | # | agent | model | tokens | tool_uses | duration | outcome |
-(one row per delegation, appended at envelope ingestion)
+(one row per delegation, appended at envelope ingestion; for an `organic-reviewer` delegation
+`outcome` names the pass type and verdict, e.g. `delta — review-clear` — the durable source the
+consecutive-delta cap counts from, Evidence-Tier Review → Delta re-validation)
 ## Amendments
 (records Scope Verification Checklist events — a brief-feeding discovery that returned no
 `scope_proposal`, or an item the orchestrator closed with its own evidence — and, when a
@@ -429,9 +436,66 @@ The classifier MUST name its reason in one line (e.g. "tier 2: modifies session 
 
 **Accepting a finding.** The user may accept-and-proceed over a tier-1 or tier-2 finding instead of re-engaging the worker, exactly as the retired security/code-review override prompts once allowed. That acceptance is recorded in the review receipt's `overrides` field (see Receipt) — declining one review this way is a per-candidate choice, not the kill switch (see Review kill switch above); the next candidate is classified and reviewed fresh.
 
+### Delta re-validation
+
+Remediation after a review receipt does not always need a full re-review. Two figures, plus the
+rule that forces a full pass:
+
+**Delta re-review.** ELIGIBLE only when the remediation touches ONLY files the prior receipt
+already covered AND adds no new surface — no new files, no new Specialist Activation Matrix
+class (e.g. remediation touching an auth path for the first time re-runs full tier
+classification instead). When eligible, delegate `organic-reviewer` in DELTA MODE: inject
+`prior_report` and `delta_scope` (Critical Context Forwarding below defines both rows).
+`delta_scope` has one shape everywhere it appears: `{ findings_to_verify: [ids], changed_files:
+[paths], prior_verdict_history: [...] }`. **Chain custody: the orchestrator is the chain's
+custodian.** It reads the prior receipt's `verdict_history` (or synthesizes the single-entry
+array for a prior full pass) and injects the full array as `delta_scope.prior_verdict_history`
+alongside `prior_report`; `organic-reviewer` appends EXACTLY ONE entry — its own pass — and
+returns the full resulting chain, never reconstructing earlier entries from the report text
+itself. A delta pass is review-plane material, so the CCF `report_destination` row below applies
+to it exactly as it does to a full pass — the pass's mandatory "not re-verified" list needs a
+durable home the same way a full report does, and also travels in the returned envelope's
+`not_reverified` field, so the gate decision sees the coverage gap without reading the report.
+The delta pass verifies (1) each named finding closed with citation, (2) no new inconsistency
+introduced by the fix, (3) the gates re-run — it does not repeat the prior pass's clean lenses —
+and it verifies its own eligibility against the actual diff before trusting the injected scope
+(`organic-reviewer/SKILL.md` → Execution Steps); a diff wider than the injected scope forces
+`verdict: review-blocked` rather than a silently widened review. The resulting receipt CHAINS:
+it carries `verdict_history` referencing the prior receipt(s) (`result-envelope.md` → Review
+Receipt); the chain's FINAL verdict is the gate input for `work-unit-commits`.
+
+**Full re-review required** when: remediation adds surface beyond the prior receipt's coverage;
+a delta pass itself files a CRITICAL finding; or the objective has already had 2 CONSECUTIVE
+delta passes since its last full pass — any full pass resets this count, so the substrate is
+per-objective-since-last-full-pass, never raw chain length (a delta → delta → full → delta →
+delta sequence for one objective never trips the cap by chain length alone). The orchestrator
+counts this itself from the Brief File's Cost Ledger rows recorded for this objective's review
+delegations — the same pattern as the amendment-request count (Amendment ingestion above) —
+never from the returned chain's length alone. A third remediation round in that run gets fresh
+eyes on the whole candidate, never a third chained delta pass.
+
+**Inline closure — a named exception to the no-inline-edits rule** (cross-referenced at
+"Handling a small addendum after a *terminal* candidate returns" below). Valid ONLY when ALL of
+the following hold: (1) the receipt's `verdict` is `review-clear` — a `review-blocked` verdict
+can NEVER be cleared this way, only a delta or full re-review clears it (Verdict handling
+above); (2) every open finding's fix is mechanically prescribed by the finding text itself (one
+word / one cell / 1-2 sentences, zero design decisions) — never CRITICAL, which cannot occur
+anyway once (1) holds; (3) the closure touches ONLY files already in the receipt's `group_files`
+— a fix needing any other file routes to a re-brief or a delta pass instead, never inline. When
+all three hold, the orchestrator MAY close the findings inline. **Seniority carve-out:** it
+re-runs ONLY the receipt's already-named verification gates itself to evidence the closure
+(`common-rules.md` → Principle 4 Boundary cell names this exception) — every other execution
+stays delegated. It records a `findings_addressed` addendum in the receipt: one entry per
+finding closed, citing the finding id, the exact file(s)/line(s) touched, and the re-run gate
+results — an addendum entry without gate evidence is invalid. The receipt PLUS its
+`findings_addressed` addendum together cover the post-edit tree, closing the coverage gap
+between the reviewed tree and the committed tree. `findings_addressed` NEVER alters `verdict`:
+an inline closure is never a substitute for a delta pass, and a `review-blocked` receipt clears
+only via a delta/full pass or a recorded override.
+
 ### Citation audit (tier ≥ 1, mechanical, BLOCKING)
 
-Every claim in a review result must cite `file:line` evidence — a reviewer's own citation section is a declaration, not proof (Evidence Protocol Rule 6). Run the mechanical check when a review report exists on disk:
+Every claim in a review result must cite `file:line` evidence — a reviewer's own citation section is a declaration, not proof (Evidence Protocol Rule 6). The report exists on disk to run this check against because `report_destination` is ALWAYS injected for review-plane delegations for exactly this reason (Critical Context Forwarding below); an unset injection is the one failure mode that silently disables this BLOCKING gate. Run the mechanical check when a review report exists on disk:
 
 ```
 bash skills/_shared/scripts/check-verify-citations.sh {review-report-path} .
@@ -561,10 +625,13 @@ lose that recoverability.
 **Handling a small addendum after a *terminal* candidate returns:** the orchestrator does not
 edit application code inline — re-engage the worker fresh with the delta inlined (a `## Re-engage
 Reason` block, see Re-engage Routing above). Inline code edits bypass Evidence-Tier Review and
-work-unit-commits' exclusive git ownership. Batch, don't drip: collect every gap found in one
-pass into a single re-engage rather than a per-gap message. This addendum rule is unchanged by
-the amendment channel — it governs only what happens after a *terminal* envelope; a `paused`
-envelope is answered per Amendment ingestion above, not re-engaged fresh.
+work-unit-commits' exclusive git ownership. **The one named exception** is inline closure under
+Evidence-Tier Review → Delta re-validation above — a review-clear receipt's purely mechanical
+findings, gated by the three conditions stated there, never a review-blocked verdict and never a
+design decision. Batch, don't drip: collect every gap found in one pass into a single re-engage
+rather than a per-gap message. This addendum rule is unchanged by the amendment channel — it
+governs only what happens after a *terminal* envelope; a `paused` envelope is answered per
+Amendment ingestion above, not re-engaged fresh.
 
 ### Critical Context Forwarding
 
@@ -587,6 +654,9 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
 | `group_id` | brief-slug label | work-unit-commits, organic-reviewer, organic-security | always when invoking these |
 | `group_files` | the union of the brief's `expected_files` paths and the implementer envelope's `artifacts` paths (canonical definition: `common-rules.md` → "Logical group") | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits — makes the receipt gate fireable and restores scoped staging |
+| `prior_report` | the prior pass's on-disk review report path (that pass's own `report_destination`) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
+| `delta_scope` | orchestrator-composed from the remediation diff and the prior receipt; single shape defined ONCE in Evidence-Tier Review → Delta re-validation (chain custody included) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
+| `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit |
 | `tier` / `tier_reason` | Evidence-Tier Review classifier | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits |
 | Review Receipt | `organic-reviewer`'s returned receipt (schema: `result-envelope.md` → Review Receipt) | work-unit-commits | verbatim, when `tier >= 1` — the receipt gate `work-unit-commits` enforces reads this injection |
 

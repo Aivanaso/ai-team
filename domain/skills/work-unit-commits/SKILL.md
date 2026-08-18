@@ -34,6 +34,7 @@ tier ≥ 1 candidate whose receipt is absent.
 | Neither a tier declaration nor a "review off" declaration is present in the prompt | `status: blocked`, reason: "no tier declaration and no review-off declaration — cannot determine the commit gate" |
 | `tier: 0`, or "review off" declared | Proceed to commit under ordinary policy; no receipt required |
 | Receipt present with `verdict: review-blocked` AND no entry in `overrides` | `status: blocked`, reason: "review-blocked with no recorded override" |
+| Receipt present with `verdict_history` (a delta-chained receipt, `_shared/result-envelope.md` → Review Receipt) | Gate reads the chain's LAST entry, not any earlier one, and cross-checks it against the top-level `verdict` field: match + `review-clear` → satisfies the gate, proceed; match + anything else → same handling as a bare `review-blocked` receipt (row above); **mismatch between the two** → `status: blocked`, reason: "verdict_history/verdict mismatch — receipt integrity failure" (fail closed, never a permissive pick of either field) |
 | Orchestrator did not pass `group_id` | `status: blocked`, reason: "missing group_id in injected context" |
 | `config.yaml` not found at `.ai-team/config.yaml` | `status: blocked`, reason: "config.yaml not found" |
 | `commit_strategy` missing or unrecognised | Default to `auto`; emit WARNING in envelope |

@@ -77,12 +77,49 @@ when the failure surfaces a stack trace or assertion message — the `file:line`
 This is a discrepancy in verified behavior, not a style disagreement; never reconcile it
 silently (Decision Gates).
 
+## Prior Report Unreadable or Delta Scope Absent
+
+**Condition:** `prior_report` is injected but cannot be read on disk (missing, moved, permission
+error), or no `delta_scope` accompanies it, or `delta_scope.findings_to_verify` is an empty
+list.
+
+**Behavior:** Return `status: blocked`, `failure_class: review`, naming the unreachable path or
+the missing field. Do NOT fall back to a bounded pass with an empty closure list — a `verdict:
+review-clear` derived from no prior evidence at all is worse than blocking (Decision Gates). An
+empty `findings_to_verify` list is invalid input, not "nothing to verify".
+
+## Delta Scope Exceeded By The Actual Diff
+
+**Condition:** In DELTA MODE, the actual changed set (`git -C {project_root} diff HEAD
+--name-only`) contains a path outside `delta_scope.changed_files` and the prior report's Scope
+section (Execution Step 2).
+
+**Behavior:** Do NOT silently review the wider diff. Record a CRITICAL correctness finding
+citing the out-of-scope path, `claim`: "delta scope exceeded — full pass required" — the
+standard `verdict` iff (`SKILL.md` → Hard Rules) then resolves to `review-blocked` with no
+special case. This CRITICAL finding is itself the "Delta Pass Files a CRITICAL" case below — the
+orchestrator routes it to a full re-review on the whole candidate, never a further chained delta
+pass.
+
+## Delta Pass Files a CRITICAL
+
+**Condition:** A DELTA MODE pass (Execution Step 2) itself finds ≥ 1 CRITICAL finding — either
+a named finding that is still open, or a new inconsistency introduced by the fix.
+
+**Behaviour:** Set `verdict: review-blocked` as normal (Decision Gates). Do NOT chain a further
+delta pass for the same objective's finding set — a delta pass finding a CRITICAL is itself the
+full-re-review trigger (`orchestrator-protocol.md` → Evidence-Tier Review → Delta
+re-validation). Note this in the executive summary and in `risks`: "delta pass found a CRITICAL
+— escalate to a full re-review, not a further delta." The orchestrator re-engages
+`organic-implementer`, then delegates a full pass (no `prior_report` injected) rather than
+another DELTA MODE run.
+
 ## Compilation/Lint Passes But Code Is Wrong
 
 Passing verification does not mean correct. A service that returns an empty array instead of
 querying the database will pass a shallow test.
 
-- Verification (Execution Step 4) and correctness (Execution Step 3) are independent checks.
+- Verification (Execution Step 5) and correctness (Execution Step 4) are independent checks.
 - Code that verifies clean but does not implement the objective: `verification` shows
   `outcome: pass`, `lenses.correctness` still carries the CRITICAL finding.
 - The overall verdict reflects both — a clean verification list never substitutes for the

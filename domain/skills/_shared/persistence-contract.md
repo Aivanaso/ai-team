@@ -24,7 +24,7 @@ Everything else a skill produces is either:
 
 - an application source file, written by `organic-implementer`, bounded by the Task Brief's `allowed_edit_roots`; or
 - a git commit, created by `work-unit-commits`, the exclusive owner of commit creation; or
-- an optional review/discovery report, written by `organic-reviewer`, `organic-security`, or `organic-scout` (discover mode) at an orchestrator-injected `report_destination` — no fixed path, created only when that destination is injected. Absent an injection, the result envelope is the sole record.
+- a review/discovery report, written by `organic-reviewer`, `organic-security`, or `organic-scout` (discover mode) at an orchestrator-injected `report_destination` — no fixed path. Optional from the skill's side (written only when the destination is injected) but mandatory from the orchestrator's side for every review-plane (`organic-reviewer`, `organic-security`) and scope-authority (`organic-scout` discover mode feeding a Task Brief) delegation (`orchestrator-protocol.md` → Critical Context Forwarding) — "optional" survives only for a genuinely context-light output, e.g. a plain `organic-scout` bootstrap pass that feeds no brief, where the result envelope remains the sole record.
 
 ## Rules
 

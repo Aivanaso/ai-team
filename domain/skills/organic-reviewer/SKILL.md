@@ -14,6 +14,11 @@ creates the commit. Produce a result envelope carrying the Review Receipt (schem
 never a plan. Read application code to find correctness defects and re-run verification
 evidence; never modify application code.
 
+A second mode, DELTA MODE, exists for remediation re-validation: activated whenever the
+delegation prompt injects `prior_report` (the prior on-disk review report path) plus a
+`delta_scope`, it runs a bounded pass instead of the full five-lens review (Decision Gates,
+Execution Steps).
+
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
@@ -35,6 +40,13 @@ evidence; never modify application code.
 | Condition | Action |
 |---|---|
 | Missing `project_root`, `group_id`, `group_files`, `tier`, or `tier_reason` | `status: blocked`, `failure_class: null`, names the missing field(s). Never guess a substitute. |
+| `prior_report` is injected, readable on disk, AND `delta_scope` accompanies it with ≥ 1 entry in `findings_to_verify` | DELTA MODE — run the bounded delta pass (Execution Step 2) instead of the full five-lens pass. |
+| `prior_report` is injected but unreadable/missing on disk, or no `delta_scope` accompanies it | `status: blocked`, `failure_class: review`, names the unreachable path or the missing field — never a bounded pass on a guessed scope. |
+| `delta_scope` is present but `findings_to_verify` is an empty list | `status: blocked`, `failure_class: review` — an empty list is invalid input, not "nothing to verify". |
+| `delta_scope` is injected without `prior_report` | `status: blocked`, `failure_class: review` — a delta scope with no prior report to verify against matches no valid mode. |
+| DELTA MODE, and `delta_scope.prior_verdict_history` is absent or empty | `status: blocked`, `failure_class: review` — the chain cannot be appended to; reconstructing it from report text is prohibited (`_shared/result-envelope.md` → Review Receipt) and truncating it loses audit history. |
+| Neither `prior_report` nor `delta_scope` is injected | Run the full pass as normal (not DELTA MODE). |
+| DELTA MODE, and the actual changed set (`git -C {project_root} diff HEAD --name-only`) contains a path outside `delta_scope.changed_files` and the prior report's Scope section | Record a CRITICAL correctness finding citing the out-of-scope path, `claim`: "delta scope exceeded — full pass required" — the verdict then follows the standard iff below; never silently review the wider diff. |
 | `group_files` is declared but a file cannot be read (permission error, path resolves outside `project_root`, `git -C {project_root}` itself fails) — the review step cannot complete, not merely an empty scope | `status: blocked`, `failure_class: review`, names the unreachable path or command. |
 | `group_files` is empty, or none of the declared files exist on disk and `git diff HEAD -- <group_files>` shows no changes | `status: ok`, `verdict: review-clear`, note "no candidate changes to review". See `references/edge-cases.md`. |
 | Finding confidence > 80% | Record finding. |
@@ -48,19 +60,22 @@ evidence; never modify application code.
 
 ## Execution Steps
 
-1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes no `.ai-team/` artifact by default). Validate injected context: `project_root`, `group_id`, `group_files`, `tier`, `tier_reason`, the implementer's result envelope (when forwarded), and an optional `report_destination`. Report `context_resolution` honestly.
-2. Resolve each `group_files` path relative to `project_root`; read the **full current content** of each file — this covers newly created files, which a diff would not surface. Run `git -C {project_root} diff HEAD -- <group_files>` as a scope pointer to the changed regions in already-tracked files. Read up to 10 1-hop callers for context.
-3. Apply the five correctness lenses (business logic, state transitions, concurrency, resource lifecycle, error handling) to the full file contents. New files are wholly in scope; the diff scopes findings only within already-tracked files. Ground each finding in `file:line`. Suppress confidence ≤ 80% with a tally.
-4. Re-run every command in the Task Brief's `acceptance_checks` verbatim, plus any `config.yaml`-declared build/lint command the checks do not already cover. Capture command, exit code, and `pass`/`fail` outcome for each — a one-line digest, never raw stdout. A contradiction against the implementer's claimed outcome becomes a CRITICAL finding (Decision Gates). Also run every `review_gates` entry declared in `.ai-team/config.yaml` (objective gates — command + exit code only, no confidence threshold); capture command, exit code, and `pass`/`fail` outcome for each, and assign severity per Decision Gates.
-5. Compute the verdict from this skill's own findings (Hard Rules). Compose the Review Receipt: `tier`, `tier_reason`, `lenses.correctness` (`status: pass | findings`, findings list), `verification` (per-command evidence), `overrides: []` (the orchestrator populates this field, never this skill).
-6. When `report_destination` is injected, write the report per `references/report-format.md` there (create its parent directory if absent), resolved relative to `project_root`. Run `bash _shared/scripts/check-verify-citations.sh {report_destination} .` when applicable — it validates both the legacy `COMPLIANT`/`FAILING` row shape and this skill's `F-<n>` / CRITICAL·MAJOR·MINOR finding blocks, requiring a resolvable `file:line` citation on every finding it detects. Otherwise the envelope's Review Receipt is the sole record.
-7. Return the envelope per Output Contract.
+1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes no `.ai-team/` artifact by default). Validate injected context: `project_root`, `group_id`, `group_files`, `tier`, `tier_reason`, the implementer's result envelope (when forwarded), `report_destination` (always injected for review-plane passes per Critical Context Forwarding — treat absence as degradation: report `context_resolution: fallback` and flag it in `risks`), and — for DELTA MODE — `prior_report` plus its delta scope. Report `context_resolution` honestly.
+2. When `prior_report` is injected, enter DELTA MODE: read the prior report on disk. **Verify delta eligibility itself before trusting the injected scope** — diff the actual changed set (`git -C {project_root} diff HEAD --name-only`) against `delta_scope.changed_files` and the prior report's Scope section; any changed path outside that coverage voids delta eligibility — record a CRITICAL correctness finding citing the out-of-scope path (`claim`: "delta scope exceeded — full pass required") instead of silently reviewing the wider diff (Decision Gates). The verdict then follows the standard iff (Hard Rules) with no special case, and the CRITICAL finding is itself the "Delta Pass Files a CRITICAL" trigger (`references/edge-cases.md`), escalating to a full re-review. When eligible, run a bounded pass scoped to (a) verifying each named finding closed with citation, (b) checking the delta scope's changed files for any new inconsistency the fix introduced, (c) re-running the gates — do NOT repeat the prior pass's clean lenses. Compose the mandatory "not re-verified" list: every lens/file the prior pass covered that this pass did not re-check, with the reason (already clean in the prior pass, or out of delta scope) — this list also travels in the returned envelope's `not_reverified` field (Output Contract). A CRITICAL finding in a delta pass escalates to a full re-review (`references/edge-cases.md`) rather than a further delta. Absent `prior_report`, skip this step and run the full pass below.
+3. Resolve each `group_files` path relative to `project_root` (in DELTA MODE, the delta scope's files); read the **full current content** of each file in scope — this covers newly created files, which a diff would not surface. Run `git -C {project_root} diff HEAD -- <group_files>` as a scope pointer to the changed regions in already-tracked files. Read up to 10 1-hop callers for context.
+4. Apply the five correctness lenses (business logic, state transitions, concurrency, resource lifecycle, error handling) to the full file contents in scope. New files are wholly in scope; the diff scopes findings only within already-tracked files. Ground each finding in `file:line`. Suppress confidence ≤ 80% with a tally. In DELTA MODE this step is bounded to the delta scope per Step 2, not the prior pass's already-clean lenses.
+5. Re-run every command in the Task Brief's `acceptance_checks` verbatim, plus any `config.yaml`-declared build/lint command the checks do not already cover. Capture command, exit code, and `pass`/`fail` outcome for each — a one-line digest, never raw stdout. A contradiction against the implementer's claimed outcome becomes a CRITICAL finding (Decision Gates). Also run every `review_gates` entry declared in `.ai-team/config.yaml` (objective gates — command + exit code only, no confidence threshold); capture command, exit code, and `pass`/`fail` outcome for each, and assign severity per Decision Gates.
+6. Compute the verdict from this skill's own findings (Hard Rules). Compose the Review Receipt: `tier`, `tier_reason`, `lenses.correctness` (`status: pass | findings`, findings list), `verification` (per-command evidence), `overrides: []` (the orchestrator populates this field, never this skill). In DELTA MODE, append EXACTLY ONE entry — this pass's own — to the `delta_scope.prior_verdict_history` array injected by the orchestrator, return the full resulting chain as `verdict_history`, and carry the Step 2 "not re-verified" list forward as `not_reverified` (schema: `_shared/result-envelope.md` → Review Receipt).
+7. When `report_destination` is injected, write the report per `references/report-format.md` there (create its parent directory if absent), resolved relative to `project_root` — use the Delta Report Variant in DELTA MODE. Run `bash _shared/scripts/check-verify-citations.sh {report_destination} .` when applicable — it validates both the legacy `COMPLIANT`/`FAILING` row shape and this skill's `F-<n>` / CRITICAL·MAJOR·MINOR finding blocks, requiring a resolvable `file:line` citation on every finding it detects. `report_destination` is always injected for review-plane passes; in the degraded case where it is absent, the envelope's Review Receipt is the only record and the blocking Citation audit cannot fire — flag that in `risks`.
+8. Return the envelope per Output Contract.
 
 ## Output Contract
 
-Writes nothing by default; writes the report at the injected `report_destination` (resolved
-relative to `project_root`) only when one is provided — no fixed path, no `.ai-team/`
-artifact. Returns:
+Writes the report at the injected `report_destination` (resolved relative to `project_root`) —
+mandatory from the orchestrator's side for every review-plane delegation
+(`orchestrator-protocol.md` → Critical Context Forwarding); optional only from this skill's own
+write step, i.e. it writes nothing when no destination is injected. No fixed path, no separate
+`.ai-team/` artifact. Returns:
 
 ```yaml
 status: ok | blocked            # blocked only on missing context, NOT on a review-blocked verdict
@@ -78,7 +93,9 @@ lenses:
 verification:
   - { command: "<verbatim>", exit_code: 0, outcome: pass | fail, gate: "<name>" }  # gate: present only for review_gates entries
 overrides: []                   # always empty on return — the orchestrator populates this field
-verdict: review-clear | review-blocked
+verdict: review-clear | review-blocked   # null only in a status:blocked context-failure envelope, where no review ran
+verdict_history: []             # DELTA MODE only — the full chain incl. this pass's appended entry; omit entirely on a full pass
+not_reverified: []              # DELTA MODE only — areas/lenses/files the prior pass covered that this pass did not re-check; omit entirely on a full pass
 suppressed_count: 0
 next_recommended: []
 risks: []
@@ -89,13 +106,21 @@ context_resolution: self-loaded | fallback | none
 `lenses.security` is never present in this skill's own return — the orchestrator merges
 `organic-security`'s separate result into the receipt at tier 2 (see Hard Rules).
 
+A DELTA MODE receipt additionally carries `verdict_history` — this pass APPENDS exactly one
+entry to the array injected as `delta_scope.prior_verdict_history` (chain custody:
+`orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation; schema:
+`_shared/result-envelope.md` → Review Receipt) and returns the full chain — and `not_reverified`
+(the areas/lenses/files the prior pass covered that this pass did not re-check, mirroring the
+on-disk report's "Not Re-Verified" list, `references/report-format.md` → Delta Report Variant);
+a full-pass receipt omits both fields entirely.
+
 ## References
 
-- [references/report-format.md](references/report-format.md) — the on-disk report template (receipt-shaped); load at Step 6 when `report_destination` is injected.
-- [references/envelope-examples.md](references/envelope-examples.md) — review-clear / review-blocked / blocked envelope variants; load when composing the result.
-- [references/edge-cases.md](references/edge-cases.md) — no candidate changes, all-suppressed, missing context, large file set, unrunnable checks, verification discrepancy; load when an unexpected condition arises.
+- [references/report-format.md](references/report-format.md) — the on-disk report template (receipt-shaped), plus the Delta Report Variant; load at Step 7 when `report_destination` is injected.
+- [references/envelope-examples.md](references/envelope-examples.md) — review-clear / review-blocked / blocked / delta envelope variants; load when composing the result.
+- [references/edge-cases.md](references/edge-cases.md) — no candidate changes, all-suppressed, missing context, large file set, unrunnable checks, verification discrepancy, unreadable prior report/absent delta scope, delta scope exceeded, delta pass files a CRITICAL; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
 - `../_shared/persistence-contract.md` — write rules (loaded per common-rules Principle 5; this skill writes no `.ai-team/` artifact by default).
 - `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
-- `../_shared/result-envelope.md` — Review Receipt schema (canonical field shapes); load at Step 5.
+- `../_shared/result-envelope.md` — Review Receipt schema (canonical field shapes, incl. `verdict_history`); load at Step 6.
 - `../_shared/evidence-protocol.md` — Rule 1 (file:line citation mandatory for every finding).

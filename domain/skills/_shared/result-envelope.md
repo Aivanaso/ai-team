@@ -186,7 +186,7 @@ Produced by `organic-reviewer` for every candidate Evidence-Tier Review classifi
 ```yaml
 tier: 0 | 1 | 2
 tier_reason: "<one line, mandatory — e.g. 'tier 2: modifies session auth middleware'>"
-verdict: review-clear | review-blocked
+verdict: review-clear | review-blocked   # null only in a status:blocked context-failure envelope, where no review ran
 lenses:
   correctness:
     status: pass | findings
@@ -200,6 +200,12 @@ verification:
   - { command: "<verbatim>", exit_code: 0, outcome: pass | fail, gate: "<name>" }  # gate: optional, present only for review_gates outcomes
 overrides:                 # user-accepted findings, if any — omit entirely when empty
   - { finding_id: "F-1", justification: "<user-supplied, one sentence>" }
+verdict_history:           # optional — present only on a delta-mode receipt; omit entirely on a full-pass receipt
+  - { pass: full | delta, report: "<path to that pass's on-disk report>", verdict: review-clear | review-blocked, note: "<one line>" }
+not_reverified:            # optional — present only on a delta-mode receipt; omit entirely on a full-pass receipt
+  - "<one line — lens/file not re-checked this pass, and why: already clean in the prior pass | outside the delta scope>"
+findings_addressed:        # optional — orchestrator-authored addendum for an inline closure (Evidence-Tier Review → Delta re-validation → "Inline closure"); omit entirely otherwise
+  - { finding_id: "F-1", fix_evidence: "<path:line or command output digest>", gate_results: "<pass|fail summary>" }
 ```
 
 **Rules:**
@@ -208,6 +214,9 @@ overrides:                 # user-accepted findings, if any — omit entirely wh
 - `lenses.security` is present only when Evidence-Tier Review activated `organic-security` (tier 2); omit it entirely for tier 1.
 - Every `findings[]` entry's `claim` MUST resolve to a `file:line` citation — this is the receipt-side half of the Citation audit in `orchestrator-protocol.md` → "Evidence-Tier Review"; a claim without a resolvable citation is a contract violation.
 - `overrides` is populated only when the user accepted-and-proceeded over a finding instead of re-engaging the worker; omit the field entirely when no override occurred.
+- `verdict_history` is present only on a delta-mode receipt (`orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation): one entry per pass in the chain — the initial full pass, then every delta pass since, oldest first. **Chain custody:** the orchestrator is the chain's custodian — it injects the prior receipt's full `verdict_history` array as `delta_scope.prior_verdict_history` (Critical Context Forwarding) alongside `prior_report`; `organic-reviewer` appends EXACTLY ONE entry, its own pass, and returns the full resulting chain — it never reconstructs earlier entries from the report text. The LAST entry's `verdict` is authoritative for the commit gate (`work-unit-commits`, Decision Gates) and MUST mirror this receipt's own top-level `verdict` field; an earlier entry recording `review-blocked` does not itself block once a later entry clears it. A receipt whose last entry disagrees with the top-level `verdict` is a contract violation — `work-unit-commits` fails closed on it (`work-unit-commits/SKILL.md` → Decision Gates), never silently picking one field over the other. Omit the field entirely for a full-pass receipt.
+- `not_reverified` is present only on a delta-mode receipt: the areas/lenses/files the prior pass covered that this pass did not re-check, mirroring the on-disk report's mandatory "Not Re-Verified" list (`organic-reviewer/references/report-format.md` → Delta Report Variant) — carrying the coverage gap into the envelope itself, since the orchestrator ingests only the envelope and never reads the report's full contents (Purpose above). Omit the field entirely for a full-pass receipt.
+- `findings_addressed` is an optional, orchestrator-authored addendum — mirroring `overrides`, `organic-reviewer` never writes it — recording an inline closure per `orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation → "Inline closure". Eligible only when ALL of: the receipt's own top-level `verdict` was ALREADY `review-clear` before the closure (a `review-blocked` receipt is never cleared this way), every closed finding's fix was mechanically prescribed by the finding text itself (never CRITICAL), and the closure touched only files already in the receipt's `group_files`. One entry per finding closed this way, citing the fix evidence and the re-run gate results — an entry without gate evidence is invalid. Never used for a CRITICAL finding, and never alters the receipt's top-level `verdict` field — an addendum records that a closure happened, it does not re-compute the gate.
 - A `verification[]` entry carrying `gate:` is an objective `review_gates` outcome from `.ai-team/config.yaml` — exit code only, never subject to the confidence threshold. A failing gate additionally lands as a `lenses.correctness.findings[]` entry: `file`/`line` cite the gate's declaring entry in `.ai-team/config.yaml` (always a resolvable citation, so the citation-suppression rule above never suppresses it), and `claim` names gate name + command + exit code. A failing blocking gate is CRITICAL and forces `verdict: review-blocked`; a failing non-blocking gate is MAJOR and does not block.
 - Tier 0 candidates produce no receipt — the result envelope alone is the record.
 

@@ -1,6 +1,6 @@
 # Review Report Format — organic-reviewer
 
-> Load at Step 6, only when `report_destination` is injected. This is the on-disk report
+> Load at Step 7, only when `report_destination` is injected. This is the on-disk report
 > template; the envelope's Review Receipt (see `_shared/result-envelope.md`) is the record
 > of authority — this file is a durable copy written into the target repo.
 
@@ -76,3 +76,42 @@ outcome produces one, it is listed directly under the Correctness Findings headi
 one exists (no empty "Gate" section for projects with no `review_gates` declared). Finding IDs
 are stable within the report so an override decision recorded in the receipt's `overrides`
 field can cite `F-N` by reference.
+
+## Delta Report Variant
+
+Used only for a DELTA MODE pass (`prior_report` injected, Execution Step 2). Replaces the
+full five-lens template above with a compact report chained to the prior pass — the delta pass
+does not re-render the prior pass's clean lenses.
+
+````markdown
+# Delta Review Report: {group_id}
+
+**Date:** {current_iso_utc}
+**Tier:** {tier} — {tier_reason}
+**Prior report:** {prior_report path}
+**Verdict:** review-clear | review-blocked
+**Chain:** {N} passes total (see `verdict_history` in the Review Receipt)
+
+## Closures Verified
+
+{for each named finding from the delta scope: "F-N — closed, {citation}" or "F-N — still open, {citation}"}
+
+## New Inconsistency Check
+
+{findings from the delta scope only, same per-finding structure as above, or "None found"}
+
+## Gates Re-run
+
+| Command | Exit Code | Outcome | Gate |
+|---------|-----------|---------|------|
+| {verbatim command} | {int} | pass / fail | {gate name or —} |
+
+## Not Re-Verified
+
+{mandatory — every lens/file the prior pass covered that this pass did not re-check, with the
+reason: "already clean in the prior pass" | "outside the delta scope"}
+````
+
+A CRITICAL finding in a delta pass escalates to a full re-review — the delta report format is
+never chained a third time for the same objective's finding set
+(`references/edge-cases.md` → "Delta Pass Files a CRITICAL").

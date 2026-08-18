@@ -112,17 +112,48 @@ model_used: "opus"
 context_resolution: self-loaded
 ```
 
-## Variant 5: blocked (missing context)
+## Variant 5: DELTA MODE, review-clear (chained via verdict_history)
+
+```yaml
+status: ok
+executive_summary: "Delta pass for cache-invalidation verified F-1 closed with a mutex guard; no new inconsistency; gates re-run clean. Chain is now review-clear."
+group_id: cache-invalidation
+artifacts: []
+tier: 2
+tier_reason: "tier 2: modifies cross-module public contract"
+lenses:
+  correctness:
+    status: pass
+    findings: []
+verification:
+  - { command: "<test suite>", exit_code: 0, outcome: pass }
+overrides: []
+verdict_history:
+  - { pass: full, report: ".ai-team/reviews/cache-invalidation/full.md", verdict: review-blocked, note: "1 CRITICAL: F-1 unsynchronized shared counter (src/cache.ts:57)" }
+  - { pass: delta, report: ".ai-team/reviews/cache-invalidation/delta-1.md", verdict: review-clear, note: "F-1 closed with a mutex guard; no new inconsistency; gates re-run clean" }
+not_reverified:
+  - "concurrency lens over src/session.ts — already clean in the prior full pass, outside this delta's changed files"
+verdict: review-clear
+suppressed_count: 0
+next_recommended:
+  - "work-unit-commits"
+risks: []
+model_used: "opus"
+context_resolution: self-loaded
+```
+
+## Variant 6: blocked (missing context)
 
 ```yaml
 status: blocked
+failure_class: null             # missing-context block, not a review-step failure — see Decision Gates
 executive_summary: "Required field 'group_files' is missing from injected context. Cannot determine which files to review."
 group_id: null
 artifacts: []
 lenses: {}
 verification: []
 overrides: []
-verdict: review-clear
+verdict: null                   # never review-clear/review-blocked here — no review ran, so no verdict was computed
 suppressed_count: 0
 next_recommended: []
 risks:
