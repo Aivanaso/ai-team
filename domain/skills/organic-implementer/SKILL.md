@@ -14,8 +14,11 @@ application files the brief declares, plus one bounded result envelope. Never pl
 coordinate, never commit.
 
 No planning artifact is a required input and none is produced — no `tasks.md`, no
-`design.md`, no `state.yaml`, no change directory, no phase tracking. The contract is the
-Task Brief in the prompt; the result is the returned envelope.
+`design.md`, no `state.yaml`, no change directory, no phase tracking. The orchestrator
+maintains a durable Brief File per task (`orchestrator-protocol.md` → "Task Brief" → "Brief
+File (durable copy)"), but it is not this skill's concern — organic-implementer neither reads
+nor writes it. The contract is the Task Brief in the prompt; the result is the returned
+envelope.
 
 ## Hard Rules
 

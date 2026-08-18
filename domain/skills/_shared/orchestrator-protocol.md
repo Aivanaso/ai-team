@@ -101,6 +101,10 @@ For **Medium and Large** tasks — this is the route firing for every non-trivia
 
 Run once per session, before the first delegation.
 
+### Brief Resume Check (every session)
+
+Once per session, before classifying new work: scan `.ai-team/briefs/*.md` frontmatter. If any brief has `status: active` or `status: paused`, surface it and offer resume — e.g. "Found an in-progress task: {task} ({status}, phases: {checked}/{total}). Resume?" — before the Mandatory Classification Gate fires on new work. Zero briefs, or every brief `status: done` → no-op, say nothing.
+
 ### Config Refresh Check (existing projects)
 
 The config template gains keys as the framework evolves; projects bootstrapped earlier keep working (every consumer defaults safely on absent keys) but stay blind to newer capabilities (`commit_strategy`, `strict_tdd`, `model_overrides`, `test_commands.*`, `review_gates`). Once per session, when `.ai-team/config.yaml` already exists:
@@ -183,13 +187,44 @@ When a lens is activated, inject `group_files` (the union of the brief's `expect
 
 One brief = one repo = one worker. For a change spanning more than one repository, each repo gets its own Task Brief and its own `organic-implementer` invocation, each scoped to that repo's edit roots. The orchestrator holds cross-repo ordering (which brief runs before which) and the cross-repo contract itself (what each side must expose to the other, in what order) — no single worker writes to two repos, and two briefs targeting the same repo never run concurrently; concurrent writers inside one repo are out of scope for this route.
 
+#### Brief File (durable copy)
+
+The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the target project. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
+
+```markdown
+---
+task: "<title>"
+created_at: "<ISO-8601 UTC>"
+status: active | paused | done
+mode: normal            # reserved field; gear semantics arrive in a later change
+base_ref: "<branch or commit the work builds on>"
+created_by: { tool: "<harness>", model: "<orchestrator model>" }
+---
+## Task Brief
+(verbatim copy of every six-element YAML block delegated for this task; one block per
+objective, appended as the task progresses)
+## Phases
+(checkbox list of the task's logical groups; the orchestrator checks items as groups
+complete — this is the pause/resume state)
+## Cost Ledger
+| # | agent | model | tokens | tool_uses | duration | outcome |
+(one row per delegation, appended at envelope ingestion)
+## Amendments
+(reserved; "none" until the amendment channel ships in a later change)
+## Close
+(written when status flips to done: totals — agents, tokens; re-brief count with causes;
+receipt reference(s); commit hashes)
+```
+
+Created at the task's first delegation; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption or session end mid-task) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
+
 ## Organic Delegation Route
 
-The only execution route: the orchestrator composes a Task Brief (above) and delegates it to `organic-implementer` — one synchronous, envelope-returning delegation per **Synchronous delegation — no live-agent continuation** below. No state machine, no `change_dir`, no phase tracking, no archive: the contract lives in the delegation prompt, the result lives in one bounded envelope, and Evidence-Tier Review decides what happens before commit.
+The only execution route: the orchestrator composes a Task Brief (above) and delegates it to `organic-implementer` — one synchronous, envelope-returning delegation per **Synchronous delegation — no live-agent continuation** below. No state machine, no `change_dir`, no per-worker phase tracking, no archive phase: the contract still lives in the delegation prompt, the result still lives in one bounded envelope, and workers stay stateless. The orchestrator maintains the durable copy — one Brief File per task (see **Task Brief** → "Brief File (durable copy)") as the route's cost ledger and resume state; Evidence-Tier Review decides what happens before commit.
 
 #### What comes back
 
-One bounded result envelope — never a prose summary. `organic-implementer` creates no commits: the orchestrator invokes `work-unit-commits` (the route's exclusive owner of commit creation, see Receipt and **work-unit-commits Invocation** below) with the injected context assembled per Critical Context Forwarding — a tier 0 candidate (or "review off") commits under ordinary policy, a tier ≥ 1 candidate requires the Review Receipt. When a skills block was forwarded, the envelope also reports `skill_resolution`.
+One bounded result envelope — never a prose summary. `organic-implementer` creates no commits: the orchestrator invokes `work-unit-commits` (the route's exclusive owner of commit creation, see Receipt and **work-unit-commits Invocation** below) with the injected context assembled per Critical Context Forwarding — a tier 0 candidate (or "review off") commits under ordinary policy, a tier ≥ 1 candidate requires the Review Receipt. When a skills block was forwarded, the envelope also reports `skill_resolution`. At every envelope ingestion the orchestrator appends one row to the Brief File's Cost Ledger and updates its Phases checkboxes (see **Task Brief** → "Brief File (durable copy)").
 
 Route the return by its `status`:
 

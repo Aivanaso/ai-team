@@ -45,7 +45,7 @@ tier ≥ 1 candidate whose receipt is absent.
 
 ## Execution Steps
 
-1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this route writes no persistent artifact, only the working tree commit itself). Validate injected context: `group_id`, `project_root`, `mode`, `tier` (or a "review off" declaration), `group_files`, and — when `tier >= 1` — the Review Receipt (verbatim). Block if `group_id` or `project_root` is missing.
+1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes no persistent artifact, only the working tree commit itself). Validate injected context: `group_id`, `project_root`, `mode`, `tier` (or a "review off" declaration), `group_files`, and — when `tier >= 1` — the Review Receipt (verbatim). Block if `group_id` or `project_root` is missing.
 2. Apply the receipt gate (Decision Gates): missing receipt at tier ≥ 1, or neither a tier nor a review-off declaration present, blocks before any git command runs. A `review-blocked` receipt with a recorded override in `overrides` clears this gate.
 3. Read `.ai-team/config.yaml`. Extract `commit_strategy` (default `auto` if absent — emit WARNING).
 4. Skill-first resolution: check `{project_root}/.claude/skills/commit/SKILL.md`, then `~/.claude/skills/commit/SKILL.md`. If found, load and apply its rules for commit message composition.
@@ -71,5 +71,5 @@ left unstaged outside `group_files`, truncated subject, missing commit_strategy)
 - [references/edge-cases.md](references/edge-cases.md) — pre-commit hook reject, file missing, merge conflict, undeclared file, skill contradiction, manual mode pending, receipt gate outcomes.
 - `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always).
 - `../_shared/context-protocol.md` — startup sequence.
-- `../_shared/persistence-contract.md` — write rules (loaded per common-rules Principle 5; this route writes no persistent artifact).
+- `../_shared/persistence-contract.md` — write rules (loaded per common-rules Principle 5; this skill writes no persistent artifact).
 - `../_shared/result-envelope.md` — envelope schema and Review Receipt shape (gate input).

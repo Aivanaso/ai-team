@@ -13,8 +13,9 @@ discovery offer, or on demand for open-ended project inspection. Two modes: **bo
 detects the project stack and generates `config.yaml`; **discover** investigates a topic or
 objective and returns a discovery report — key files, structure, existing patterns to
 follow, and risks, grounded in read evidence with `file:line` citations. Never write
-application code. Never modify existing source files. Never write `design.md` or any
-`.ai-team/` artifact other than `config.yaml` (bootstrap only).
+application code. Never modify existing source files. Writes only `config.yaml` (bootstrap
+mode) and its own report at an injected `report_destination` (discover mode) — never
+`design.md`, and never under `.ai-team/briefs/` (Brief Files are orchestrator-authored only).
 
 ## Hard Rules
 

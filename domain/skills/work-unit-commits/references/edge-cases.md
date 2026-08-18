@@ -58,7 +58,7 @@
 
 **Behaviour during skill execution:**
 - Envelope `status: ok`, `mode: manual`, `manual_commit: { message, files, commands }`.
-- No persistent artifact is updated — this route tracks no state file, so there is nothing to mark "pending" on disk.
+- No persistent artifact is updated by this skill — the route's state file (the orchestrator's Brief File) is orchestrator-authored, so work-unit-commits marks nothing "pending" on disk.
 
 **After user commits:**
 - The user is responsible for running the provided `commands` in the listed order.

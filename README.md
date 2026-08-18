@@ -142,8 +142,10 @@ that follows the model above.
 ## Persistence
 
 Every delegated worker is stateless: it reads its skill file and the delegation prompt, writes
-the files its brief declares, and returns one bounded result envelope. There is no phase
-tracking and no `state.yaml`. A project accumulates these filesystem artifacts:
+the files its brief declares, and returns one bounded result envelope. There is still no
+`state.yaml` — phase tracking now lives in the orchestrator's Brief File checkboxes
+(see `domain/skills/_shared/orchestrator-protocol.md` → "Task Brief" → "Brief File (durable
+copy)"). A project accumulates these filesystem artifacts:
 
 - `.ai-team/config.yaml` — project stack, conventions, structure, architecture, and
   `commit_strategy` (default `auto`), written once by `organic-scout` on first bootstrap, then
@@ -153,6 +155,11 @@ tracking and no `state.yaml`. A project accumulates these filesystem artifacts:
 - `.ai-team/skill-registry.md` and `.ai-team/.skill-registry.cache` — the stack/convention
   skill index and its freshness fingerprint, refreshed once per session (see the orchestrator
   protocol's Session Init → "Skill Registry Refresh").
+- `.ai-team/briefs/` — one durable Brief File per task, orchestrator-authored only: audit
+  trail, cost ledger, and pause/resume state. Session Init → "Brief Resume Check" offers to
+  resume any `active`/`paused` brief at the start of the next session.
+- `.ai-team/retros/` — per-task retrospectives; format and generation defined by a later
+  change.
 - An on-disk report copy, only when a reviewer or security pass runs with a
   `report_destination` injected.
 
