@@ -54,7 +54,7 @@ Rationale: mocking a framework boundary (e.g., `MessageBusInterface` as a spy) m
 
 ## Rule 4 — Validate Assumed Invariants at Brief-Authoring / Discovery Time
 
-When a Task Brief or a discovery report depends on a **codebase-wide invariant** (a naming convention, a regex, a contract, a "consistency" assumption), the party asserting it — the orchestrator composing the Task Brief, or `organic-scout` running discovery — MUST validate it with greps before finalizing the brief or the report.
+When a Task Brief or a discovery report depends on a **codebase-wide invariant** (a naming convention, a regex, a contract, a "consistency" assumption), the party asserting it — the orchestrator composing the Task Brief, or `organic-scout` running discovery — MUST validate it with greps before finalizing the brief or the report. The `scope_proposal` block (`organic-scout`, discover mode) is this rule's natural artifact: an invariant the proposal relies on is validated — or listed as an open question — before the brief is composed.
 
 **Trigger** — this rule activates ONLY if the brief's objective/out_of_scope text, the discovery request, or the user's request contains one of these signals about the invariant:
 

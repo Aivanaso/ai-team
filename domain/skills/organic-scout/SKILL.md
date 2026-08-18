@@ -27,6 +27,10 @@ mode) and its own report at an injected `report_destination` (discover mode) —
 - Discover: name actual files, classes, interfaces, and directories. Abstract descriptions ("a service", "some module") are not accepted. -- because abstract descriptions force the Task Brief author to make decisions scout had the evidence to answer.
 - Discover: follow existing project patterns in the report's recommendations — if the project uses a repository pattern, the report names it as the pattern to follow; it does not propose a new paradigm the discovery request did not ask for.
 - Discover: the report is returned in the result envelope, not persisted as a `.ai-team/` artifact by default — the orchestrator folds it directly into the Task Brief it composes next. Write it to disk only when a `report_destination` is injected.
+- Discover, scope_proposal: when the orchestrator injects `scope_proposal: true`, every `expected_files` entry in the proposal carries its own `file:line` evidence — a path without evidence is not a proposal, it is a guess.
+- Discover, scope_proposal: every proposed `acceptance_checks.command` is verified runnable BEFORE proposing it — execute it read-only when side-effect-free, otherwise cite the declaring target's existence (e.g. the `targets` block of a `project.json`, a script in `package.json`/`Makefile`) with `file:line`. An unrunnable check protects nothing and burns a delegation round.
+- Discover, scope_proposal: before closing `expected_files`, sweep construction sites of every touched type/interface — grep for object literals, builders, stubs, and factories that build it, not only files that annotate or mention it. A type gaining a required member breaks its constructors first.
+- Discover, scope_proposal: trace the objective's chain to the leaves — if the report's prose describes a data/control flow, every link of that flow appears in `expected_files`, or in `open_scope_questions` with the reason it could not be closed.
 
 ## Decision Gates
 
@@ -35,6 +39,7 @@ mode) and its own report at an injected `report_destination` (discover mode) —
 | `mode: bootstrap` AND `config.yaml` already exists | Return `status: blocked`. |
 | `mode: bootstrap` AND `config.yaml` missing | Run Phase A stack detection → write `config.yaml` per [references/config-template.md](references/config-template.md). |
 | `mode: discover` | Run Phase A/B scoped to `topic` → return a discovery report in the envelope. |
+| `mode: discover` AND `scope_proposal: true` injected | Produce the discovery report AND the `scope_proposal` block (Output Contract); a chain link with no resolvable evidence goes in `open_scope_questions` — never silently omitted. |
 | `mode` missing, or `topic` absent in discover mode | Recover from user-facing prompt text if possible; else `status: needs_input`, `context_resolution: fallback`, flag in envelope. |
 | Architecture signals conflict during bootstrap | Default to `ddd` if `domain/application/infrastructure/` appear in ≥2 feature folders; else `layered`; else `unknown`. See [references/edge-cases.md](references/edge-cases.md). |
 
@@ -42,7 +47,7 @@ mode) and its own report at an injected `report_destination` (discover mode) —
 
 ### Phase A — Glob/grep (free, no token budget)
 
-1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes `.ai-team/config.yaml` only in bootstrap mode). Identify mode from injected context (`mode:`, `project_root`, plus `topic` in discover mode).
+1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes `.ai-team/config.yaml` only in bootstrap mode). Identify mode from injected context (`mode:`, `project_root`, plus `topic` and the optional `scope_proposal: true` flag in discover mode).
 2. Glob project root for stack markers: `package.json`, `composer.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `Gemfile`, `turbo.json`, `pnpm-workspace.yaml`, `lerna.json`. Detect language, framework, package manager, monorepo status from these files without reading them fully (names suffice for a first pass).
 3. Grep for architecture signals: directory names `domain/`, `application/`, `infrastructure/`, `controllers/`, `services/`, `entities/` under `src/`. Grep for code patterns: `*Command.ts`, `*Handler.ts`, `*Event.ts`, `*Repository.ts`, `*Saga.ts`.
 4. Discover mode: grep for `topic` keywords to locate relevant files (controllers, services, entities, DTOs, test files, pages/components).
@@ -58,7 +63,7 @@ mode) and its own report at an injected `report_destination` (discover mode) —
    - Monorepo: `turbo.json` OR `pnpm-workspace.yaml` OR `lerna.json` OR `workspaces` field in `package.json` OR multiple package manifests in direct child dirs.
    - App vs library: `main.ts`/routes/controllers → `app`; `package.json` with `main`/`exports`/`types` and no server code → `library`.
    - Package manager lock file precedence: `pnpm-lock.yaml` > `yarn.lock` > `bun.lockb` > `package-lock.json` > `composer.lock`.
-8. **Discover**: compose the discovery report — Key Files (path, role, `file:line` evidence), Patterns Observed (existing conventions the Task Brief should follow), Risks (grounded citations), Open Questions (claims with no resolvable evidence). Return it in the envelope's `discovery_report` field. When `report_destination` is injected, also write it there (create its parent directory if absent).
+8. **Discover**: compose the discovery report — Key Files (path, role, `file:line` evidence), Patterns Observed (existing conventions the Task Brief should follow), Risks (grounded citations), Open Questions (claims with no resolvable evidence). When the orchestrator injected `scope_proposal: true`, additionally compose the `scope_proposal` block: cite `file:line` evidence for every `expected_files` entry, verify each `acceptance_checks.command` runnable before proposing it, sweep construction sites for every touched type, and name each seam's `public_contracts`. Return it all in the envelope's `discovery_report` field. When `report_destination` is injected, also write it there (create its parent directory if absent).
 9. Return the envelope per Output Contract.
 
 ## Output Contract
@@ -76,6 +81,15 @@ discovery_report:                # discover mode only
   patterns: []                   # existing conventions to follow, each grounded
   risks: []
   open_questions: []
+  scope_proposal:                # discover mode, only when the orchestrator requests it (scope_proposal: true)
+    expected_files:
+      - { action: CREATE|MODIFY|REMOVE, path: "<repo-relative>", evidence: "<path:line — why this file is in the chain>" }
+    construction_sites_swept: true # object literals, builders, stubs, factories that BUILD the touched types were grepped — not just annotations/mentions
+    acceptance_checks:
+      - { command: "<verbatim>", verified: "<how runnability was proven: executed read-only | target exists at path:line>", expect: "<observable outcome>" }
+    public_contracts:            # what the change creates/modifies/deletes at its seams
+      - "<one line each: signatures, events + fields, named test cases, DB schema, user-visible copy — with a file:line anchor>"
+    open_scope_questions: []     # anything the scout could not close with evidence
 next_recommended: []
 risks: []
 model_used: "sonnet"

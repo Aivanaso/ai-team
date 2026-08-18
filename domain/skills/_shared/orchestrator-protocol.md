@@ -92,7 +92,7 @@ For **Small** implementation tasks: a trivial mechanical edit goes inline per th
 For **Medium and Large** tasks — this is the route firing for every non-trivial implementation request, regardless of size:
 1. Get user confirmation on the plan (and, for Large, on the optional discovery pass).
 2. Exit plan mode.
-3. If discovery was accepted, delegate `organic-scout` first and fold its findings into the Task Brief.
+3. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected; on return, verify the proposal per the **Scope Verification Checklist** below and adopt it as the brief's `expected_files`/`acceptance_checks`.
 4. **Delegate implementation — this is the default.** Compose a Task Brief (see **Task Brief** below) and delegate to `organic-implementer`. Implementing inline on your own turn requires an explicit user override in the vocabulary of the User Override section: "no subagents" / "hazlo tú" / "do it yourself".
 5. If the user's reply is neither an approval nor a recognized override token, re-prompt for an explicit choice — do NOT silently fall back to inline.
 6. Review the returned envelope per **Organic Delegation Route → What comes back**.
@@ -162,6 +162,22 @@ out_of_scope:
 
 **Author-side invariants:** `allowed_edit_roots` is a **superset** of the containing directories of `expected_files`, per the Roots Computation algorithm below. Paths in the brief are repo-relative so the within-roots check runs on the same textual form the definition specifies (absolute paths and `..` segments are rejected by definition). A brief without `allowed_edit_roots` is `brief-incomplete` — there is no empty-roots fallback on this route.
 
+**Composition inversion — verify, don't compose.** When a discovery pass ran, the scout's `scope_proposal` (`organic-scout`'s Output Contract, discover mode) is the SOURCE of the brief's `expected_files` and `acceptance_checks` — the orchestrator verifies it against the Scope Verification Checklist below and copies it into the brief; it does not recompose the file list from its own reading. Adoption copies only the proposal's `action`/`path` pairs into `expected_files` and `command`/`expect` pairs into `acceptance_checks` — the brief's six-element YAML schema gains no new fields; the proposal's `evidence` and `verified:` keys stay in the scout's discovery report, which remains the audit trail, referenced from the Brief File's Amendments section. Discovery that will feed a Task Brief is always delegated to `organic-scout`, whose Evidence Protocol contract makes every claim citable — never to a bare general-purpose or Explore-style agent, whose uncited conclusions have twice contradicted raw evidence already in the orchestrator's hands. A discovery pass that returns without a `scope_proposal` block (the contract not honored — e.g. an older installed scout) routes to the no-discovery branch below: the orchestrator composes the brief itself against the same checklist, and records the gap in the Brief File's Amendments section.
+
+**When no discovery pass ran** (e.g. Small/clear scope), or when one ran but returned no `scope_proposal` block, the orchestrator composes the brief itself and closes each checklist item from evidence already in hand — for items 2 and 3 below this means the orchestrator performs the construction-site sweep and the runnability verification itself, never waiting on a proposal that does not exist. For Small or self-evident scope this closure is immediate, consistent with the Small-task delegation path (**Mandatory Classification Gate → After classification** above) and the trivial-edit floor (**Delegation Philosophy** above); a scout discovery pass is forced only when an item genuinely cannot be closed from evidence already in hand, never merely because no proposal exists.
+
+**Objective-level briefs.** The brief prescribes WHAT (objective + acceptance) and the scope envelope — never the implementation pattern. Naming a pattern to copy ("do it like X") requires citing X's complete path with `file:line` for each leg: where it is written, where it is read, where it is re-emitted. A pattern named without its trace is a delegated assumption.
+
+#### Scope Verification Checklist
+
+Each item names its evidence; none may be skipped silently. **Failure consequence (applies to every item below):** on any failed item the brief is NOT composed; the orchestrator either re-engages `organic-scout` with the failed item named, or closes the gap itself with its own cited evidence and records that correction in the Brief File's Amendments section — a brief is never delegated on an open checklist failure.
+
+1. **Chain to the leaves** — every link in the objective's described flow has an `expected_files` entry, or an explicit open question. Prose promising more than the file list authorizes is the known failure mode (a worker honoring the list will block, at full delegation cost).
+2. **Construction sites swept** — with a proposal, the proposal declares the sweep (`construction_sites_swept: true`) and the orchestrator spot-checks at least one construction site with its own grep; without a proposal, the orchestrator sweeps construction sites of every touched type itself, with its own grep, before closing `expected_files`.
+3. **Checks runnable** — with a proposal, every `acceptance_checks.command` carries its `verified:` evidence and the orchestrator re-runs at least one side-effect-free check itself; without a proposal, the orchestrator verifies every check runnable itself — executing it read-only when side-effect-free, or citing the declaring target's `file:line` otherwise.
+4. **Criteria mapped** — every acceptance criterion of the objective maps to an `acceptance_checks` entry or a named test in the brief; an unmapped criterion means either the criterion is out of scope or the brief is incomplete.
+5. **Raw evidence wins** — where any sub-agent conclusion contradicts command output the orchestrator itself produced, the command output prevails and the conflict is resolved before delegating.
+
 #### What travels in the delegation prompt
 
 | Prompt part | Content |
@@ -210,7 +226,10 @@ complete — this is the pause/resume state)
 | # | agent | model | tokens | tool_uses | duration | outcome |
 (one row per delegation, appended at envelope ingestion)
 ## Amendments
-(reserved; "none" until the amendment channel ships in a later change)
+(records Scope Verification Checklist events — a brief-feeding discovery that returned no
+`scope_proposal`, or an item the orchestrator closed with its own evidence — and, when a
+proposal fed this brief, a pointer to the scout's discovery report; "none" until the first.
+The general live-amendment channel ships in a later change.)
 ## Close
 (written when status flips to done: totals — agents, tokens; re-brief count with causes;
 receipt reference(s); commit hashes)
@@ -379,6 +398,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `skills_to_load` | `.ai-team/skill-registry.md` — match rows against the brief's stack + `expected_files` paths; forward matching `Path` values | organic-implementer | when the registry exists and ≥1 row matches; omit the block on zero matches |
 | `allowed_edit_roots` | the brief's `expected_files` (Roots Computation below) | organic-implementer | always — the brief always declares roots |
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` | organic-implementer | if config sets it |
+| `scope_proposal` | orchestrator's decision at delegation time | organic-scout | always when the discovery pass will feed a Task Brief (an on-demand inspection that feeds no brief may omit it) |
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
 | `group_id` | brief-slug label | work-unit-commits, organic-reviewer, organic-security | always when invoking these |
 | `group_files` | the union of the brief's `expected_files` paths and the implementer envelope's `artifacts` paths (canonical definition: `common-rules.md` → "Logical group") | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits — makes the receipt gate fireable and restores scoped staging |
@@ -403,7 +423,7 @@ This block closes the channel between hostile repo content and an agent armed wi
 
 ### Roots Computation (`allowed_edit_roots`)
 
-**When:** while composing the Task Brief, before delegating `organic-implementer`.
+**When:** while composing the Task Brief, before delegating `organic-implementer`. Provenance: the `expected_files` input to this algorithm may be the scout's checklist-verified `scope_proposal` (see **Task Brief** → Scope Verification Checklist) or orchestrator-composed directly — this algorithm treats either source identically.
 
 **Algorithm:** for every entry in the brief's `expected_files` list, take its `path` and drop the last `/`-segment (its containing directory). **All action types contribute** — CREATE, MODIFY, and REMOVE paths each contribute their containing directory. `allowed_edit_roots` is the **union** (de-duplicated set) of those containing directories.
 
