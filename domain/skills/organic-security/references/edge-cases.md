@@ -14,18 +14,19 @@ and run independently of touchpoints.
 - If either sweep produces findings: follow normal severity logic (≥1 CRITICAL → `warning`
   base status; MAJOR/MINOR only → `ok` base status with `security_lens.status: findings`).
 
-## Edge Case 2: All Findings Below 80% Confidence
+## Edge Case 2: All Findings Low-Confidence
 
-**Condition:** Every finding generated (across all touchpoints and both sweeps) has
-confidence ≤ 80%.
+**Condition:** Every finding generated (across all touchpoints and both sweeps) carries
+`confidence: low`.
 
-**Behavior:** Suppress all findings. Return `status: ok`, `security_lens.status: pass`,
-`findings: []`. Set `suppressed_count` to the number of suppressed findings. Note: "All {N}
-candidate findings suppressed — confidence below threshold."
+**Behavior:** Record every one of them — coverage never filters by confidence (Hard Rules).
+Return `status`/`security_lens.status` per the normal severity logic (Decision Gates): `warning`
+base status if any of them is CRITICAL, `ok` with `security_lens.status: findings` otherwise.
+Note: "All {N} findings reported at low confidence — none suppressed."
 
-Rationale: false positives train reviewers to ignore findings. A clean report with a non-zero
-`suppressed_count` is an accurate signal that the audit ran and found only low-confidence
-candidates.
+Rationale: a self-filtered report trains the orchestrator to trust a clean audit that actually
+hid its own uncertainty. Reporting every low-confidence finding, tagged as such, gives the
+orchestrator the same signal without dropping a possible real defect.
 
 ## Edge Case 3: group_files Empty or None Exist (code-audit mode)
 

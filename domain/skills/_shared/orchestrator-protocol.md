@@ -240,7 +240,7 @@ predict. Evaluated twice: (1) **at brief-authoring time** — from `objective` +
 
 When a lens is activated, inject `group_files` (the union of the brief's `expected_files` paths and the returned envelope's `artifacts` paths — canonical definition in `common-rules.md` → "Logical group"), `project_root`, `group_id` (a brief-slug label), `tier`, and `tier_reason`. No `change_dir`, no `tasks_path` — those fields have no analogue on this route.
 
-**Verdict handling.** Verdict vocabulary: `review-clear` / `review-blocked`. On `review-blocked` the orchestrator presents three options — **re-brief** (one fresh delegation with the findings batched in — never a live addendum, per Synchronous delegation below), **accept and proceed** (recorded in the review receipt's `overrides` field — no `decisions[]` entry, no `state.yaml`), or **stop** (leave the tree uncommitted, surface the report path).
+**Verdict handling.** Verdict vocabulary: `review-clear` / `review-blocked`. On `review-blocked` the orchestrator presents three options — **re-brief** (one fresh delegation with the findings batched in — never a live addendum, per Synchronous delegation below), **accept and proceed** (recorded in the review receipt's `overrides` field — no `decisions[]` entry, no `state.yaml`), or **stop** (leave the tree uncommitted, surface the report path). For non-blocking findings (MAJOR/MINOR on a `review-clear` receipt), the orchestrator triages by severity then per-finding `confidence` when choosing between re-brief, inline closure under the findings_addressed guardrails, deferral to a named later candidate, or acceptance — every finding gets one of those four dispositions, none is silently ignored.
 
 #### Multi-repo lane rule
 
@@ -590,6 +590,14 @@ Omit shared protocol paths the worker does not reference in its SKILL.md Referen
 **`install_dir`**: Resolve once per session. For Claude Code: `~/.claude/skills`. For other adapters: per `adapters/{adapter}/install.sh` destination.
 
 **Sub-agent fallback chain:** If the skill path does not exist, the sub-agent returns `status: blocked` with `risks: ["SKILL.md not found at {path}"]` — it cannot proceed without primary instructions. If a shared protocol path does not exist, the sub-agent continues with loaded instructions, reports `context_resolution: fallback`, and lists the missing protocol in `risks`. The orchestrator checks `install_dir` correctness and re-engages if needed.
+
+### Prompt composition practices
+
+- **Complete spec up front.** The delegation prompt carries the full task specification in one message; batch every gap found later into one re-engage (Re-engage prompt block above) rather than drip-feeding clarifications — this is the same discipline the Re-engage prompt block already enforces, named here explicitly.
+- **Explicit quantifiers.** Scope statements name their exact range ("every finding", "only the files in `group_files`") — current models follow instructions literally and do not silently generalize a single-item instruction to the rest of a list.
+- **No redundant verification scaffolding.** Enumerate the objective gates (named commands + expected outcomes, `acceptance_checks`/`review_gates`) once; never append a generic "double-check your work" line on top of them — current models self-verify, and a stacked re-check instruction wastes tokens without a quality gain.
+- **Lens delegations state the coverage rule.** Report every finding, including uncertain and low-severity ones, each with its own `confidence` and `severity`; the orchestrator's downstream triage is the filter, not the lens (`organic-reviewer/SKILL.md`, `result-envelope.md` → Review Receipt).
+- **Positive exemplars for style.** Show the wanted shape of a report or summary rather than prohibiting the unwanted one; reserve hard "must not"/"never" prohibitions for contract rules (write-scope, envelope-always, seniority).
 
 ### Synchronous delegation — no live-agent continuation
 

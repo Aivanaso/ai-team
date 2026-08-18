@@ -22,7 +22,6 @@ verification:
   - { command: "<smoke check>", exit_code: 0, outcome: pass }
 overrides: []
 verdict: review-clear
-suppressed_count: 0
 next_recommended:
   - "work-unit-commits"
 risks: []
@@ -34,7 +33,7 @@ context_resolution: self-loaded
 
 ```yaml
 status: ok
-executive_summary: "Review complete for session-refresh. 2 MAJOR findings (no CRITICAL). Gate does not block; findings are informational."
+executive_summary: "Review complete for session-refresh. 2 MAJOR findings (no CRITICAL), 1 MINOR at low confidence also reported. Gate does not block; findings are informational."
 group_id: session-refresh
 artifacts: []
 tier: 1
@@ -43,13 +42,13 @@ lenses:
   correctness:
     status: findings
     findings:
-      - { id: "F-1", severity: MAJOR, file: "src/processor.ts", line: 84, claim: "Exception caught but swallowed; no log or re-throw." }
-      - { id: "F-2", severity: MAJOR, file: "src/db.ts", line: 112, claim: "Connection acquired but not released on the error path." }
+      - { id: "F-1", severity: MAJOR, confidence: high, file: "src/processor.ts", line: 84, claim: "Exception caught but swallowed; no log or re-throw." }
+      - { id: "F-2", severity: MAJOR, confidence: medium, file: "src/db.ts", line: 112, claim: "Connection acquired but not released on the error path." }
+      - { id: "F-3", severity: MINOR, confidence: low, file: "src/db.ts", line: 118, claim: "Possible off-by-one in the retry counter; could not confirm the caller's max-retry contract." }
 verification:
   - { command: "<test suite>", exit_code: 0, outcome: pass }
 overrides: []
 verdict: review-clear
-suppressed_count: 1
 next_recommended:
   - "work-unit-commits"
 risks: []
@@ -61,7 +60,7 @@ context_resolution: self-loaded
 
 ```yaml
 status: ok
-executive_summary: "Review complete for cache-invalidation. 1 CRITICAL finding: data race on shared mutable state. Gate is blocked; override or re-engage required."
+executive_summary: "Review complete for cache-invalidation. 1 CRITICAL finding (confidence: low — pattern is suspicious but not conclusively provable from static reading): data race on shared mutable state. Gate is blocked (fail closed); override or re-engage required."
 group_id: cache-invalidation
 artifacts: []
 tier: 2
@@ -70,12 +69,11 @@ lenses:
   correctness:
     status: findings
     findings:
-      - { id: "F-1", severity: CRITICAL, file: "src/cache.ts", line: 57, claim: "Shared mutable counter incremented without synchronization; data race under concurrent requests." }
+      - { id: "F-1", severity: CRITICAL, confidence: low, file: "src/cache.ts", line: 57, claim: "Shared mutable counter incremented without synchronization; data race under concurrent requests." }
 verification:
   - { command: "<test suite>", exit_code: 0, outcome: pass }
 overrides: []
 verdict: review-blocked
-suppressed_count: 0
 next_recommended:
   - "override or re-engage"
 risks:
@@ -97,13 +95,12 @@ lenses:
   correctness:
     status: findings
     findings:
-      - { id: "F-1", severity: CRITICAL, file: ".ai-team/config.yaml", line: 34, claim: "review_gates entry 'coverage' ('<coverage check>') exited 1." }
+      - { id: "F-1", severity: CRITICAL, confidence: high, file: ".ai-team/config.yaml", line: 34, claim: "review_gates entry 'coverage' ('<coverage check>') exited 1." }
 verification:
   - { command: "<test suite>", exit_code: 0, outcome: pass }
   - { command: "<coverage check>", exit_code: 1, outcome: fail, gate: "coverage" }
 overrides: []
 verdict: review-blocked
-suppressed_count: 0
 next_recommended:
   - "override or re-engage"
 risks:
@@ -134,7 +131,6 @@ verdict_history:
 not_reverified:
   - "concurrency lens over src/session.ts — already clean in the prior full pass, outside this delta's changed files"
 verdict: review-clear
-suppressed_count: 0
 next_recommended:
   - "work-unit-commits"
 risks: []
@@ -154,7 +150,6 @@ lenses: {}
 verification: []
 overrides: []
 verdict: null                   # never review-clear/review-blocked here — no review ran, so no verdict was computed
-suppressed_count: 0
 next_recommended: []
 risks:
   - "group_files: missing from injected context"

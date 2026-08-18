@@ -65,6 +65,29 @@ One verb, one action. If a step requires more than two sentences to describe, it
 
 ---
 
+## Prompt Composition Rules
+
+Authoring rules for how a SKILL.md itself instructs the model, distinct from the section
+structure above (see `orchestrator-protocol.md` → "Prompt composition practices" for the
+orchestrator-side counterpart):
+
+- **Explicit quantifiers.** State a rule's exact range ("every finding", "only the files in
+  `group_files`") — a scope word left implicit ("relevant", "important") is read literally, not
+  generalized, and produces a narrower result than intended.
+- **No redundant re-check scaffolding.** Enumerate a skill's gates (Decision Gates, Output
+  Contract checks) exactly once. Never add a generic "verify your work" / "double-check before
+  returning" line on top of them — stacked re-check instructions waste tokens without a quality
+  gain.
+- **Positive exemplars for style.** To shape a report's or summary's shape, show the wanted form
+  (a worked example in `references/`) rather than listing prohibited forms. Reserve "MUST NOT" /
+  "never" prohibitions for Hard Rules — contract constraints, not style guidance.
+- **Coverage over self-filtering.** A lens skill (`organic-reviewer`, `organic-security`) never
+  suppresses a finding by confidence — it reports every finding with its own `confidence` field
+  and lets the orchestrator's downstream triage filter (see `result-envelope.md` → Review
+  Receipt).
+
+---
+
 ## Line Budget
 
 | Budget | When it applies |

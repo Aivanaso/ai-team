@@ -9,19 +9,21 @@
 
 **Behavior:** Return `status: ok`, `verdict: review-clear`, `lenses.correctness.findings: []`.
 Note in executive summary: "no candidate changes to review — gate passes with no findings".
-Set `suppressed_count: 0`.
 
 Rationale: an empty change set is a valid state (e.g., the Task Brief declared a file the
 implementer did not need to touch). The gate must not block on a clean slate.
 
-## All Findings Below 80% Confidence
+## All Findings Low-Confidence
 
-**Condition:** Every finding identified across the five correctness lenses has confidence
-≤ 80%.
+**Condition:** Every finding identified across the five correctness lenses carries
+`confidence: low`.
 
-**Behavior:** Suppress all findings. Return `status: ok`, `verdict: review-clear`,
-`lenses.correctness.findings: []`. Set `suppressed_count` to the total suppressed. Note:
-"All {N} candidate findings suppressed — confidence below threshold."
+**Behavior:** Record every one of them — coverage never filters by confidence (Hard Rules).
+The verdict follows the standard iff unchanged: `review-blocked` if any of them is CRITICAL,
+`review-clear` otherwise, regardless of confidence. Note in executive summary: "All {N}
+findings reported at low confidence — none suppressed; verdict follows the standard iff."
+Nothing is hidden from the orchestrator: low confidence is visible per-finding for its own
+triage.
 
 ## Missing group_files (not injectable)
 
@@ -38,8 +40,9 @@ alongside 1-hop callers.
 
 **Behavior:** Read files in the order `group_files` lists them; prioritise CREATE over MODIFY
 (new code is more likely to carry defects). Note in the report's Scope section: "read budget
-reached after {N}/{total} files; {M} files not reviewed". Return the partial verdict;
-`suppressed_count` stays 0 for unreviewed files (not reviewed, not suppressed).
+reached after {N}/{total} files; {M} files not reviewed". Return the partial verdict; unreviewed
+files produce no findings at all (they were never read) — the Scope section's read-budget note
+is the only trace of the gap, not a finding count.
 
 ## Verification Check Cannot Be Re-Run
 

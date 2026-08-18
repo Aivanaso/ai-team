@@ -19,8 +19,8 @@ merge. Read application code to find vulnerabilities; never modify it.
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Security artifacts write only to the injected `report_destination`, resolved relative to `project_root` — no fixed `.ai-team/` path exists on this route.
-- Every finding cites `file:line` per Evidence Protocol Rule 1. No citation = suppress and tally. -- because uncited findings are unverifiable and slow down triage; the orchestrator cannot route a fix without knowing exactly where the vulnerability is.
-- Confidence threshold > 80%. Suppress uncertain findings; tally every suppression. False positives are worse than missed low-confidence findings.
+- Every finding cites `file:line` per Evidence Protocol Rule 1 — a finding without a resolvable citation is not recorded, but its drop is never silent — note each uncited candidate in `risks` ("uncited candidate finding dropped: <one-line topic>"). -- because uncited findings are unverifiable and slow down triage; the orchestrator cannot route a fix without knowing exactly where the vulnerability is.
+- Report every finding, including ones you are uncertain about or consider low-severity. Do not filter for importance or confidence at this stage — coverage is the goal, and the orchestrator's downstream triage is the filter, not this lens. Each finding carries its own `confidence: high | medium | low` alongside `severity`, so the orchestrator can rank.
 - Severity vocabulary: `CRITICAL` / `MAJOR` / `MINOR` — the Review Receipt's vocabulary (`_shared/result-envelope.md` → Review Receipt); every finding this skill emits uses this vocabulary exclusively.
 - The nine security touchpoint slugs (verbatim, `auth/authz` with slash; the other 8 with dashes): `auth/authz`, `crypto`, `deserialization`, `file-io-uploads`, `network-ssrf`, `db-direct-input`, `new-dependencies`, `env-secrets`, `regex-external-input`.
 - No independent commit-blocking verdict: this skill returns `security_lens: {status: pass | findings, findings: []}` for the orchestrator to fold into the Review Receipt. `review-clear` / `review-blocked` is `organic-reviewer`'s vocabulary alone — this skill never emits it. Base envelope `status` is `warning` when ≥ 1 CRITICAL finding exists, `ok` otherwise.
@@ -37,9 +37,8 @@ merge. Read application code to find vulnerabilities; never modify it.
 | `mode: code-audit` AND `group_files` empty or none exist on disk | `status: ok`, `security_lens.status: pass`, note "no candidate changes to audit". See `references/edge-cases.md`. |
 | `mode: threat-model` AND `scope_description` missing | `status: blocked`. |
 | `security_touchpoints` absent/empty (threat-model) | Infer touchpoints from `scope_description` text via the nine-slug heuristics. STILL run the Temporal Invariant Sweep + Seam & Failure Sweep (transversal, unconditional). |
-| Finding confidence > 80% | Record finding. |
-| Finding confidence ≤ 80% | Suppress; tally. |
-| ≥ 1 CRITICAL finding | `security_lens.status: findings`, base `status: warning`. |
+| Finding identified (any confidence, any severity) | Record it, with its own `confidence` and `severity` — never filter for importance or confidence at this stage. |
+| ≥ 1 CRITICAL finding, at ANY confidence level | `security_lens.status: findings`, base `status: warning`. Low confidence never exempts a CRITICAL finding from this row. |
 | 0 CRITICAL findings, ≥ 1 MAJOR/MINOR | `security_lens.status: findings`, base `status: ok`. |
 | 0 findings at all | `security_lens.status: pass`, base `status: ok`. |
 
@@ -52,7 +51,7 @@ merge. Read application code to find vulnerabilities; never modify it.
 3. Walk each triggered touchpoint, applying the five audit-prompt categories (see [references/worked-examples.md](references/worked-examples.md)): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure. Read codebase files to ground findings in specific locations.
 4. Run the Temporal Invariant Sweep (always, transversal): detect temporal fields referenced in `scope_description` and any schema files it points to; identify the rejection semantic per field; enumerate every read path; verify enforcement; emit a finding when a read path consumes the field for an auth/access/state decision without the matching check.
 5. Run the Seam & Failure Sweep (always, transversal): failure-mode per call-site, interleaving per mutated field, crash-window per multi-store sequence — mechanics in [references/worked-examples.md](references/worked-examples.md).
-6. When `report_destination` is injected, write `threat-model.md` per [references/threat-model-template.md](references/threat-model-template.md) there (create its parent directory if absent). Include: summary, touchpoints triggered, per-touchpoint findings, both sweeps (always present), `security_requirements:`, suppression tally.
+6. When `report_destination` is injected, write `threat-model.md` per [references/threat-model-template.md](references/threat-model-template.md) there (create its parent directory if absent). Include: summary, touchpoints triggered, per-touchpoint findings, both sweeps (always present), `security_requirements:`.
 7. Return the envelope per Output Contract.
 
 ### Mode code-audit
@@ -78,10 +77,9 @@ mode: threat-model | code-audit
 artifacts: []                    # only when report_destination was written this run
 security_lens:                   # shaped for direct Review Receipt lenses.security merge
   status: pass | findings
-  findings:                      # CAP 20 entries
-    - { id: "F-1", severity: CRITICAL | MAJOR | MINOR, file: "<path>", line: <int>, claim: "<one line>" }
+  findings:                      # CAP 20 entries — on overflow keep the highest severity-then-confidence entries and note the omitted count in risks ("findings omitted at cap: N")
+    - { id: "F-1", severity: CRITICAL | MAJOR | MINOR, confidence: high | medium | low, file: "<path>", line: <int>, claim: "<one line>" }
 security_requirements: []        # threat-model only; [] for code-audit
-suppressed_count: 0
 next_recommended: []
 risks: []
 model_used: "sonnet"
@@ -94,7 +92,7 @@ context_resolution: self-loaded | fallback | none
 - [references/audit-report-template.md](references/audit-report-template.md) — audit-report.md output template and enforcement-wiring category; load in code-audit mode when `report_destination` is injected.
 - [references/worked-examples.md](references/worked-examples.md) — temporal-sweep retrospective + the five audit-prompt categories full detail; load at the audit-prompt step in either mode.
 - [references/envelope-examples.md](references/envelope-examples.md) — envelope variants for both modes (ok/warning/blocked); load when composing the result.
-- [references/edge-cases.md](references/edge-cases.md) — no touchpoints, all-suppressed, empty group_files, invalid mode, re-audit; load when an unexpected condition arises.
+- [references/edge-cases.md](references/edge-cases.md) — no touchpoints, all findings low-confidence, empty group_files, invalid mode, re-audit; load when an unexpected condition arises.
 - `../_shared/context-protocol.md` — startup sequence; load first.
 - `../_shared/persistence-contract.md` — write rules (loaded per common-rules Principle 5; this skill writes only when `report_destination` is injected).
 - `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
