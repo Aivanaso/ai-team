@@ -238,6 +238,22 @@ Each item names its evidence; none may be skipped silently. **Failure consequenc
 3. **Checks runnable** — with a proposal, every `acceptance_checks.command` carries its `verified:` evidence and the orchestrator re-runs at least one side-effect-free check itself; without a proposal, the orchestrator verifies every check runnable itself — executing it read-only when side-effect-free, or citing the declaring target's `file:line` otherwise.
 4. **Criteria mapped** — every acceptance criterion of the objective maps to an `acceptance_checks` entry or a named test in the brief; an unmapped criterion means either the criterion is out of scope or the brief is incomplete.
 5. **Raw evidence wins** — where any sub-agent conclusion contradicts command output the orchestrator itself produced, the command output prevails and the conflict is resolved before delegating.
+6. **Invariant reconciliation** — when the objective introduces or tightens an invariant in a shared contract, grep every existing statement of the invariant it replaces or constrains, and cite the reconciliation in the brief itself — or, on the brief-less retro-application route, in the applying record (Retro trigger below): the sites the candidate must also update, or an explicit no-conflict note. A new rule shipped in the same candidate as an unretired rule that contradicts it is a recurrent CRITICAL class on this route (organic-v2 retro: 3 of its 8 CRITICALs) — the sweep belongs in the same candidate, never a follow-up phase.
+
+#### New worker checklist
+
+A brief whose objective adds a new skill/worker directory under `domain/skills/` names, in its `expected_files`, every registry site the newcomer must join — checked site-by-site at brief time, never discovered finding-by-finding in review (organic-v2 retro: 16 findings in one pass, most of them enumeration omissions). The sites below are the named starting set, not a proof of completeness — the brief author additionally greps an existing worker's name repo-wide to catch enumeration sites this list does not yet name, and any site found that way is added here:
+
+- `config/schema.yaml` — config keys the skill introduces, and every enumeration of an existing key the newcomer joins
+- `organic-scout/references/config-template.md` — the same keys and enumerations, template side
+- `common-rules.md` — Principle 1 and Principle 4 rosters, and Principle 2's write-scope roster
+- the Critical Context Forwarding table (this file) — rows for the injections the new worker needs
+- the Model Routing table and the `subagent_type` list (this file)
+- `_shared/scripts/refresh-skill-registry.sh` — exclusion list, and the Skill Registry Refresh prose enumeration of pipeline skills (this file)
+- both adapters' agent files (`adapters/claude-code/templates/agents/`, the opencode agent merge)
+- the target project's `.ai-team/config.yaml` `architecture.layers` / `bounded_contexts` enumerations, when present
+
+The named paths are the ai-team framework repo's own; in a target project without them, only the `.ai-team/config.yaml` site applies. An unsatisfied site carries the same failure consequence as a failed Scope Verification Checklist item (above): the brief is not composed until the site is named in `expected_files` or explicitly recorded as not-applicable.
 
 #### What travels in the delegation prompt
 
@@ -338,7 +354,11 @@ review-report path this task's Cost Ledger recorded (`organic-reviewer`/`organic
 `report_destination` values). Model: sonnet (Model Routing below). The returned
 `conventions_proposed` entries are proposals only — the orchestrator applies a user-accepted one
 as a trivial-floor edit to the target file+section the proposal names (Delegation Philosophy
-above), or leaves it for the user; `organic-retro` itself never writes `CLAUDE.md`,
+above), or leaves it for the user. A proposal that introduces or tightens a shared-contract
+invariant additionally runs the invariant-reconciliation sweep (Scope Verification Checklist
+item 6) BEFORE the edit, recording the sweep's greps and outcome in the applying commit or the
+retro file — the brief-less route never skips the sweep, it only relocates where the
+reconciliation is recorded; `organic-retro` itself never writes `CLAUDE.md`,
 `AGENTS.md`, or any config file (Principle 2, `common-rules.md`).
 
 ## Organic Delegation Route

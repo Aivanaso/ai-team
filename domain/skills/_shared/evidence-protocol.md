@@ -25,9 +25,9 @@ If evidence cannot be gathered (unfamiliar config, no existing caller), mark the
 
 **Applies to:** routing, serialization, caching, transactions, events, middleware, dependency injection, autowiring, type coercion, ORM lifecycle.
 
-## Rule 2 — Interface Signature Changes Require an Implementors Sweep
+## Rule 2 — Interface Signature and Contract-Field Changes Require an Implementors Sweep
 
-When a change renames, modifies, or removes a method on a **public interface** (not private/protected):
+When a change renames, modifies, or removes a method on a **public interface** (not private/protected) — or, per the schema/contract clause at the end of this rule, a field of a serialized contract structure:
 
 1. Grep the old method name across `src/`, `tests/`, `config/`, and any custom directories
 2. Enumerate implementors (`implements <InterfaceName>`) including test doubles, mocks, fakes, stubs
@@ -37,6 +37,8 @@ When a change renames, modifies, or removes a method on a **public interface** (
 Test doubles in `tests/Double/`, `tests/Mock/`, `tests/Fixture/` are invisible to a `src/`-only scope and WILL cause fatal runtime errors when tests boot.
 
 **Output requirement:** tasks that touch an interface MUST include a sub-task explicitly named "Implementors sweep for <InterfaceName>" with the grep commands run and the resulting file list.
+
+**Schema/contract fields — same principle, markdown form:** a change to a serialized contract structure (envelope field, receipt schema, config key) sweeps every site that renders that structure — SKILL.md Output Contract blocks, `references/*.md` exemplars, templates, envelope examples. The sweep is owned like any acceptance check: the brief (or the worker's own `check_results`) carries the grep as a runnable check, and the reviewer re-runs it in its verification section. A correct schema beside a lagging exemplar teaches the pre-change shape to every reader who loads the example (organic-v2 retro: recurred across 4 phases).
 
 ## Rule 3 — Test Adequacy Before Declaring Apply Done
 
@@ -79,7 +81,7 @@ If none of these appear, stay within the exploration budget declared in the dele
 
 **Why this exists**: in the messenger-buses retrospective, 15 legacy `messageName()` violations surfaced mid-implementation and forced a re-brief. They were greppable before delegation.
 
-**Out of scope for this rule**: framework-behavior claims (Rule 1 covers them), interface signature sweeps (Rule 2), test execution (Rule 3). Rule 4 is specifically about invariants the brief or report *itself* asserts as currently true.
+**Out of scope for this rule**: framework-behavior claims (Rule 1 covers them), interface-signature and schema/contract-field sweeps (Rule 2), test execution (Rule 3). Rule 4 is specifically about invariants the brief or report *itself* asserts as currently true.
 
 ## Rule 5 — Cross-Repo Pattern Transplant Check
 
