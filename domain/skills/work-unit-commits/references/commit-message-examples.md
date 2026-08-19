@@ -41,7 +41,7 @@ risks:
   - "WARNING: commit subject truncated from 79 to 72 chars — review for clarity"
 ```
 
-## Example 3 — Project-skill override
+## Example 3 — Convention-first override
 
 The project has `{project_root}/.claude/skills/commit/SKILL.md` which mandates a different
 scope token format: `[PROJ-NNN] {description}` instead of `{group_id}`.
@@ -61,7 +61,7 @@ Files: services/api/client.py, tests/api/test_client.py
 Envelope includes:
 ```yaml
 risks:
-  - "WARNING: project commit skill overrode scope token — applied [ECO-1234] instead of default (api-cleanup)"
+  - "WARNING: project commit skill (commit/SKILL.md) override applied for field: scope — value: [ECO-1234]"
 ```
 
 Note: the project skill's scope token replaces the parenthetical scope; the `type:` and file

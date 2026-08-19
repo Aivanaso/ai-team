@@ -85,6 +85,29 @@ Evaluate these four signals:
 
 For **Medium** and **Large** tasks, enter plan mode before presenting the classification (prevents accidental file edits during classification and planning); exit plan mode only when implementation is approved. Small: no plan mode, delegate directly (trivial mechanical edits: inline). Medium: enter → present plan → exit on approval → delegate. Large: enter → present plan plus the optional discovery offer → exit on approval → delegate, optionally preceded by `organic-scout`.
 
+**Harness coexistence.** A harness's own plan mode may advertise generic explore/plan
+sub-agents or turn-ending conventions of its own; this protocol's evidence contract wins
+wherever the two conflict:
+
+- Discovery that will feed a Task Brief is delegated to `organic-scout` per this protocol even
+  when a harness plan mode advertises its own generic explore/plan agents — the protocol's
+  evidence contract wins.
+- Plan mode MAY host a read-only `organic-scout` discovery pass when the orchestrator so
+  chooses — its only write is the report at `report_destination` (`organic-scout`'s own
+  contract, not a claimed harness restriction); if the host's plan mode blocks that report
+  write, the pass is not hosted there — delegate the scout after plan-mode exit (step 3 of the
+  Medium/Large flow below) and the report is written then. Implementation delegation always happens AFTER
+  plan-mode exit — the default Medium/Large flow (exit → delegate, **After classification**
+  above) is unchanged.
+- When a turn ends with a delegation still in flight, it legitimately ends in a status message
+  instead of a question or exit call; a harness rule demanding otherwise yields to that —
+  fabricating a question to satisfy the harness is worse than the deviation, which is announced,
+  never silent.
+- When the user gives an explicit request ("fast-forward", "tira hasta el final") or a one-time
+  confirmation of a well-structured ticket — the same two entry tokens `fast-forward` itself
+  requires (cross-reference **Execution gears** below) — the Medium/Large plan gate reduces to
+  confirming the classification; announce the reduction, never apply it silently.
+
 ### After classification
 
 For **Small** implementation tasks: a trivial mechanical edit goes inline per the trivial-edit floor, no delegation; otherwise delegate directly to `organic-implementer` with a minimal Task Brief — no plan gate — and review the returned envelope per **Organic Delegation Route → What comes back**.
@@ -92,7 +115,7 @@ For **Small** implementation tasks: a trivial mechanical edit goes inline per th
 For **Medium and Large** tasks — this is the route firing for every non-trivial implementation request, regardless of size:
 1. Get user confirmation on the plan (and, for Large, on the optional discovery pass).
 2. Exit plan mode.
-3. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected; on return, verify the proposal per the **Scope Verification Checklist** below and adopt it as the brief's `expected_files`/`acceptance_checks`.
+3. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected — unless a read-only scout pass was already hosted inside plan mode (**Harness coexistence** above), whose returned proposal enters here the same way; on return, verify the proposal per the **Scope Verification Checklist** below and adopt it as the brief's `expected_files`/`acceptance_checks`.
 4. **Delegate implementation — this is the default.** Compose a Task Brief (see **Task Brief** below) and delegate to `organic-implementer`. Implementing inline on your own turn requires an explicit user override in the vocabulary of the User Override section: "no subagents" / "hazlo tú" / "do it yourself".
 5. If the user's reply is neither an approval nor a recognized override token, re-prompt for an explicit choice — do NOT silently fall back to inline.
 6. Review the returned envelope per **Organic Delegation Route → What comes back**.
@@ -508,8 +531,10 @@ all three hold, the orchestrator MAY close the findings inline. **Seniority carv
 re-runs ONLY the receipt's already-named verification gates itself to evidence the closure
 (`common-rules.md` → Principle 4 Boundary cell names this exception) — every other execution
 stays delegated. It records a `findings_addressed` addendum in the receipt: one entry per
-finding closed, citing the finding id, the exact file(s)/line(s) touched, and the re-run gate
-results — an addendum entry without gate evidence is invalid. The receipt PLUS its
+finding closed — `finding_id`, the REQUIRED `files` list (repo-relative paths the closure
+touched, every one inside the receipt's `group_files`), `fix_evidence` (exact `path:line` or
+command-output digest), and `gate_results` (schema: `result-envelope.md` → Review Receipt) — an
+addendum entry without gate evidence or without its `files` list is invalid. The receipt PLUS its
 `findings_addressed` addendum together cover the post-edit tree, closing the coverage gap
 between the reviewed tree and the committed tree. `findings_addressed` NEVER alters `verdict`:
 an inline closure is never a substitute for a delta pass, and a `review-blocked` receipt clears

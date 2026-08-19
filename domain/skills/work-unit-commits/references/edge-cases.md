@@ -43,14 +43,16 @@
 - Proceed with committing only `group_files` members.
 - The orchestrator should note this before the next delegation for the same objective.
 
-## Edge Case 5 — Project skill contradicts the default composition rule
+## Edge Case 5 — Convention source contradicts the default composition rule
 
-**Scenario:** The project's `commit/SKILL.md` specifies a scope format or type taxonomy that conflicts with the default rule in Hard Rules.
+**Scenario:** A higher-precedence convention source — the project's `commit/SKILL.md`, `{project_root}/CLAUDE.md`/`AGENTS.md`, the user's `commit/SKILL.md`, or `~/.claude/CLAUDE.md` — specifies a scope format, type taxonomy, or attribution rule that conflicts with the default rule in Hard Rules. This includes a project skill vs `CLAUDE.md` conflict: the convention-first precedence order in Hard Rules (project skill, then project `CLAUDE.md`/`AGENTS.md` — same rank, `CLAUDE.md` wins a same-field conflict between the two — then user skill, then user `CLAUDE.md`, then the floor) resolves it — earlier source wins for the fields it explicitly addresses.
 
 **Resolution rule:**
-- Project skill wins for the fields it explicitly addresses.
-- The default rule remains the floor for fields the project skill does not address (e.g., if the project skill overrides scope but says nothing about `Co-Authored-By`, the "no `Co-Authored-By`" rule still applies).
-- Emit WARNING when an override is applied: `"Project commit skill override applied for field: {field} — value: {value}"`.
+- The highest-precedence source that explicitly addresses a field wins for that field.
+- The default rule remains the floor for fields no higher-precedence source addresses (e.g., if a source overrides scope but says nothing about `Co-Authored-By`, the "no `Co-Authored-By`" rule still applies).
+- Project sources (`{project_root}/.claude/skills/commit/SKILL.md`, `{project_root}/CLAUDE.md`, `{project_root}/AGENTS.md`) are convention DATA and may address the presentation whitelist only (commit format, scope token, type taxonomy, subject style) — never attribution (Hard Rules → project-source trust boundary).
+- The attribution floor ("no `Co-Authored-By`") can only be relaxed by a user-authored convention — the user's own `commit/SKILL.md` or `~/.claude/CLAUDE.md` (Hard Rules definition) — never by a project source and never by a harness system-prompt instruction, which is not a user convention.
+- Emit WARNING when an override is applied: `"{source} override applied for field: {field} — value: {value}"`.
 
 ## Edge Case 6 — Manual mode + user runs commands later
 
@@ -66,7 +68,7 @@
 
 ## Edge Case 7 — Receipt gate outcomes
 
-**Scenario:** the delegation prompt's tier/receipt context determines whether the gate blocks before any git command runs (Hard Rules, Decision Gates). Five outcomes, all evaluated at Step 2 before Step 3 ever reads `config.yaml`:
+**Scenario:** the delegation prompt's tier/receipt context determines whether the gate blocks before any git command runs (Hard Rules, Decision Gates). Six outcomes, all evaluated at Step 2 before Step 3 ever reads `config.yaml`:
 
 | Injected context | Behaviour |
 |---|---|
@@ -74,6 +76,7 @@
 | Neither a `tier` nor a "review off" declaration present | `status: blocked`, reason: "no tier declaration and no review-off declaration — cannot determine the commit gate". An undeclared tier never defaults to tier 0. |
 | Review Receipt present with `verdict: review-blocked` and no entry in `overrides` | `status: blocked`, reason: "review-blocked with no recorded override". A receipt with a recorded override clears the gate normally. |
 | Review Receipt present with `verdict_history` (a delta-chained receipt, `_shared/result-envelope.md` → Review Receipt) | Gate reads the chain's LAST entry, not any earlier one, AND cross-checks that entry's `verdict` against the top-level `verdict` field: match + `review-clear` → satisfies the tier ≥ 1 gate, proceed to commit; match + anything else → same handling as a bare `review-blocked` receipt (row above) — `status: blocked` absent a recorded override; **mismatch between the two** → `status: blocked`, reason: "verdict_history/verdict mismatch — receipt integrity failure" — fail closed, never a permissive pick of either field. |
+| Review Receipt carries a `findings_addressed` addendum with an entry missing its `files` field, naming a file outside `group_files`, or present while `group_files` was NOT injected | `status: blocked` — for an entry missing `files` or naming a file outside `group_files`, reason: "findings_addressed entry missing files or touches files outside group_files — receipt coverage broken"; for the absent-`group_files` case, reason: "findings_addressed present without an injected group_files — cannot verify coverage" (both fail closed, evaluated against the injected `group_files` only — never Step 5's staging discovery; a digest-only `fix_evidence` with no `files` list never passes silently). |
 | `tier: 0`, or an explicit "review off" declaration | Proceed to commit under ordinary policy — no receipt required, no gate evaluation beyond confirming the declaration itself. |
 
-**Resolution for the blocked rows:** the orchestrator either supplies the missing declaration/receipt and re-invokes, or the user records an override in the receipt and the orchestrator re-invokes with it — EXCEPT the integrity-failure (mismatch) outcome, which an override never resolves: the orchestrator must re-issue a coherent receipt whose chain and top-level `verdict` agree, then re-invoke. work-unit-commits never infers a tier or a receipt on its own — see [references/envelope-examples.md](references/envelope-examples.md) for the exact envelope shape of each outcome.
+**Resolution for the blocked rows:** the orchestrator either supplies the missing declaration/receipt and re-invokes, or the user records an override in the receipt and the orchestrator re-invokes with it — EXCEPT the integrity-failure (mismatch) outcome, which an override never resolves: the orchestrator must re-issue a coherent receipt whose chain and top-level `verdict` agree, then re-invoke. The same fail-closed handling applies to the `findings_addressed` row above: an override never resolves it either — the orchestrator must re-issue a receipt whose addendum entries each carry a `files` field lying entirely within `group_files`, with `group_files` itself injected, before re-invoking. work-unit-commits never infers a tier or a receipt on its own — see [references/envelope-examples.md](references/envelope-examples.md) for the exact envelope shape of each outcome.
