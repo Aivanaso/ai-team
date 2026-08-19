@@ -46,7 +46,7 @@ merge. Read application code to find vulnerabilities; never modify it.
 
 ### Mode threat-model
 
-1. Read `_shared/context-protocol.md` (startup), `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes only when `report_destination` is injected). Validate injected context: `mode`, `project_root`, `scope_description`, `security_touchpoints` (optional). Report `context_resolution`.
+1. Read `_shared/context-protocol.md` (startup), `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes only when `report_destination` is injected). Validate injected context: `mode`, `project_root`, `scope_description`, `security_touchpoints` (optional), and `report_destination` (always injected for review-plane passes per Critical Context Forwarding — treat absence as degradation: report `context_resolution: fallback` and flag it in `risks`). Report `context_resolution`.
 2. For each slug in `security_touchpoints` (injected, or inferred from `scope_description` text per the nine-slug heuristics), identify the passage in `scope_description` that triggered it.
 3. Walk each triggered touchpoint, applying the five audit-prompt categories (see [references/worked-examples.md](references/worked-examples.md)): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure. Read codebase files to ground findings in specific locations.
 4. Run the Temporal Invariant Sweep (always, transversal): detect temporal fields referenced in `scope_description` and any schema files it points to; identify the rejection semantic per field; enumerate every read path; verify enforcement; emit a finding when a read path consumes the field for an auth/access/state decision without the matching check.
@@ -56,7 +56,7 @@ merge. Read application code to find vulnerabilities; never modify it.
 
 ### Mode code-audit
 
-1. Read `_shared/context-protocol.md`, `_shared/persistence-contract.md`. Validate injected context: `mode`, `project_root`, `group_files`, optional `report_destination`. Report `context_resolution`.
+1. Read `_shared/context-protocol.md`, `_shared/persistence-contract.md`. Validate injected context: `mode`, `project_root`, `group_files`, and `report_destination` (always injected for review-plane passes per Critical Context Forwarding — absence is degradation: report `context_resolution: fallback` and flag it in `risks`). Report `context_resolution`.
 2. Resolve each `group_files` path relative to `project_root`; read each in full, plus up to 10 1-hop callers. Scope any git inspection (e.g. `git status`) with `-C {project_root}`.
 3. Read `config.yaml` from `project_root`. If `test_commands.security:` exists, run it and capture output; if absent, log "Dependency auditor: not configured (skipped)".
 4. Apply the five audit-prompt categories scoped to `group_files` (see [references/worked-examples.md](references/worked-examples.md)): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure.
@@ -66,9 +66,11 @@ merge. Read application code to find vulnerabilities; never modify it.
 
 ## Output Contract
 
-Writes nothing by default; writes `threat-model.md` / `audit-report.md` at the injected
-`report_destination` (resolved relative to `project_root`) only when one is provided.
-Returns:
+Writes `threat-model.md` / `audit-report.md` at the injected `report_destination` (resolved
+relative to `project_root`) — mandatory from the orchestrator's side for every review-plane
+delegation (`orchestrator-protocol.md` → Critical Context Forwarding); optional only from this
+skill's own write step, i.e. it writes nothing when no destination is injected. No fixed path,
+no separate `.ai-team/` artifact. Returns:
 
 ```yaml
 status: ok | warning | blocked

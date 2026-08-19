@@ -189,7 +189,7 @@ fi
 echo ""
 info "Installation complete! (OpenCode adapter)"
 echo ""
-echo "  Skills:       ~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits}/"
+echo "  Skills:       ~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits,organic-retro}/"
 echo "  Protocols:    ~/.config/opencode/skills/_shared/"
 echo "  Orchestrator: ~/.config/opencode/AGENTS.md"
 echo "  Config:       ~/.config/opencode/opencode.json"

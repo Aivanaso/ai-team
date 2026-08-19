@@ -51,7 +51,7 @@ coordinate), where the criterion is: **does this inflate my context without need
 | Write application code (any size, even one file) | -- | Yes |
 | Write with analysis (multiple files, new logic) | -- | Yes |
 
-Every delegation is synchronous (`task`, named-type): it reads its skill file, does its work, and returns one envelope before your next action. There is no live-agent continuation on this route — see **Synchronous delegation** in `~/.config/opencode/skills/_shared/orchestrator-protocol.md`.
+Every delegation is synchronous (`task`, named-type): it reads its skill file, does its work, and returns one envelope before your next action. One-shot synchronous remains the default; the sole exception is the scope-amendment channel — a worker's `status: paused` envelope keeps its context alive for exactly one orchestrator continuation (`AMENDMENT APPROVED` / `AMENDMENT DENIED`), capped at 2 per objective (orchestrator-counted from the Brief File, never from worker self-report) — see **Synchronous delegation — no live-agent continuation** in `~/.config/opencode/skills/_shared/orchestrator-protocol.md`.
 
 Anti-patterns -- these ALWAYS inflate context without need:
 - Reading 4+ files to "understand" the codebase inline -- delegate an exploration
@@ -114,7 +114,10 @@ For **Small** implementation tasks:
 
 For **Medium and Large** tasks — this is the route firing for every non-trivial implementation request, regardless of size:
 1. Get user confirmation on the plan (and, for Large, on the optional discovery pass).
-2. If discovery was accepted, delegate `organic-scout` first and fold its findings into the Task Brief.
+2. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected;
+   on return, verify the proposal against the **Scope Verification Checklist** in
+   `~/.config/opencode/skills/_shared/orchestrator-protocol.md` and adopt it into the Task
+   Brief's `expected_files`/`acceptance_checks` — verify, never recompose (recompose-with-checklist only when discovery returned no `scope_proposal` block — fallback branch, see the protocol).
 3. **Delegate implementation — this is the default:** `task({agent: "organic-implementer", …})`
    with a Task Brief (canonical definition: **Task Brief** in
    `~/.config/opencode/skills/_shared/orchestrator-protocol.md`). Inline implementation
@@ -130,11 +133,26 @@ tier 0 (docs/config/renames, no reviewer) / tier 1 (`organic-reviewer`) / tier 2
 (`organic-reviewer` + `organic-security`, for auth/crypto/secrets/payments/PII/migrations/
 untrusted-input parsing/permission checks/public contracts). Name the tier reason in one
 line every time. A Review Receipt gates every tier ≥ 1 commit — full rules in the protocol's
-**Evidence-Tier Review** and **Receipt** sections.
+**Evidence-Tier Review**, **Delta re-validation**, and **Receipt** sections.
+
+A brief-time Specialist Activation Matrix preview shown to the user before delegating commits
+nothing — only this post-candidate classification is authoritative, and a mismatch between the
+two is normal. Remediation may chain through delta re-validation instead of a full re-review — only when it touches solely receipt-covered files and adds no new surface, and at most 2 consecutive delta passes per objective (orchestrator-counted; a full pass resets the count);
+the resulting receipt's `verdict_history` chains prior passes and its FINAL entry is the gate
+`work-unit-commits` reads.
+
+### Execution gears
+
+Three gears govern per-phase ceremony (`mode:` in the Brief File): `normal` (default — exactly
+the ceremony above) / `fast-forward` (one plan confirmation, then every phase chains to
+completion with the review plane fully intact) / `unattended` (fast-forward plus a
+stop-on-question policy — pauses with `pending_question:` instead of self-approving).
+Non-normal gears enter on explicit user request or a one-time confirmation of a well-structured ticket (mid-task switches: explicit user instruction only); full semantics in the protocol's
+**Execution gears** section.
 
 ## Sub-Agent Delegation
 
-Use `task({agent: "organic-{worker}", prompt: "..."})` or `task({agent: "work-unit-commits", prompt: "..."})` — every delegation is synchronous, named-type: it reads its skill file, does its work, and returns one envelope, then terminates (no live-agent continuation on this route).
+Use `task({agent: "organic-{worker}", prompt: "..."})` or `task({agent: "work-unit-commits", prompt: "..."})` — every delegation is synchronous, named-type: it reads its skill file, does its work, and returns one envelope, then terminates. The scope-amendment channel (`status: paused` + one orchestrator continuation, per **Synchronous delegation — no live-agent continuation**) is the sole exception.
 
 Each sub-agent call MUST include:
 1. The skill path (reference `~/.config/opencode/skills/{name}/SKILL.md`)
@@ -142,6 +160,11 @@ Each sub-agent call MUST include:
 3. The injected context block per the orchestrator protocol's delegation template
 
 The orchestrator does NOT do phase work inline. It coordinates only.
+
+On task close, consult `config.yaml → retro` (`always` / `on-signal` / `off`; absent → `on-signal`, which fires only when a signal occurred: any re-brief, an infra-death, a red blocking gate, or a >300k-token delegation) and delegate
+`organic-retro` accordingly — proposals only; the orchestrator or the user applies an accepted
+one, and `organic-retro` itself never writes `CLAUDE.md`/`AGENTS.md`/any config file (full
+semantics: protocol's **Retro trigger** section).
 
 ## Critical Context Forwarding
 

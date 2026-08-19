@@ -26,7 +26,7 @@ mode) and its own report at an injected `report_destination` (discover mode) —
 - Discover: ground every codebase claim in read evidence with a `file:line` citation (Evidence Protocol Rule 1); an unfamiliar pattern or absent evidence is surfaced as an open question, never guessed.
 - Discover: name actual files, classes, interfaces, and directories. Abstract descriptions ("a service", "some module") are not accepted. -- because abstract descriptions force the Task Brief author to make decisions scout had the evidence to answer.
 - Discover: follow existing project patterns in the report's recommendations — if the project uses a repository pattern, the report names it as the pattern to follow; it does not propose a new paradigm the discovery request did not ask for.
-- Discover: the report is returned in the result envelope, not persisted as a `.ai-team/` artifact by default — the orchestrator folds it directly into the Task Brief it composes next. Write it to disk only when a `report_destination` is injected.
+- Discover: `report_destination` is always injected by the orchestrator for a discovery pass that feeds a Task Brief or otherwise counts as review-plane/scope-authority material (Critical Context Forwarding, `orchestrator-protocol.md`) — write the report there; an absent injection is degradation, not a design choice: report `context_resolution: fallback` and flag the gap in `risks`. An on-demand inspection that feeds no brief may omit the injection — the report then returns in the result envelope only, and the orchestrator folds it directly into whatever it composes next.
 - Discover, scope_proposal: when the orchestrator injects `scope_proposal: true`, every `expected_files` entry in the proposal carries its own `file:line` evidence — a path without evidence is not a proposal, it is a guess.
 - Discover, scope_proposal: every proposed `acceptance_checks.command` is verified runnable BEFORE proposing it — execute it read-only when side-effect-free, otherwise cite the declaring target's existence (e.g. the `targets` block of a `project.json`, a script in `package.json`/`Makefile`) with `file:line`. An unrunnable check protects nothing and burns a delegation round.
 - Discover, scope_proposal: before closing `expected_files`, sweep construction sites of every touched type/interface — grep for object literals, builders, stubs, and factories that build it, not only files that annotate or mention it. A type gaining a required member breaks its constructors first.
@@ -69,7 +69,7 @@ mode) and its own report at an injected `report_destination` (discover mode) —
 ## Output Contract
 
 - Bootstrap: writes `.ai-team/config.yaml`. `context_resolution: none`.
-- Discover: writes nothing by default; writes the report at `report_destination` (resolved relative to `project_root`) only when one is injected. `context_resolution: self-loaded` (or `fallback`).
+- Discover: writes the report at the injected `report_destination` (resolved relative to `project_root`) — mandatory from the orchestrator's side for every discovery pass that feeds a Task Brief or otherwise counts as review-plane/scope-authority material (Critical Context Forwarding); optional only from this skill's own write step, i.e. it writes nothing when no destination is injected. `context_resolution: self-loaded` (or `fallback` when the injection is absent and the pass was review-plane material).
 
 ```yaml
 status: ok | warning | needs_input | blocked

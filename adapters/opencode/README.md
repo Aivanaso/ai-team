@@ -23,7 +23,7 @@ Installs the ai-team organic evidence-tiered delegation framework into OpenCode 
 |----------|----------|
 | Orchestrator instructions | `~/.config/opencode/AGENTS.md` |
 | Agent definitions | `~/.config/opencode/opencode.json` (merged) |
-| Skills | `~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits}/` |
+| Skills | `~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits,organic-retro}/` |
 | Shared protocols | `~/.config/opencode/skills/_shared/` |
 
 ## Usage

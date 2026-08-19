@@ -18,7 +18,7 @@ Claude Code must be installed and `~/.claude/` must exist. The installer aborts 
 
 ## What the install does
 
-1. **Copies skills** from `domain/skills/` to `~/.claude/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits}/` and `~/.claude/skills/_shared/`
+1. **Copies skills** from `domain/skills/` to `~/.claude/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits,organic-retro}/` and `~/.claude/skills/_shared/`
 2. **Rewrites skill paths** in `~/.claude/skills/_shared/orchestrator-protocol.md` — relative `skills/` references become absolute `~/.claude/skills/` paths so Claude can read them without knowing the repo location
 3. **Injects orchestrator content** from `adapters/claude-code/templates/CLAUDE.md` inline into `~/.claude/CLAUDE.md`, between `<!-- ai-team:orchestrator -->` and `<!-- /ai-team:orchestrator -->` markers
 

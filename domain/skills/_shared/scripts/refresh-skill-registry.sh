@@ -6,7 +6,7 @@
 # + scope + path of every stack/convention skill; dedupes by name with first-hit-wins, so a
 # project skill beats a user/global skill of the same name; excludes the route's own
 # skills (work-unit-commits, organic-implementer, organic-reviewer, organic-scout,
-# organic-security, _shared) — route workers are delegated by name, never
+# organic-security, organic-retro, _shared) — route workers are delegated by name, never
 # matched by stack. The registry is an INDEX, not a
 # summary: delegators match rows and
 # forward exact SKILL.md paths; sub-agents read the full files (author intent preserved).
@@ -69,7 +69,7 @@ for root in "${scan_roots[@]}"; do
   while IFS= read -r f; do
     skill_dir="$(basename "$(dirname "$f")")"
     case "$skill_dir" in
-      _shared|skill-registry|work-unit-commits|organic-implementer|organic-reviewer|organic-scout|organic-security) continue ;;
+      _shared|skill-registry|work-unit-commits|organic-implementer|organic-reviewer|organic-scout|organic-security|organic-retro) continue ;;
     esac
     files+=("$f")
   done < <(find "$root" -mindepth 2 -maxdepth 2 -type f -name SKILL.md 2>/dev/null | LC_ALL=C sort)

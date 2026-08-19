@@ -24,6 +24,7 @@ id: F-1
 category: temporal-invariant-sweep
 file_line: (scope_description reference — sessions schema definition)
 severity: MINOR
+confidence: medium
 description: "sessions.refresh_expires_at is defined in the schema but the change scope
   does not state that POST /v1/auth/refresh rejects requests where refresh_expires_at
   < now. No enforcement clause referenced."

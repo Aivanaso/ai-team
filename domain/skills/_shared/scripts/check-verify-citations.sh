@@ -24,9 +24,11 @@
 #    comes first. Any such block that carries a CRITICAL/MAJOR/MINOR severity token MUST
 #    also carry a `path/to/file:line`-shaped citation somewhere in the block — presence
 #    only, no on-disk resolution (the citation's line-level claim is opaque to this script).
-#    Limitation: a Suppression Tally mention of an `F-<n>` id that does NOT restate a
-#    severity token is not treated as a finding row (avoids false positives on suppressed
-#    references) — do not rely on this to skip citing an actual finding.
+#    Limitation: a mention of an `F-<n>` id that does NOT restate a severity token is not
+#    treated as a finding row (avoids false positives on non-finding references) — do not
+#    rely on this to skip citing an actual finding. Coverage model (skill-style-guide.md →
+#    "Coverage over self-filtering"): every finding is reported with its own `confidence`
+#    field regardless of severity; no suppression-tally report section exists to exempt one.
 #
 # Usage: check-verify-citations.sh <report.md> [repo-root] [tasks-md] [test-log]
 #        tasks-md defaults to tasks.md next to the report;
