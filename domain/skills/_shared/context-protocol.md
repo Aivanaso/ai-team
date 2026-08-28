@@ -60,7 +60,7 @@ Read .ai-team/config.yaml
 
 # 2. Injected context (inlined in the delegation prompt, not a path to read)
 Task Brief: objective, target_repo, allowed_edit_roots, expected_files,
-            acceptance_checks, out_of_scope
+            acceptance_checks, out_of_scope, constraints
 
 # 3. Protocols JIT (as each Execution Step needs them)
 Read _shared/persistence-contract.md   # at the step that checks write rules

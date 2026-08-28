@@ -78,6 +78,8 @@ discovery_report:
     public_contracts:
       - "ExportService.export(invoiceIds: string[]): Promise<ExportResult> — new public method (does not exist yet, modeled on InvoiceService.ts:40)"
       - "InvoiceRepository.findForExport(ids: string[]): Promise<Invoice[]> — new interface member, src/billing/repositories/InvoiceRepository.ts:12"
+    constraints_candidates:
+      - "InvoiceService never returns partial results on a failed batch item — it fails the whole export instead (src/billing/services/InvoiceService.ts:55)"
     open_scope_questions:
       - "Retention policy for generated exports has no existing caller — cannot cite evidence for a cleanup job path."
 next_recommended: []

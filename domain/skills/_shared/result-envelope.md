@@ -106,8 +106,10 @@ The orchestrator inspects this field on every return that carries it. See `orche
 
 `organic-implementer` defines its own **bounded** envelope variant (Output Contract in its own
 SKILL.md) rather than reusing this base schema verbatim — bounded evidence (`check_results`,
-capped digests) instead of a raw-stdout evidence field, and `scope_report` instead of a
-structured deviation block. See that skill's Output Contract for its complete field set.
+capped digests) instead of a raw-stdout evidence field, `scope_report` instead of a
+structured deviation block, and `decisions_taken` (CAP 5, terminal envelopes only) for
+behavioral decisions the brief did not fix. See that skill's Output Contract for its complete
+field set.
 
 ## Intermediate envelope — paused
 
@@ -123,6 +125,7 @@ status: paused                       # not terminal — the worker is waiting fo
 artifacts:                           # REQUIRED — files already written before pausing (Execution Steps implement before the pause gate, so partial writes are certain, not merely possible) — CAP 25 entries, same shape/cap discipline as the terminal artifacts field
   - { name: "<short label>", path: "<repo-relative path>" }
 artifacts_omitted: 0                 # >0 only when the cap was hit
+# decisions_taken does NOT travel here — it is terminal-only (organic-implementer's Output Contract); a pause carries the fields declared in this block and nothing more.
 amendment_request:
   kind: scope-amendment
   reason: "<one sentence — which brief element the evidence outgrew>"

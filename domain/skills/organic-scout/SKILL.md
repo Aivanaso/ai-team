@@ -31,6 +31,7 @@ mode) and its own report at an injected `report_destination` (discover mode) —
 - Discover, scope_proposal: every proposed `acceptance_checks.command` is verified runnable BEFORE proposing it — execute it read-only when side-effect-free, otherwise cite the declaring target's existence (e.g. the `targets` block of a `project.json`, a script in `package.json`/`Makefile`) with `file:line`. An unrunnable check protects nothing and burns a delegation round.
 - Discover, scope_proposal: before closing `expected_files`, sweep construction sites of every touched type/interface — grep for object literals, builders, stubs, and factories that build it, not only files that annotate or mention it. A type gaining a required member breaks its constructors first.
 - Discover, scope_proposal: trace the objective's chain to the leaves — if the report's prose describes a data/control flow, every link of that flow appears in `expected_files`, or in `open_scope_questions` with the reason it could not be closed.
+- Discover, scope_proposal: a `constraints_candidates` entry without a `file:line` anchor is not proposed — the same evidence discipline as `expected_files`.
 
 ## Decision Gates
 
@@ -63,7 +64,7 @@ mode) and its own report at an injected `report_destination` (discover mode) —
    - Monorepo: `turbo.json` OR `pnpm-workspace.yaml` OR `lerna.json` OR `workspaces` field in `package.json` OR multiple package manifests in direct child dirs.
    - App vs library: `main.ts`/routes/controllers → `app`; `package.json` with `main`/`exports`/`types` and no server code → `library`.
    - Package manager lock file precedence: `pnpm-lock.yaml` > `yarn.lock` > `bun.lockb` > `package-lock.json` > `composer.lock`.
-8. **Discover**: compose the discovery report — Key Files (path, role, `file:line` evidence), Patterns Observed (existing conventions the Task Brief should follow), Risks (grounded citations), Open Questions (claims with no resolvable evidence). When the orchestrator injected `scope_proposal: true`, additionally compose the `scope_proposal` block: cite `file:line` evidence for every `expected_files` entry, verify each `acceptance_checks.command` runnable before proposing it, sweep construction sites for every touched type, and name each seam's `public_contracts`. Return it all in the envelope's `discovery_report` field. When `report_destination` is injected, also write it there (create its parent directory if absent).
+8. **Discover**: compose the discovery report — Key Files (path, role, `file:line` evidence), Patterns Observed (existing conventions the Task Brief should follow), Risks (grounded citations), Open Questions (claims with no resolvable evidence). When the orchestrator injected `scope_proposal: true`, additionally compose the `scope_proposal` block: cite `file:line` evidence for every `expected_files` entry, verify each `acceptance_checks.command` runnable before proposing it, sweep construction sites for every touched type, name each seam's `public_contracts`, and name any evidence-derived `constraints_candidates` (optional — never invented). Return it all in the envelope's `discovery_report` field. When `report_destination` is injected, also write it there (create its parent directory if absent).
 9. Return the envelope per Output Contract.
 
 ## Output Contract
@@ -89,6 +90,8 @@ discovery_report:                # discover mode only
       - { command: "<verbatim>", verified: "<how runnability was proven: executed read-only | target exists at path:line>", expect: "<observable outcome>" }
     public_contracts:            # what the change creates/modifies/deletes at its seams
       - "<one line each: signatures, events + fields, named test cases, DB schema, user-visible copy — with a file:line anchor>"
+    constraints_candidates:      # optional — an existing invariant/pattern/decision the objective must honor, evidence-derived, never invented
+      - "<one line — an existing invariant/pattern/decision the objective must honor, with file:line>"
     open_scope_questions: []     # anything the scout could not close with evidence
 next_recommended: []
 risks: []

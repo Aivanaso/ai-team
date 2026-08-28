@@ -193,7 +193,7 @@ The registry feeds the `skills_to_load` flag in Critical Context Forwarding: the
 
 ## Task Brief
 
-The canonical, author-side contract the orchestrator composes and inlines into the delegation prompt. Six required elements — both the prose spelling and the serialized field name are given, since the brief travels as a YAML block:
+The canonical, author-side contract the orchestrator composes and inlines into the delegation prompt. Seven required elements — both the prose spelling and the serialized field name are given, since the brief travels as a YAML block:
 
 | Element (prose) | Meaning | Serialized field |
 |---|---|---|
@@ -203,6 +203,7 @@ The canonical, author-side contract the orchestrator composes and inlines into t
 | expected files | The files the brief expects to exist or change afterwards, each with its action. Contributes to `group_files` when a lens or `work-unit-commits` is activated — see **Logical group — canonical definition** in `common-rules.md`. | `expected_files` |
 | acceptance checks | Runnable commands the worker executes and the orchestrator can re-run, each with its expected outcome. An adjective ("works correctly") is not a check. | `acceptance_checks` |
 | out-of-scope | Explicit non-goals — what the worker must not do even if it looks adjacent. | `out_of_scope` |
+| constraints | Design decisions already taken that the worker honors and never re-decides — error semantics, validations NOT to add, defaults, timeouts/retries, where a behavior is documented. Each entry is verifiable by the reviewer without judgment. An empty list is legal and means "none declared". | `constraints` |
 
 ```yaml
 ## Task Brief
@@ -219,11 +220,14 @@ acceptance_checks:
   - { command: "<verbatim runnable command>", expect: "<one-line observable outcome>" }
 out_of_scope:
   - "<explicit non-goal>"
+constraints: ["<one verifiable sentence>", "..."]   # empty list legal — means "none declared"
 ```
 
 **Author-side invariants:** `allowed_edit_roots` is a **superset** of the containing directories of `expected_files` (a top-level, no-`/` entry contributes none — it is permitted by its own exact-path declaration instead, never by root membership; see **Roots Computation** below), per the Roots Computation algorithm below. Paths in the brief are repo-relative so the within-roots check runs on the same textual form the definition specifies (absolute paths and `..` segments are rejected by definition). A brief without the `allowed_edit_roots` field is `brief-incomplete` — there is no empty-roots fallback on this route (an empty *list* is legitimate only in the all-top-level-files case Roots Computation defines, never elsewhere).
 
-**Composition inversion — verify, don't compose.** When a discovery pass ran, the scout's `scope_proposal` (`organic-scout`'s Output Contract, discover mode) is the SOURCE of the brief's `expected_files` and `acceptance_checks` — the orchestrator verifies it against the Scope Verification Checklist below and copies it into the brief; it does not recompose the file list from its own reading. Adoption copies only the proposal's `action`/`path` pairs into `expected_files` and `command`/`expect` pairs into `acceptance_checks` — the brief's six-element YAML schema gains no new fields; the proposal's `evidence` and `verified:` keys stay in the scout's discovery report, which remains the audit trail, referenced from the Brief File's Amendments section. Discovery that will feed a Task Brief is always delegated to `organic-scout`, whose Evidence Protocol contract makes every claim citable — never to a bare general-purpose or Explore-style agent, whose uncited conclusions have twice contradicted raw evidence already in the orchestrator's hands. A discovery pass that returns without a `scope_proposal` block (the contract not honored — e.g. an older installed scout) routes to the no-discovery branch below: the orchestrator composes the brief itself against the same checklist, and records the gap in the Brief File's Amendments section.
+**`constraints` asymmetry — author-required, consumer-safe-absent.** The orchestrator MUST close this element when composing a brief (Scope Verification Checklist item 7 below); an explicitly empty list is legal and recorded as a deliberate "none declared". On the consumer side, a brief WITHOUT the `constraints` field at all — never composed under this contract, but reachable via verbatim re-brief/replay of a brief composed before this element existed (Re-engage prompt block, Infra-death policy below) — is treated by `organic-implementer` as `constraints: []`, never as `brief-incomplete`: this asymmetry protects those pre-existing replay paths from a retroactive strictness the original brief was never composed against.
+
+**Composition inversion — verify, don't compose.** When a discovery pass ran, the scout's `scope_proposal` (`organic-scout`'s Output Contract, discover mode) is the SOURCE of the brief's `expected_files` and `acceptance_checks` — the orchestrator verifies it against the Scope Verification Checklist below and copies it into the brief; it does not recompose the file list from its own reading. Adoption copies only the proposal's `action`/`path` pairs into `expected_files` and `command`/`expect` pairs into `acceptance_checks` — the brief's seven-element YAML schema gains no new fields from this adoption; the proposal's `evidence` and `verified:` keys stay in the scout's discovery report, which remains the audit trail, referenced from the Brief File's Amendments section. The same inversion governs the scout's optional `constraints_candidates` block (`organic-scout`'s Output Contract, discover mode): the orchestrator adopts it into the brief's `constraints` the same way it adopts `expected_files` — verify each candidate's `file:line` evidence against the Scope Verification Checklist below, then copy it in verbatim; it does not invent constraints from its own reading. Discovery that will feed a Task Brief is always delegated to `organic-scout`, whose Evidence Protocol contract makes every claim citable — never to a bare general-purpose or Explore-style agent, whose uncited conclusions have twice contradicted raw evidence already in the orchestrator's hands. A discovery pass that returns without a `scope_proposal` block (the contract not honored — e.g. an older installed scout) routes to the no-discovery branch below: the orchestrator composes the brief itself against the same checklist, and records the gap in the Brief File's Amendments section.
 
 **When no discovery pass ran** (e.g. Small/clear scope), or when one ran but returned no `scope_proposal` block, the orchestrator composes the brief itself and closes each checklist item from evidence already in hand — for items 2 and 3 below this means the orchestrator performs the construction-site sweep and the runnability verification itself, never waiting on a proposal that does not exist. For Small or self-evident scope this closure is immediate, consistent with the Small-task delegation path (**Mandatory Classification Gate → After classification** above) and the trivial-edit floor (**Delegation Philosophy** above); a scout discovery pass is forced only when an item genuinely cannot be closed from evidence already in hand, never merely because no proposal exists.
 
@@ -239,6 +243,7 @@ Each item names its evidence; none may be skipped silently. **Failure consequenc
 4. **Criteria mapped** — every acceptance criterion of the objective maps to an `acceptance_checks` entry or a named test in the brief; an unmapped criterion means either the criterion is out of scope or the brief is incomplete.
 5. **Raw evidence wins** — where any sub-agent conclusion contradicts command output the orchestrator itself produced, the command output prevails and the conflict is resolved before delegating.
 6. **Invariant reconciliation** — when the objective introduces or tightens an invariant in a shared contract, grep every existing statement of the invariant it replaces or constrains, and cite the reconciliation in the brief itself — or, on the brief-less retro-application route, in the applying record (Retro trigger below): the sites the candidate must also update, or an explicit no-conflict note. A new rule shipped in the same candidate as an unretired rule that contradicts it is a recurrent CRITICAL class on this route (organic-v2 retro: 3 of its 8 CRITICALs) — the sweep belongs in the same candidate, never a follow-up phase.
+7. **Constraints declared** — every design decision the objective already fixes (from the user's request, the Brief File's Amendments, or the scout's `constraints_candidates`) appears in `constraints`; an explicitly empty list carries a one-line note in the Brief File's Amendments saying why none apply.
 
 #### New worker checklist
 
@@ -262,7 +267,7 @@ The named paths are the ai-team framework repo's own; in a target project withou
 | Preamble | `You are the organic-implementer executor. …` (mirrors the agent template) |
 | `## Skill and Protocol Paths` | `{install_dir}/skills/organic-implementer/SKILL.md`, `{install_dir}/skills/_shared/context-protocol.md`, `…/persistence-contract.md`, `…/common-rules.md`, `…/result-envelope.md`, `…/evidence-protocol.md`, `…/orchestrator-protocol.md`. No `references_dir` — the skill is single-file. |
 | `## Injected Context` | `project_root` (= the brief's target repo), `model_alias: sonnet`, `current_iso_utc`, `install_dir`, `amendment_requests_used`, `amendments_denied` — all resolved per the Critical Context Forwarding table below |
-| `## Task Brief` | the six-element YAML block (see **Task Brief** above) |
+| `## Task Brief` | the seven-element YAML block (see **Task Brief** above) |
 | `## Skills to load before work` | forwarded from `.ai-team/skill-registry.md` **only when the brief's target repo is the session's project root**; omitted otherwise |
 | Mandatory tail | the verbatim UNTRUSTED CONTENT block in Critical Context Forwarding below — reused, not re-authored |
 
@@ -302,9 +307,9 @@ base_ref: "<branch or commit the work builds on>"
 created_by: { tool: "<harness>", model: "<orchestrator model>" }
 ---
 ## Task Brief
-(verbatim copy of every six-element YAML block delegated for this task; one block per
+(verbatim copy of every seven-element YAML block delegated for this task; one block per
 objective, appended as the task progresses; a cross-repo objective's block is preceded by a
-`base_ref:` annotation line, outside the six-element block itself, only when that repo's base
+`base_ref:` annotation line, outside the seven-element block itself, only when that repo's base
 differs from the frontmatter's)
 ## Phases
 (checkbox list of the task's logical groups; the orchestrator checks items as groups
@@ -376,10 +381,10 @@ Route the return by its `status`:
 
 | Worker return | Orchestrator action |
 |---|---|
-| `ok` and `artifacts` cover the expected-files set | Confirm each `artifacts` path exists on disk under `target_repo` — self-reported `artifacts` alone is not proof. Any path that fails this confirmation routes to the partial-run row below instead. Otherwise run the Specialist Activation Matrix against `artifacts`, resolve the tier (Evidence-Tier Review), delegate activated lenses, then commit. |
+| `ok` and `artifacts` cover the expected-files set | Confirm each `artifacts` path exists on disk under `target_repo` — self-reported `artifacts` alone is not proof. Any path that fails this confirmation routes to the partial-run row below instead. Read the envelope's `decisions_taken` (if any) and cross-check each entry against the brief's `constraints` BEFORE the review delegation — a contradiction is inlined into the reviewer prompt as a focus item (the reviewer still records the finding per its own Hard Rules). Otherwise run the Specialist Activation Matrix against `artifacts`, resolve the tier (Evidence-Tier Review), delegate activated lenses (forwarding `decisions_taken` per Critical Context Forwarding when non-empty), then commit. |
 | `ok` or `warning` but `artifacts` do **not** cover the expected-files set (partial run) | Do not activate lenses yet — resolve the gap first. A lens pointed at files a partial run never created returns a *false clear*. |
-| `warning` (checks failed, objective met, evidence of pre-existing failure) | Present `check_results`; the user decides re-brief / accept / stop; lenses run only once the objective's own checks pass. |
-| `needs_input` | Surface `questions`; amend the brief; re-delegate fresh — no addendum channel. Counts against the shared re-brief budget (`paused` amendment requests do not — see Amendment ingestion below). |
+| `warning` (checks failed, objective met, evidence of pre-existing failure) | Present `check_results`; read `decisions_taken` (if any) and cross-check against `constraints` the same way as the `ok` row above; the user decides re-brief / accept / stop; lenses run only once the objective's own checks pass. |
+| `needs_input` | Surface `questions`; amend the brief; re-delegate fresh — no addendum channel. On this row and the `blocked`/`failed` rows below, a non-empty `decisions_taken` is recorded in the Brief File's Amendments and re-inlined in the re-brief's `## Re-engage Reason` so the next run does not re-decide silently. Counts against the shared re-brief budget (`paused` amendment requests do not — see Amendment ingestion below). |
 | `blocked` | Route by `scope_report.kind`: `brief-incomplete`/`check-unrunnable` → amend the brief (or fix the environment) and re-delegate; `out-of-roots` → widen-or-stop (see Apply-Blocked Re-engage Routing below); `scope-exceeds-brief` → extend `expected_files`/roots and re-brief; `scope-large` → escalate to the user (offer an `organic-scout` discovery pass or splitting into multiple briefs); `check-failed` → present `check_results` and decide re-brief vs accept vs stop. Counts against the shared re-brief budget (`paused` amendment requests do not — see Amendment ingestion below). |
 | `paused` | An intermediate, non-terminal envelope carrying `amendment_request` — route to **Amendment ingestion** below. Does not count against the shared re-brief budget. |
 | `failed` | Report; one re-brief at most, then escalate. |
@@ -497,7 +502,7 @@ Review happens AFTER a candidate exists — post-implementation, pre-commit — 
 
 The classifier MUST name its reason in one line (e.g. "tier 2: modifies session auth middleware"). Review cost is never unexplained. **Calibration:** a 1000-line documentation change is tier 0; a 2-line auth change is tier 2.
 
-**Escalate, never de-escalate.** Escalate one tier when the implementer's envelope reports deviations, failed/skipped verification, or self-declared uncertainty. Never de-escalate below the content-based tier.
+**Escalate, never de-escalate.** Escalate one tier when the implementer's envelope reports deviations, failed/skipped verification, or self-declared uncertainty. Never de-escalate below the content-based tier. A non-empty `decisions_taken` list is declared design information, not self-declared uncertainty — it never triggers this escalation by itself; self-declared uncertainty (recorded in `risks`) still triggers it — the trigger is the uncertainty, never the mere presence of a `risks` entry, which does.
 
 **Tool gates (objective review).** Projects may declare `review_gates` in `.ai-team/config.yaml`; `organic-reviewer` re-runs them at tier ≥ 1 alongside its verification evidence — script asserts, agent fixes — and records each failure as a `lenses.correctness.findings[]` entry cited to the gate's declaring entry in `.ai-team/config.yaml`. A failing blocking gate yields a CRITICAL finding and `verdict: review-blocked`, which the orchestrator routes exactly like any other review-blocked outcome (see **Verdict handling** above): re-brief `organic-implementer` with the finding inlined (counts against the shared re-brief budget), or the user accepts-and-proceeds per **Accepting a finding** below. A failing non-blocking gate yields a MAJOR finding that documents but does not block. Tier 0 runs no gates. See `config/schema.yaml` and `organic-reviewer/SKILL.md` for full semantics.
 
@@ -732,6 +737,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
 | `group_id` | brief-slug label | work-unit-commits, organic-reviewer, organic-security | always when invoking these |
 | `group_files` | the union of the brief's `expected_files` paths and the implementer envelope's `artifacts` paths (canonical definition: `common-rules.md` → "Logical group") | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits — makes the receipt gate fireable and restores scoped staging |
+| `decisions_taken` | the implementer envelope's `decisions_taken` (verbatim) | organic-reviewer | mandatory whenever the list is non-empty at tier ≥ 1 (full pass and delta pass alike) |
 | `prior_report` | the prior pass's on-disk review report path (that pass's own `report_destination`) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
 | `delta_scope` | orchestrator-composed from the remediation diff and the prior receipt; single shape defined ONCE in Evidence-Tier Review → Delta re-validation (chain custody included) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
 | `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security, organic-retro (retro mode — path convention `.ai-team/retros/`) | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit |
