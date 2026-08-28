@@ -50,6 +50,12 @@ Files audited: {group_files}
 ## Dependency Auditor
 
 {output of test_commands.security, or "Dependency auditor: not configured (skipped)"}
+
+## Sidecar Self-Validation
+
+| Command | Exit Code | Violations fixed before return |
+|---------|-----------|--------------------------------|
+| python3 skills/_shared/scripts/check-receipt.py receipt {sidecar path} . | {int} | none / {one line per VIOLATION fixed} |
 ```
 
 ## Per-Finding Structure

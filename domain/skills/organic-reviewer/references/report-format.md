@@ -52,6 +52,12 @@ Files reviewed: {group_files}   (1-hop callers read: {n}/10)
 `review_gates` entry's `name` for a gate outcome row. unrunnable commands are omitted from this
 table; the gap is noted in the envelope's `risks` instead — for an unrunnable gate, name it:
 "review gate '{name}' could not be re-run in this environment")
+
+## Sidecar Self-Validation
+
+| Command | Exit Code | Violations fixed before return |
+|---------|-----------|--------------------------------|
+| python3 skills/_shared/scripts/check-receipt.py receipt {sidecar path} . | {int} | none / {one line per VIOLATION fixed} |
 ````
 
 ## Per-Finding Structure
@@ -119,6 +125,12 @@ line and "Not Re-Verified" section are the human-readable mirror, never the vali
 
 {mandatory — every lens/file the prior pass covered that this pass did not re-check, with the
 reason: "already clean in the prior pass" | "outside the delta scope"}
+
+## Sidecar Self-Validation
+
+| Command | Exit Code | Violations fixed before return |
+|---------|-----------|--------------------------------|
+| python3 skills/_shared/scripts/check-receipt.py receipt {sidecar path} . | {int} | none / {one line per VIOLATION fixed} |
 ````
 
 A CRITICAL finding in a delta pass escalates to a full re-review — the delta report format is

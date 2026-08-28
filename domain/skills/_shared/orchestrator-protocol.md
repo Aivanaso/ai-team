@@ -220,7 +220,7 @@ The canonical, author-side contract the orchestrator composes and inlines into t
 | expected files | The files the brief expects to exist or change afterwards, each with its action. Contributes to `group_files` when a lens or `work-unit-commits` is activated — see **Logical group — canonical definition** in `common-rules.md`. | `expected_files` |
 | acceptance checks | Runnable commands the worker executes and the orchestrator can re-run, each with its expected outcome. An adjective ("works correctly") is not a check. When the objective's fix touches state one run leaves for the next (a branch, worktree, lock, or file shared between executions), the checks include a **second-run** check from the first brief — set up the state the fix leaves behind, then exercise the next run's entry path against it (error-reporting retro F1: three MAJOR regressions, all in the un-checked second-run path). | `acceptance_checks` |
 | out-of-scope | Explicit non-goals — what the worker must not do even if it looks adjacent. | `out_of_scope` |
-| constraints | Design decisions already taken that the worker honors and never re-decides — error semantics, validations NOT to add, defaults, timeouts/retries, where a behavior is documented. Each entry is verifiable by the reviewer without judgment. An empty list is legal and means "none declared". | `constraints` |
+| constraints | Design decisions already taken that the worker honors and never re-decides — error semantics, validations NOT to add, defaults, timeouts/retries, where a behavior is documented. Each entry is verifiable by the reviewer without judgment. NEVER an implementation design no review pass has yet tested (a filter shape, an algorithm, a data structure the orchestrator merely prefers) — a constraint fixes what is already decided; a solution the review plane may still refute stays out of `constraints`, or the re-brief cannot adopt the lens's recommendation (G4 retro: constraint 2 blocked the same recommendation across two passes). An empty list is legal and means "none declared". | `constraints` |
 
 ```yaml
 ## Task Brief
@@ -261,7 +261,8 @@ Each item names its evidence; none may be skipped silently. **Failure consequenc
    - When the fix touches state one run leaves for the next, the mapped checks include the second-run check (**Task Brief** table, `acceptance checks` row above).
 5. **Raw evidence wins** — where any sub-agent conclusion contradicts command output the orchestrator itself produced, the command output prevails and the conflict is resolved before delegating.
 6. **Invariant reconciliation** — when the objective introduces or tightens an invariant in a shared contract, grep every existing statement of the invariant it replaces or constrains, and cite the reconciliation in the brief itself — or, on the brief-less retro-application route, in the applying record (Retro trigger below): the sites the candidate must also update, or an explicit no-conflict note. A new rule shipped in the same candidate as an unretired rule that contradicts it is a recurrent CRITICAL class on this route (organic-v2 retro: 3 of its 8 CRITICALs) — the sweep belongs in the same candidate, never a follow-up phase.
-7. **Constraints declared** — every design decision the objective already fixes (from the user's request, the Brief File's Amendments, or the scout's `constraints_candidates`) appears in `constraints`; an explicitly empty list carries a one-line note in the Brief File's Amendments saying why none apply.
+7. **Constraints declared** — every design decision the objective already fixes (from the user's request, the Brief File's Amendments, or the scout's `constraints_candidates`) appears in `constraints`; an explicitly empty list carries a one-line note in the Brief File's Amendments saying why none apply. Each entry is a decision already taken — never an untested implementation design (**Task Brief** table, `constraints` row).
+8. **Fix class named** — when the objective reads as "harden / tighten a parser, regex, or text filter over prose or free-form input", the orchestrator first asks whether the real fix is the INPUT FORMAT (structured data validated structurally) rather than the parser; a parser-hardening objective is composed only with a one-line reason in the Brief File's Amendments why a format change was rejected, or it routes to discovery instead (G4 retro: 1.52M tokens hardening a bash/regex parser over markdown whose real fix was JSON).
 
 #### New worker checklist
 
@@ -566,13 +567,13 @@ verification above, cover a paused-worker death identically to any other infra-d
 
 ## Evidence-Tier Review (post-candidate)
 
-Review happens AFTER a candidate exists — post-implementation, pre-commit — on the exact diff the worker produced, never on the plan. Tier is decided by evidence in the diff, never by size:
+Review happens AFTER a candidate exists — post-implementation, pre-commit — on the exact diff the worker produced, never on the plan. Tier is decided by evidence in the diff, never by size — and never by recall of similar tasks (a diff that "looks like" a low-tier predecessor is read, not remembered; G4 retro: the only BLOCKING gate script of the review plane would have gone unaudited on a by-memory classification):
 
 | Tier | Trigger | Review |
 |---|---|---|
 | **0** | Docs, comments, non-runtime config, typos, pure renames/moves | No reviewer — result envelope only. |
 | **1** | Standard code change | `organic-reviewer`: correctness lens + verification evidence (tests/build output). |
-| **2** | Diff touches any of: auth/authz, crypto, secrets, payments, PII, data migrations or deletion paths, parsing of untrusted input, permission checks, cross-module public contracts | `organic-reviewer` multi-lens (correctness + security via `organic-security`); evidence citations mandatory per `evidence-protocol.md`. |
+| **2** | Diff touches any of: auth/authz, crypto, secrets, payments, PII, data migrations or deletion paths, parsing of untrusted input, permission checks, cross-module public contracts, or any script/check that acts as a BLOCKING gate of the review plane itself (the receipt validator `check-receipt.py`, a blocking `review_gates` command) | `organic-reviewer` multi-lens (correctness + security via `organic-security`); evidence citations mandatory per `evidence-protocol.md`. |
 
 The classifier MUST name its reason in one line (e.g. "tier 2: modifies session auth middleware"). Review cost is never unexplained. **Calibration:** a 1000-line documentation change is tier 0; a 2-line auth change is tier 2.
 
@@ -612,11 +613,23 @@ Receipt); the chain's FINAL verdict is the gate input for `work-unit-commits`.
 
 **Delta budget.** When a re-brief closes ≥1 finding on an error-handling, signal/trap,
 timeout/retry, or idempotency path, the `## Re-engage Reason` block states the expected
-delta budget — "1-2 new findings in the same lens are expected; new MINOR `evidence: read`
-findings with no named trigger default to the bulk disposition (Verdict handling)" — so the delta pass is budgeted
-as discovery, not treated as pure confirmation (measured three times — preflight retro F2
-~1:1, sentry-500 retro F2 2:1 on `trap` handling, error-reporting retro F1/F4
-regression-on-regression at 63 % of task cost — proposed twice, never applied until now).
+delta budget **by surface type** — the figure is never flat across surfaces (G4 retro: the prose
+figure applied to a bash parser rewrite missed by an order of magnitude, 18 real vs 1-2 declared):
+
+- **Closures on protocol prose / documentation**: "1-2 new findings in the same lens are expected;
+  new MINOR `evidence: read` findings with no named trigger default to the bulk disposition
+  (Verdict handling)".
+- **Closures on executable code** (parsing, error/exit paths, branches touched): no fixed ceiling —
+  the budget is declared as an **expected decreasing series** of new findings per round (G4b-A:
+  24 → 18 → 11 → 6), with no new CRITICAL after the first full pass. A **non-decreasing round**
+  (round N+1 yields ≥ as many new findings as round N, or any new CRITICAL after pass 1) is itself
+  the STOP signal: it routes to a full re-review, a re-scope, or discarding the candidate —
+  never to one more delta pass (G4 diverged 24 → 18 with 4 new CRITICAL and was cut up, not iterated).
+
+Either way the delta pass is budgeted as discovery, not treated as pure confirmation (measured
+three times — preflight retro F2 ~1:1, sentry-500 retro F2 2:1 on `trap` handling,
+error-reporting retro F1/F4 regression-on-regression at 63 % of task cost — proposed twice, never
+applied until now).
 
 **Full re-review required** when: remediation adds surface beyond the prior receipt's coverage;
 a delta pass itself files a CRITICAL finding; or the objective has already had 2 CONSECUTIVE
@@ -643,7 +656,7 @@ stays delegated. It records a `findings_addressed` addendum in the receipt: one 
 finding closed — `finding_id`, the REQUIRED `files` list (repo-relative paths the closure
 touched, every one inside the receipt's `group_files`), `fix_evidence` (exact `path:line` or
 command-output digest), and `gate_results` (schema: `result-envelope.md` → Review Receipt) — an
-addendum entry without gate evidence or without its `files` list is invalid. The receipt PLUS its
+addendum entry without gate evidence or without its `files` list is invalid. Two closures carry a stricter evidence bar inside `gate_results`: (a) a closure that adds or modifies a rule in a validator or its calibration suite (fixtures, tests) records a **red mutant** — the rule deleted or inverted → the suite FAILS — alongside the green re-run; a green suite alone is not closure evidence (G4b-A retro: a green 40/40 hid 17 fixtures that no longer discriminated anything); (b) a closure that touches a schema/contract field records the Rule 2 implementors-sweep grep as an executed row, never as a sentence in the Amendments (`evidence-protocol.md` → Rule 2). The receipt PLUS its
 `findings_addressed` addendum together cover the post-edit tree, closing the coverage gap
 between the reviewed tree and the committed tree. `findings_addressed` NEVER alters `verdict`:
 an inline closure is never a substitute for a delta pass, and a `review-blocked` receipt clears
