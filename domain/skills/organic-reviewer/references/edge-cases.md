@@ -7,7 +7,9 @@
 **Condition:** `group_files` is empty, or none of the declared files exist on disk (and
 `git diff HEAD -- <group_files>` also shows no changes to tracked files).
 
-**Behavior:** Return `status: ok`, `verdict: review-clear`, `lenses.correctness.findings: []`.
+**Behavior:** Return `status: ok`, `verdict: review-clear`, `lenses.correctness.findings: []`,
+`verification: []` WITH `verification_omitted_reason: "no candidate changes to review"` — the
+sidecar gate (`check-receipt.py`) rejects an empty `verification` that carries no reason.
 Note in executive summary: "no candidate changes to review — gate passes with no findings".
 
 Rationale: an empty change set is a valid state (e.g., the Task Brief declared a file the
@@ -61,8 +63,10 @@ command, or a `review_gates` entry cannot be executed in this environment (missi
 network, sandboxed tool).
 
 **Behavior:** Omit that command from `verification` — never fabricate `pass` or `fail` for a
-command that did not run. Note the gap in `risks`: "verification check '{command}' could not
-be re-run in this environment" (for an unrunnable `review_gates` entry, name the gate:
+command that did not run. If EVERY declared check is unrunnable and `verification` is left empty,
+set `verification_omitted_reason: "every declared check unrunnable in this environment"` — the
+sidecar gate rejects an unexplained empty list. Note the gap in `risks`: "verification check
+'{command}' could not be re-run in this environment" (for an unrunnable `review_gates` entry, name the gate:
 "review gate '{name}' ('{command}') could not be re-run in this environment"). This does not
 by itself block the verdict (the correctness lenses still resolve normally); it does mean the
 receipt's verification evidence is partial — record that plainly rather than padding the list.

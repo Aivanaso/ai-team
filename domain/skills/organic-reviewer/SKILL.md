@@ -51,7 +51,7 @@ Execution Steps).
 | Neither `prior_report` nor `delta_scope` is injected | Run the full pass as normal (not DELTA MODE). |
 | DELTA MODE, and the actual changed set (`git -C {project_root} diff HEAD --name-only`) contains a path outside `delta_scope.changed_files` and the prior report's Scope section | Record a CRITICAL correctness finding citing the out-of-scope path, `claim`: "delta scope exceeded — full pass required" — the verdict then follows the standard iff below; never silently review the wider diff. |
 | `group_files` is declared but a file cannot be read (permission error, path resolves outside `project_root`, `git -C {project_root}` itself fails) — the review step cannot complete, not merely an empty scope | `status: blocked`, `failure_class: review`, names the unreachable path or command. |
-| `group_files` is empty, or none of the declared files exist on disk and `git diff HEAD -- <group_files>` shows no changes | `status: ok`, `verdict: review-clear`, note "no candidate changes to review". See `references/edge-cases.md`. |
+| `group_files` is empty, or none of the declared files exist on disk and `git diff HEAD -- <group_files>` shows no changes | `status: ok`, `verdict: review-clear`, note "no candidate changes to review"; the receipt's `verification: []` carries `verification_omitted_reason: "no candidate changes to review"` so the sidecar gate accepts the empty list (`result-envelope.md` → Review Receipt). See `references/edge-cases.md`. |
 | Finding identified (any confidence, any severity) | Record it, with its own `confidence`, `severity`, and `evidence: executed \| read` — never filter for importance or confidence at this stage (Hard Rules). |
 | A finding is `evidence: read` with no named `trigger`, and would otherwise be MAJOR or CRITICAL | Emit it at `severity: MINOR` instead (the evidence cap applies at emission, before the verdict is computed) — still recorded in full, per the coverage rule. |
 | A forwarded `decisions_taken` entry contradicts a brief `constraints` entry | Record a MAJOR finding, `evidence: read`, `trigger` citing the constraint text and the decision's `where` (Hard Rules). An undeclared but diff-visible decision is MINOR (MAJOR if it contradicts a constraint). `constraints` absent while `decisions_taken` is injected → note the un-auditable gap in `risks`. |
@@ -59,7 +59,7 @@ Execution Steps).
 | Verification re-run outcome contradicts the implementer's claimed `check_results` | Record a CRITICAL correctness finding citing the discrepancy (command + both outcomes). |
 | A `review_gates` entry with `blocking: true` (or `blocking` absent) exits non-zero | Record a CRITICAL finding in `lenses.correctness.findings[]`; `file`/`line` cite the gate's declaring entry in `.ai-team/config.yaml` (the line its `name:`/`command:` is declared on), `claim` names gate name + command + exit code; `verdict: review-blocked`. |
 | A `review_gates` entry with `blocking: false` exits non-zero | Record a MAJOR finding in `lenses.correctness.findings[]` with the same `.ai-team/config.yaml` citation and `claim` shape; does not block the verdict. |
-| A declared check — an `acceptance_checks` command, a `config.yaml`-declared build/lint command, or a `review_gates` entry — cannot be executed in this environment at all (missing tool, unreachable command) | Omit it from `verification`; note the gap in `risks` — never fabricate `pass` or `fail`. |
+| A declared check — an `acceptance_checks` command, a `config.yaml`-declared build/lint command, or a `review_gates` entry — cannot be executed in this environment at all (missing tool, unreachable command) | Omit it from `verification`; note the gap in `risks` — never fabricate `pass` or `fail`. If EVERY declared check is unrunnable and `verification` ends up empty, set `verification_omitted_reason` naming that fact — the sidecar gate rejects an unexplained empty list. |
 | A declared check WAS executed but returned a zero-work result (`No files analyzed`, `No tests found`, `0 suites`, `0 findings checked`, or an equivalent digest) | NOT the row above — it ran. Record it in `verification` as `outcome: fail`, per `_shared/evidence-protocol.md` → Rule 7 item 3; note the zero-work nature in `risks`. |
 | ≥ 1 CRITICAL finding | `verdict: review-blocked`. |
 | 0 CRITICAL findings (MAJOR/MINOR allowed) | `verdict: review-clear`. |
@@ -72,13 +72,14 @@ Execution Steps).
 4. Apply the five correctness lenses (business logic, state transitions, concurrency, resource lifecycle, error handling) to the full file contents in scope. New files are wholly in scope; the diff scopes findings only within already-tracked files. Ground each finding in `file:line`. Record every finding surfaced, tagged with its own `confidence: high | medium | low`, `severity`, and `evidence: executed | read` (with a named `trigger` when `evidence: read` and severity would otherwise be MAJOR or CRITICAL — the evidence cap then applies before the verdict is computed, per Hard Rules) — never filter at this stage (Hard Rules). When `decisions_taken` is injected, read each `where` citation FIRST and audit it against the brief's `constraints` and the objective — these are the candidate's self-declared judgment calls and the highest-yield review surface. In DELTA MODE this step is bounded to the delta scope per Step 2, not the prior pass's already-clean lenses.
 5. Re-run every command in the Task Brief's `acceptance_checks` verbatim, plus any `config.yaml`-declared build/lint command the checks do not already cover. Capture command, exit code, and `pass`/`fail` outcome for each — a one-line digest, never raw stdout. A contradiction against the implementer's claimed outcome becomes a CRITICAL finding (Decision Gates). Also run every `review_gates` entry declared in `.ai-team/config.yaml` (objective gates — command + exit code only, always `confidence: high`); capture command, exit code, and `pass`/`fail` outcome for each, and assign severity per Decision Gates.
 6. Compute the verdict from this skill's own findings (Hard Rules). Compose the Review Receipt: `tier`, `tier_reason`, `lenses.correctness` (`status: pass | findings`, findings list), `verification` (per-command evidence), `overrides: []` (the orchestrator populates this field, never this skill). In DELTA MODE, append EXACTLY ONE entry — this pass's own — to the `delta_scope.prior_verdict_history` array injected by the orchestrator, return the full resulting chain as `verdict_history`, and carry the Step 2 "not re-verified" list forward as `not_reverified` (schema: `_shared/result-envelope.md` → Review Receipt).
-7. When `report_destination` is injected, write the report per `references/report-format.md` there (create its parent directory if absent), resolved relative to `project_root` — use the Delta Report Variant in DELTA MODE. Run `bash _shared/scripts/check-verify-citations.sh {report_destination} .` when applicable — it validates both the legacy `COMPLIANT`/`FAILING` row shape and this skill's `F-<n>` / CRITICAL·MAJOR·MINOR finding blocks, requiring a resolvable `file:line` citation on every finding it detects. `report_destination` is always injected for review-plane passes; in the degraded case where it is absent, the envelope's Review Receipt is the only record and the blocking Citation audit cannot fire — flag that in `risks`.
+7. When `report_destination` is injected, write the report per `references/report-format.md` there (create its parent directory if absent), resolved relative to `project_root` — use the Delta Report Variant in DELTA MODE. In the SAME step, write a `.json` sidecar next to it — `report_destination` with the `.md` extension replaced by `.json` — serializing the exact Review Receipt object composed at Step 6 (same field names, no additions). Self-check it before returning: `python3 skills/_shared/scripts/check-receipt.py receipt {sidecar path} .`; fix any printed `VIOLATION` line before returning — the orchestrator's own Citation audit re-runs this same validator as its BLOCKING gate and never reads the `.md` report. `report_destination` is always injected for review-plane passes; in the degraded case where it is absent, the envelope's Review Receipt is the only record, no sidecar exists, and the blocking Citation audit cannot fire — flag that in `risks`.
 8. Return the envelope per Output Contract.
 
 ## Output Contract
 
-Writes the report at the injected `report_destination` (resolved relative to `project_root`) —
-mandatory from the orchestrator's side for every review-plane delegation
+Writes the report at the injected `report_destination` (resolved relative to `project_root`),
+plus a `.json` sidecar of the same name (`.md` → `.json`) serializing the Review Receipt object
+verbatim — mandatory from the orchestrator's side for every review-plane delegation
 (`orchestrator-protocol.md` → Critical Context Forwarding); optional only from this skill's own
 write step, i.e. it writes nothing when no destination is injected. No fixed path, no separate
 `.ai-team/` artifact. Returns:
@@ -88,7 +89,7 @@ status: ok | blocked            # blocked only on missing context, NOT on a revi
 failure_class: null | review    # "review" iff the review step itself could not complete (Decision Gates); null otherwise
 executive_summary: "..."
 group_id: "<brief-slug>"
-artifacts: []                   # only when report_destination was written this run
+artifacts: []                   # only when report_destination was written this run — both the .md report and its .json sidecar
 tier: 1 | 2
 tier_reason: "<one line>"
 lenses:
@@ -98,10 +99,14 @@ lenses:
       - { id: "F-1", severity: CRITICAL | MAJOR | MINOR, confidence: high | medium | low, evidence: executed | read, trigger: "<one line — optional; REQUIRED when severity is MAJOR or CRITICAL and evidence is read>", file: "<path>", line: <int>, claim: "<one line>" }
 verification:
   - { command: "<verbatim>", exit_code: 0, outcome: pass | fail, gate: "<name>" }  # gate: present only for review_gates entries
+# verification_omitted_reason: "<one line>"   # ONLY when verification is [] (no candidate changes / every check unrunnable); omit otherwise
 overrides: []                   # always empty on return — the orchestrator populates this field
 verdict: review-clear | review-blocked   # null only in a status:blocked context-failure envelope, where no review ran
-verdict_history: []             # DELTA MODE only — the full chain incl. this pass's appended entry; omit entirely on a full pass
-not_reverified: []              # DELTA MODE only — areas/lenses/files the prior pass covered that this pass did not re-check; omit entirely on a full pass
+# verdict_history: []           # DELTA MODE only — the full chain incl. this pass's appended entry.
+                                 # Omit the field entirely on a full pass — never render it as `[]`;
+                                 # the validator rejects an empty verdict_history list outright.
+# not_reverified: []            # DELTA MODE only — areas/lenses/files the prior pass covered that
+                                 # this pass did not re-check. Omit entirely on a full pass, same rule.
 next_recommended: []
 risks: []
 model_used: "opus"

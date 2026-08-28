@@ -312,7 +312,7 @@ One brief = one repo = one worker. For a change spanning more than one repositor
 
 #### Brief File (durable copy)
 
-The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the SESSION project root (the repo the orchestrator session opened in), never one per target repo. A cross-repo task (**Multi-repo lane rule** above) still keeps exactly one Brief File there: each per-repo Task Brief block already records its own `target_repo`, and gains its own `base_ref` line whenever it differs from the frontmatter's (frontmatter `base_ref` names the primary/first repo's). Brief Resume Check (Session Init) scans only the session project root. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
+The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the SESSION project root (the repo the orchestrator session opened in), never one per target repo. A cross-repo task (**Multi-repo lane rule** above) still keeps exactly one Brief File there: each per-repo Task Brief block already records its own `target_repo`, and gains its own `base_ref` line whenever it differs from the frontmatter's (frontmatter `base_ref` names the primary/first repo's). The Cost Ledger and Close totals also live in a JSON sidecar at `.ai-team/briefs/YYYY-MM-DD-<slug>.json` — same slug — kept in sync by the orchestrator at every ledger append and at the Close write; the `.md` file stays the human-readable narrative, the `.json` sidecar is what the structural check below reads. Brief Resume Check (Session Init) scans only the session project root. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
 
 ```markdown
 ---
@@ -355,7 +355,9 @@ logged as a one-line audit event rather than a scope amendment (**Execution gear
 "none" until the first entry of any of these kinds.)
 ## Close
 (written when status flips to done — the two canonical, machine-readable totals below may
-appear anywhere in this section, not by bullet position; every other line is free-form prose)
+appear anywhere in this section, not by bullet position; every other line is free-form prose;
+sidecar <brief>.json carries the same two totals plus `commits`/`re_briefs` for the structural
+check below — kept in sync with this section, never diverging from it)
 - delegations: <int>          # MUST equal the Cost Ledger's row count
 - subagent_tokens: <int>       # MUST equal the sum of the Cost Ledger's tokens column; plain integer, no thousands separator
 (then free prose: re-brief count with causes; receipt reference(s); commit hashes)
@@ -363,12 +365,26 @@ appear anywhere in this section, not by bullet position; every other line is fre
 
 Created at the task's first delegation; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption, session end mid-task, or an `unattended`-gear pending question) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
 
-**Brief File structural check (orchestrator, before the status:done flip):** before flipping
-`status` to `done`, the orchestrator confirms against the Cost Ledger itself that `delegations:`
-equals the ledger's row count, that `subagent_tokens:` equals the sum of its tokens column, and
-that a `work-unit-commits` row is present. A mechanical gate over a machine-readable (JSON)
-ledger is a named later candidate; until it lands this check is performed by hand and recorded
-in the `## Close` prose.
+**Brief File structural check (orchestrator, before the status:done flip):** the orchestrator
+maintains a JSON sidecar next to the Brief File — `.ai-team/briefs/YYYY-MM-DD-<slug>.json`,
+same slug, updated at every Cost Ledger row append and at the `## Close` write — schema:
+`{ "ledger": [ {"n", "agent", "model", "tokens", "tool_uses", "duration_s", "outcome"} ],
+"close": {"delegations", "subagent_tokens", "commits", "re_briefs"} }` (field names mirror the
+`## Cost Ledger` table and `## Close` prose exactly; the `.md` file remains the human-readable
+narrative, the `.json` sidecar is what the gate below reads). Before flipping `status` to
+`done`, run:
+
+```
+python3 skills/_shared/scripts/check-receipt.py ledger {brief-file-path with .md replaced by .json}
+```
+
+Exit 0 → `delegations`, `subagent_tokens`, and the `work-unit-commits` row are all confirmed
+consistent; flip to `done`. Exit 1 → fix the sidecar (or the `## Close` prose it mirrors) per
+the printed `VIOLATION` lines before flipping. Exit 2 → the sidecar could not be validated at all: missing on
+disk (never written), unreadable, not valid UTF-8, a top-level JSON value that is not an
+object, or any other failure that stops validation before a shape check runs — read the single
+`ERROR` line, fix the sidecar (writing it from the Cost Ledger's own rows when it is missing),
+and re-run; never flip `status: done` on a missing or unrunnable gate.
 
 ### Retro trigger
 
@@ -635,15 +651,17 @@ only via a delta/full pass or a recorded override.
 
 ### Citation audit (tier ≥ 1, mechanical, BLOCKING)
 
-Every claim in a review result must cite `file:line` evidence — a reviewer's own citation section is a declaration, not proof (Evidence Protocol Rule 6). The report exists on disk to run this check against because `report_destination` is ALWAYS injected for review-plane delegations for exactly this reason (Critical Context Forwarding below); an unset injection is the one failure mode that silently disables this BLOCKING gate. Run the mechanical check when a review report exists on disk:
+Every claim in a review result must cite `file:line` evidence — a reviewer's own citation section is a declaration, not proof (Evidence Protocol Rule 6). The JSON sidecar exists on disk to run this check against because `report_destination` is ALWAYS injected for review-plane delegations for exactly this reason (Critical Context Forwarding below); an unset injection is the one failure mode that silently disables this BLOCKING gate. Run the mechanical check against the sidecar — never the paired `.md` report, which this gate never parses:
 
 ```
-bash skills/_shared/scripts/check-verify-citations.sh {review-report-path} .
+python3 skills/_shared/scripts/check-receipt.py receipt {report_destination with .md replaced by .json} .
 ```
 
-- Exit 0 → accept the review verdict — AND `finding_checked` ≥ 1 whenever the receipt itself declares ≥1 finding; a zero-work pass (`0 severity findings checked`) against a receipt that claims findings is not acceptance — treat it as an unresolved gate exactly like an `UNRESOLVED` line below (the script's own zero-work guard raises this as `UNRESOLVED ... zero-work` when it fires; a bare exit 0 alone is never sufficient evidence that the intended findings were actually scanned).
-- Any `UNRESOLVED` line → re-engage `organic-reviewer` once with the unresolved lines inlined: "downgrade these to unverified or cite resolvable evidence." Still unresolved after re-engage → escalate to the user; treat the affected claim as unverified for gating.
-- Script missing at `{install_dir}` → run `scripts/install.sh`, or check manually: extract `path::evidence` citation tokens from the report, verify the path exists and the citation greps in the file with `grep -F`.
+- Exit 0 → accept the review verdict (any `INFO` lines are advisory — e.g. CRITICAL findings present only in `lenses.security`, which the orchestrator combines into the tier-2 verdict itself).
+- Exit 1 → re-engage `organic-reviewer` once with the printed `VIOLATION` lines inlined verbatim: "fix these shape violations or cite resolvable evidence." Still violating after the re-engage → escalate to the user; treat the affected claim as unverified for gating.
+- Exit 2 → the sidecar could not be validated at all — missing on disk, unreadable, not valid UTF-8, a top-level JSON value that is not an object, or any other failure that stops validation before a shape check can even run (the validator prints one `ERROR <path>: <what>` line to stderr, never a traceback). Not a shape defect to fix in place: `status: blocked`, `failure_class: review`, re-delegate the lens to produce a correct sidecar. Never fall back to reading the `.md` report by hand as the gate — a hand-read is not this mechanical check.
+
+**Orchestrator duty — the gate's own calibration.** `scripts/tests/run-script-tests.sh` (repo-local, dev-only, protected by the denylist) is the Evidence Protocol Rule 7 calibration suite for `check-receipt.py`: it runs the known-negative fixtures first and asserts the exit codes. Before any commit that touches `_shared/scripts/`, the orchestrator runs it and requires a full pass — a gate whose failure has never been observed is not a gate.
 
 ## Receipt
 
@@ -807,7 +825,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `decisions_taken` | the implementer envelope's `decisions_taken` (verbatim) | organic-reviewer | mandatory whenever the list is non-empty at tier ≥ 1 (full pass and delta pass alike) |
 | `prior_report` | the prior pass's on-disk review report path (that pass's own `report_destination`) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
 | `delta_scope` | orchestrator-composed from the remediation diff and the prior receipt; single shape defined ONCE in Evidence-Tier Review → Delta re-validation (chain custody included) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
-| `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security, organic-retro (retro mode — path convention `.ai-team/retros/`) | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit |
+| `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security, organic-retro (retro mode — path convention `.ai-team/retros/`) | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit. For `organic-reviewer`/`organic-security` (code-audit mode) this path names the `.md` narrative report; the lens writes a `.json` sidecar of the same name alongside it (Review Receipt, `result-envelope.md`) — the Citation audit above validates the `.json` twin, never the `.md` file itself. |
 | `brief_file` | the closed task's Brief File path under `.ai-team/briefs/` | organic-retro (retro mode) | always in retro mode — the skill's primary evidence source (sole authorized Brief File READ) |
 | `review_reports` | the task's on-disk review-report paths, read from the Brief File's receipt records | organic-retro (retro mode) | always in retro mode (may be an empty list; unreadable entries are noted in the skill's `risks`) |
 | `source_material` | the correction/friction context conventions are drawn from | organic-retro (conventions mode) | always in conventions mode — absent → the skill returns `needs_input` |

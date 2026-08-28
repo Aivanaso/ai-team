@@ -1,0 +1,12 @@
+{
+  "ledger": [
+    { "n": 1, "agent": "organic-implementer", "model": "sonnet", "tokens": -500, "tool_uses": 12, "duration_s": 300, "outcome": "ok" },
+    { "n": 2, "agent": "work-unit-commits", "model": "sonnet", "tokens": 5000, "tool_uses": 3, "duration_s": 60, "outcome": "ok" }
+  ],
+  "close": {
+    "delegations": 2,
+    "subagent_tokens": 4500,
+    "commits": ["a1b2c3d"],
+    "re_briefs": 0
+  }
+}

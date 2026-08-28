@@ -14,7 +14,7 @@
 # What it does:
 #   1. Copies skills to ~/.claude/skills/
 #   2. Copies agent files to ~/.claude/agents/
-#   3. Rewrites skill paths in orchestrator-protocol.md (idempotency-safe)
+#   3. Rewrites skill paths in every installed skill .md file (idempotency-safe)
 #   4. Injects orchestrator stub into ~/.claude/CLAUDE.md
 #      between <!-- ai-team:orchestrator --> markers
 #
@@ -78,15 +78,21 @@ verify_install() {
       echo "[ai-team] missing: $src -> $dst" >&2
       missing=$((missing + 1))
     fi
-  done < <(find "$REPO_ROOT/domain/skills" -type f -print0)
+  done < <(find "$REPO_ROOT/domain/skills" -type f -not -path '*/__pycache__/*' -print0)
 
   if (( missing > 0 )); then
     die "verify-install: $missing file(s) failed to copy. See errors above."
   fi
-  info "  -> verify-install: all $(find "$REPO_ROOT/domain/skills" -type f | wc -l) source files present"
+  info "  -> verify-install: all $(find "$REPO_ROOT/domain/skills" -type f -not -path '*/__pycache__/*' | wc -l) source files present"
 }
 
 # --- Preflight ---
+
+# check-receipt.py (the review-plane's BLOCKING structural gate, replacing the
+# retired bash/regex citation-audit script) is Python-stdlib-only but still
+# needs a python3 interpreter on PATH — fail fast rather than let the gate
+# silently error out mid-task.
+command -v python3 >/dev/null 2>&1 || die "python3 required (used by skills/_shared/scripts/check-receipt.py)."
 
 # Create ~/.claude/ if missing — supports fresh-install scenarios (Claude Code
 # installed but never run) and smoke tests against temp HOME directories.
@@ -122,6 +128,8 @@ for dir in "$REPO_ROOT/domain/skills/"*/; do
   if ! cp -R "$dir." "$dest/" 2>/dev/null; then
     die "skill $name: failed to copy from $dir to $dest"
   fi
+  # Never ship Python byte-cache from the checkout (py_compile leaves it behind).
+  find "$dest" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
 done
 
 skill_count=$(find "$CLAUDE_DIR/skills" -mindepth 1 -maxdepth 1 -type d -not -name '_shared' 2>/dev/null | wc -l)
@@ -130,19 +138,35 @@ info "  -> ~/.claude/skills/ ($skill_count skills)"
 # Verify every source file landed at the corresponding destination.
 verify_install "$CLAUDE_DIR/skills"
 
-# Rewrite skill paths in the orchestrator protocol for installed location.
-# Anchored patterns (command `bash skills/...`) are idempotent by construction —
-# after one rewrite the pattern no longer matches — and they leave
-# `{install_dir}/skills/...` references and prose mentioning skill roots untouched.
-# (The old broad guard `grep -q '~/.claude/skills/'` skipped the whole sed once the source
-# protocol legitimately mentioned that path in prose, leaving command lines unrewritten.)
-ORCHESTRATOR_PROTOCOL="$CLAUDE_DIR/skills/_shared/orchestrator-protocol.md"
-if [[ -f "$ORCHESTRATOR_PROTOCOL" ]]; then
-  sed -i \
-    -e 's|bash skills/_shared/|bash ~/.claude/skills/_shared/|g' \
-    "$ORCHESTRATOR_PROTOCOL"
-  info "  -> Rewrote skill paths in orchestrator-protocol.md"
-fi
+# Rewrite skill paths for the installed location, across every .md file of the
+# skills THIS installer ships (the same set the copy loop above wrote) — not
+# just orchestrator-protocol.md, and never third-party skills under ~/.claude/skills. Two invocation prefixes need
+# the rewrite: `bash skills/_shared/...` (refresh-skill-registry.sh) and
+# `python3 skills/_shared/scripts/check-receipt.py` (the review-plane's
+# BLOCKING structural gate, invoked verbatim from organic-reviewer/SKILL.md,
+# organic-security/SKILL.md, and orchestrator-protocol.md alike). Anchored
+# patterns are idempotent by construction — after one rewrite the pattern no
+# longer matches — and they leave `{install_dir}/skills/...` references and
+# prose mentioning skill roots untouched.
+# (The old broad guard `grep -q '~/.claude/skills/'` skipped the whole sed once
+# the source protocol legitimately mentioned that path in prose, leaving
+# command lines unrewritten; the per-file idempotent anchors below replace it.)
+while IFS= read -r -d '' md_file; do
+  if grep -qE 'bash skills/_shared/|python3 skills/_shared/' "$md_file"; then
+    sed -i \
+      -e 's|bash skills/_shared/|bash ~/.claude/skills/_shared/|g' \
+      -e 's|python3 skills/_shared/|python3 ~/.claude/skills/_shared/|g' \
+      "$md_file"
+    info "  -> Rewrote skill paths in ${md_file#"$CLAUDE_DIR"/}"
+  fi
+done < <(
+  # Scope: ONLY the skill directories this run installs (mirrors the copy loop
+  # above) — never the whole ~/.claude/skills tree, which may hold third-party
+  # skills whose docs legitimately mention these prefixes.
+  for src_dir in "$REPO_ROOT/domain/skills/"*/; do
+    find "$CLAUDE_DIR/skills/$(basename "$src_dir")" -type f -name '*.md' -print0 2>/dev/null
+  done
+)
 
 # --- 2. Agents ---
 

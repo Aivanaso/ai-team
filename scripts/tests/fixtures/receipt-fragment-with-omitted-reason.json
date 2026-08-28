@@ -1,0 +1,12 @@
+{
+  "kind": "security-fragment",
+  "tier": 2,
+  "tier_reason": "tier 2: security lens fragment",
+  "lenses": {
+    "security": {
+      "status": "pass",
+      "findings": []
+    }
+  },
+  "verification_omitted_reason": "should be rejected on a fragment"
+}

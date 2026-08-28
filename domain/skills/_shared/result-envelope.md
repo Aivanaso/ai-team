@@ -192,7 +192,43 @@ ingestion (both in their own files) cross-reference this list rather than repeat
 
 Produced by `organic-reviewer` for every candidate Evidence-Tier Review classifies as tier ≥ 1 (schema: `orchestrator-protocol.md` → "Evidence-Tier Review"). Consumed by `work-unit-commits` (commit gate) and the orchestrator (routing, Re-engage Routing on `failure_class`). An absent receipt for a tier ≥ 1 candidate is a hard block on commit — `work-unit-commits` refuses without it.
 
+**On-disk JSON sidecar.** The schema below is the receipt object as returned in the delegation
+envelope; `work-unit-commits` keeps receiving it verbatim in `## Injected Context` (unchanged —
+see `orchestrator-protocol.md` → Open question on this route). For the on-disk copy, the lens
+ALSO serializes this exact object — same field names, no additions, no renames — to a `.json`
+sidecar next to its `.md` narrative report: `report_destination` with the `.md` extension
+replaced by `.json` (e.g. `.ai-team/reviews/billing-export.md` →
+`.ai-team/reviews/billing-export.json`), written in the same write step as the `.md` file
+(`organic-reviewer/SKILL.md` Step 7, `organic-security/SKILL.md` code-audit Step 6). This
+sidecar — never the `.md` file — is what the BLOCKING Citation audit
+(`orchestrator-protocol.md` → Evidence-Tier Review) validates, via
+`python3 skills/_shared/scripts/check-receipt.py receipt <sidecar> <project_root>`: a
+Python-stdlib, JSON-only structural check (valid shape, CONTAINED on-disk resolution of every
+cited `file` — `os.path.realpath` containment under `project_root` plus `os.path.isfile`, never
+a bare existence check — the evidence→trigger coupling, verdict/`verdict_history` coherence,
+`id` uniqueness after NFC normalization, the severity enum, lens `status`/findings coherence,
+`kind` restricted to `"security-fragment"` or absent, a non-empty `verification[]` with
+`{command, exit_code, outcome}` per row — or an empty one justified by `verification_omitted_reason` —
+`not_reverified[]` as non-empty strings, and a `project_root` that is an existing directory other
+than the filesystem root; an unusable citation string such as an embedded NUL is a VIOLATION, not
+a crash) — it never re-runs a command and never opens the `.md` report.
+`organic-security` in `threat-model` mode writes no sidecar (it never produces a `verdict` or
+`lenses.correctness` object) — its report notes "no receipt sidecar in this mode" instead.
+
+**`kind` — the FULL-receipt vs SECURITY-FRAGMENT discriminator.** A sidecar is a full reviewer
+receipt by default. It is instead a security-lens fragment ONLY when it declares the top-level
+`kind: "security-fragment"` field explicitly — `organic-security` (code-audit mode) always sets
+it on the fragment it writes (`organic-security/SKILL.md` code-audit Step 6). The ABSENCE of
+`lenses.correctness` is never itself the discriminator: a sidecar with no `kind` and no
+`lenses.correctness` is a truncated full receipt (a contract violation), not a fragment. A
+fragment MUST declare `lenses.security` and MUST NOT declare `lenses.correctness`; it never
+carries a `verdict` field (only `organic-reviewer` computes that field), but if one is present
+anyway it must be coherent with the fragment's own CRITICAL findings — `review-blocked` iff a
+CRITICAL exists.
+
 ```yaml
+kind: security-fragment  # OPTIONAL — omit entirely for a full reviewer receipt (the default);
+                          # present ONLY on an organic-security code-audit fragment
 tier: 0 | 1 | 2
 tier_reason: "<one line, mandatory — e.g. 'tier 2: modifies session auth middleware'>"
 verdict: review-clear | review-blocked   # null only in a status:blocked context-failure envelope, where no review ran
@@ -207,6 +243,7 @@ lenses:
       - { id: "F-2", severity: CRITICAL | MAJOR | MINOR, confidence: high | medium | low, evidence: executed | read, trigger: "<one line — optional; REQUIRED when severity is MAJOR or CRITICAL and evidence is read>", file: "<path>", line: <int>, claim: "<one line>" }
 verification:
   - { command: "<verbatim>", exit_code: 0, outcome: pass | fail, gate: "<name>" }  # gate: optional, present only for review_gates outcomes
+verification_omitted_reason: "<one line>"   # ONLY when verification is [] on a full receipt (no candidate changes / every check unrunnable); MUST be absent otherwise — see Rules
 overrides:                 # user-accepted findings, if any — omit entirely when empty
   - { finding_id: "F-1", justification: "<user-supplied, one sentence>" }   # singular form — one finding
   - { finding_ids: ["F-3", "F-6"], justification: "<user-supplied, one sentence>" }   # bulk form — see Rules below
@@ -219,6 +256,14 @@ findings_addressed:        # optional — orchestrator-authored addendum for an 
 ```
 
 **Rules:**
+- `kind` (optional, top-level): absent or explicit `null` = a full reviewer receipt; the string `"security-fragment"` = the security lens's stand-alone sidecar (no `lenses.correctness`, no required `verdict`); ANY other value is a validator VIOLATION — a typo'd `kind` is never silently treated as a full receipt.
+- `verification_omitted_reason` (optional, top-level): a full receipt whose `verification[]` is empty MUST carry this non-empty string naming the contract case that left nothing to re-run ("no candidate changes to review" — `group_files` empty; or "every declared check unrunnable in this environment"); it MUST be absent when `verification[]` is non-empty. A full receipt that re-ran nothing and says nothing is the zero-work class and fails the gate.
+- `kind: "security-fragment"` is the ONLY discriminator between a full reviewer receipt and a
+  security-lens fragment — see "kind" above. A full receipt (the default, `kind` absent) REQUIRES
+  `lenses.correctness` and a top-level `verdict` in `VERDICTS`; a fragment REQUIRES
+  `lenses.security` and forbids `lenses.correctness`. `check-receipt.py` fails closed on a sidecar
+  that declares neither `kind` nor `lenses.correctness` — that shape is a truncated full receipt,
+  never treated as an implicit fragment.
 - `tier_reason` is REQUIRED and non-empty for tier 1 and tier 2 — review cost is never unexplained.
 - Every finding carries its own `confidence: high | medium | low` alongside `severity`. Coverage, not self-filtering, is the contract: a lens reports every finding it identifies — including ones it is uncertain about or considers low-severity — and never withholds one for importance or confidence; the orchestrator's downstream triage (accept-and-proceed, re-brief, delta re-validation) is the filter, not the lens itself. A `confidence: low` finding still counts fully toward the verdict below — low confidence narrows the recommended remediation path, never the verdict (fail closed).
 - Every finding also carries `evidence: executed | read` — `executed` means the lens ran something (command, mutation probe, scenario, measurement against real data) whose observed result demonstrates the defect; `read` means the finding rests on code reading alone. `trigger` (optional in general) names the concrete input/command/state that reaches the cited line and produces the defect; it is REQUIRED whenever `severity` is MAJOR or CRITICAL and `evidence: read`. A `read` finding with no named `trigger` is emitted at `MINOR` as maximum — this caps the severity a lens may claim from reading alone, it never gates coverage: the finding is still reported, at every confidence level, exactly as the bullet above requires.
@@ -233,6 +278,53 @@ findings_addressed:        # optional — orchestrator-authored addendum for an 
 - `findings_addressed` is an optional, orchestrator-authored addendum — mirroring `overrides`, `organic-reviewer` never writes it — recording an inline closure per `orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation → "Inline closure". Eligible only when ALL of: the receipt's own top-level `verdict` was ALREADY `review-clear` before the closure (a `review-blocked` receipt is never cleared this way), every closed finding's fix was mechanically prescribed by the finding text itself (never CRITICAL), and the closure touched only files already in the receipt's `group_files`. One entry per finding closed this way, citing the fix evidence and the re-run gate results — an entry without gate evidence is invalid. Each entry's `files` field is REQUIRED: the repo-relative paths the closure actually touched — a digest-only `fix_evidence` never substitutes for it. An entry missing `files`, or naming any file outside `group_files`, is invalid and fails the commit gate closed (`work-unit-commits/SKILL.md` → Decision Gates) — a fail-closed gate never treats a pathless entry as an implicit pass. Never used for a CRITICAL finding, and never alters the receipt's top-level `verdict` field — an addendum records that a closure happened, it does not re-compute the gate.
 - A `verification[]` entry carrying `gate:` is an objective `review_gates` outcome from `.ai-team/config.yaml` — exit code only, always `confidence: high` (objective exit-code evidence, not a judgment call). A failing gate additionally lands as a `lenses.correctness.findings[]` entry: `file`/`line` cite the gate's declaring entry in `.ai-team/config.yaml` (always a resolvable citation), and `claim` names gate name + command + exit code. A failing blocking gate is CRITICAL and forces `verdict: review-blocked`; a failing non-blocking gate is MAJOR and does not block.
 - Tier 0 candidates produce no receipt — the result envelope alone is the record.
+
+## Brief File Ledger JSON sidecar
+
+The orchestrator maintains this sidecar next to a Brief File — `.ai-team/briefs/YYYY-MM-DD-
+<slug>.json`, same slug as the `.md` Brief File — mirroring the `## Cost Ledger` table and
+`## Close` section byte-for-byte in field meaning (`orchestrator-protocol.md` → Task Brief →
+"Brief File (durable copy)"). No delegated skill writes this file; it is orchestrator-authored
+only, exactly like the Brief File itself.
+
+```json
+{
+  "ledger": [
+    { "n": 1, "agent": "organic-implementer", "model": "sonnet", "tokens": 50000, "tool_uses": 12, "duration_s": 300, "outcome": "ok" }
+  ],
+  "close": {
+    "delegations": 1,
+    "subagent_tokens": 50000,
+    "commits": ["<commit hash>", "..."],
+    "re_briefs": 0
+  }
+}
+```
+
+`close` is written only once `status` flips to `done` (mirrors the `.md` file's `## Close`
+section — absent while the task is `active`/`paused`) — and the gate below has exactly one
+prescribed invocation, immediately before that flip, so `close` is REQUIRED at the moment the
+gate runs: `ledger` mode never accepts a missing `close` as "task still in progress, nothing to
+check yet". Validated by `python3 skills/_shared/scripts/check-receipt.py ledger <sidecar>`
+(`orchestrator-protocol.md` → Task Brief → "Brief File structural check"). Every check the
+validator performs, synced to the code (this doc follows the code, never the reverse — a future
+change to `validate_ledger` updates this list in the same commit):
+
+- `ledger` must be a list; every row must be an object.
+- Each row's `n`, `tokens`, `tool_uses`, `duration_s` must be a plain integer — `true`/`false`
+  and floats are rejected, not silently coerced. `tokens`, `tool_uses`, `duration_s` must also be
+  ≥ 0. `n` must be unique across every row (no two rows share an identifier).
+- Each row's `agent`, `model`, `outcome` must be a non-empty string.
+- `close` is REQUIRED and must be an object.
+- `close.delegations` must be a non-negative plain integer equal to `ledger`'s row count.
+- `close.subagent_tokens` must be a non-negative plain integer equal to the sum of `ledger`'s
+  `tokens` column.
+- `close.commits` must be a list; every entry must be a non-empty string.
+- `close.re_briefs` must be a non-negative plain integer.
+- At least one `ledger` row's `agent` must be EXACTLY `"work-unit-commits"` — an exact-match
+  identity check, never a substring/contains test, so a spoofed or typo'd agent name (e.g.
+  `"work-unit-commits-not-really"`) cannot satisfy the invariant that a real commit-creating
+  delegation actually ran.
 
 ## Rules
 

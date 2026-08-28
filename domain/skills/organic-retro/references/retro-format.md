@@ -44,7 +44,11 @@ written yet).
 
 - Reproduce the Brief File's `## Cost Ledger` table **verbatim** — same columns (`#, agent,
   model, tokens, tool_uses, duration, outcome`). Never recompute or estimate a figure the
-  ledger did not already record.
+  ledger did not already record. When the Brief File's `.json` sidecar exists (`brief_file`
+  with `.md` replaced by `.json`), source these figures from its `ledger`/`close` fields
+  instead — the machine-validated copy (`_shared/result-envelope.md` → "Brief File Ledger JSON
+  sidecar") — and render them into this same table shape; a Brief File with no sidecar (legacy)
+  falls back to reading the `.md` table directly, unchanged from before.
 - **Re-brief count**: count `outcome` cells that are a re-delegation for the same objective
   (a fresh `organic-implementer` row following a `review-blocked`/`needs_input`/`blocked`
   row), grouped by cause (review-blocked finding, needs_input, blocked/scope-large, infra-death, amendment

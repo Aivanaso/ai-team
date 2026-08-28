@@ -11,9 +11,10 @@ Run when the orchestrator launches either security workflow: `code-audit` mode a
 security lens for a candidate diff (`group_files`), invoked alongside `organic-reviewer` and
 merged by the orchestrator into the Review Receipt's `lenses.security`; or either
 `threat-model` / `code-audit` mode standalone, on user request, independent of any Task
-Brief. Produce `threat-model.md` / `audit-report.md` only when a `report_destination` is
-injected; always return a `security_lens` block in the envelope shaped for direct receipt
-merge. Read application code to find vulnerabilities; never modify it.
+Brief. Produce the on-disk report AT the injected `report_destination` — a FILE path ending in
+`.md`, never a directory — only when that field is injected; always return a `security_lens`
+block in the envelope shaped for direct receipt merge. Read application code to find
+vulnerabilities; never modify it.
 
 ## Hard Rules
 
@@ -53,7 +54,7 @@ merge. Read application code to find vulnerabilities; never modify it.
 3. Walk each triggered touchpoint, applying the five audit-prompt categories (see [references/worked-examples.md](references/worked-examples.md)): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure. Read codebase files to ground findings in specific locations.
 4. Run the Temporal Invariant Sweep (always, transversal): detect temporal fields referenced in `scope_description` and any schema files it points to; identify the rejection semantic per field; enumerate every read path; verify enforcement; emit a finding when a read path consumes the field for an auth/access/state decision without the matching check.
 5. Run the Seam & Failure Sweep (always, transversal): failure-mode per call-site, interleaving per mutated field, crash-window per multi-store sequence — mechanics in [references/worked-examples.md](references/worked-examples.md).
-6. When `report_destination` is injected, write `threat-model.md` per [references/threat-model-template.md](references/threat-model-template.md) there (create its parent directory if absent). Include: summary, touchpoints triggered, per-touchpoint findings, both sweeps (always present), `security_requirements:`.
+6. When `report_destination` is injected, write the report AT that path (it is a FILE path ending in `.md`, e.g. `.ai-team/reviews/YYYY-MM-DD-<slug>-threat-model.md` — never a directory to write a fixed filename into; create its parent directory if absent) per [references/threat-model-template.md](references/threat-model-template.md). Include: summary, touchpoints triggered, per-touchpoint findings, both sweeps (always present), `security_requirements:`. This mode writes no `.json` sidecar — `threat-model` findings carry no `verdict`/`lenses.correctness` and never feed the Review Receipt (Hard Rules); the report includes a one-line "no receipt sidecar in this mode" note instead.
 7. Return the envelope per Output Contract.
 
 ### Mode code-audit
@@ -63,22 +64,25 @@ merge. Read application code to find vulnerabilities; never modify it.
 3. Read `config.yaml` from `project_root`. If `test_commands.security:` exists, run it and capture output; if absent, log "Dependency auditor: not configured (skipped)".
 4. Apply the five audit-prompt categories scoped to `group_files` (see [references/worked-examples.md](references/worked-examples.md)): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure. Tag each finding with its own `confidence: high | medium | low`, `severity`, and `evidence: executed | read` (with a named `trigger` when `evidence: read` and severity would otherwise be MAJOR or CRITICAL — the evidence cap then applies before any downstream verdict computation, per Hard Rules).
 5. Enforcement wiring check: for every guard the candidate introduces (lint rule, CI step, test gate, pre-commit hook, middleware, validation), verify its executor (workflow step, script entry, registration, route binding) ships in the same candidate. A guard with no executor is a finding (`category: enforcement-wiring`; MAJOR by default, CRITICAL when it is the only control for a CRITICAL threat).
-6. When `report_destination` is injected, write `audit-report.md` per [references/audit-report-template.md](references/audit-report-template.md) there (create its parent directory if absent). All 6 category sections present ("No findings" if clean).
+6. When `report_destination` is injected, write the report AT that path (it is a FILE path ending in `.md` — never a directory to write a fixed filename into; create its parent directory if absent) per [references/audit-report-template.md](references/audit-report-template.md). All 6 category sections present ("No findings" if clean). In the same step, write a `.json` sidecar next to it — the identical path with `.md` replaced by `.json` — serializing `{ kind: "security-fragment", tier, tier_reason, lenses: { security: security_lens } }`: the fragment shape of the Review Receipt this lens contributes (the `kind` field is what lets `check-receipt.py` accept this shape without `lenses.correctness`/`verdict` — their absence is never itself the discriminator; no `verdict` field at all, since only `organic-reviewer` computes that field — the orchestrator merges this fragment into the full receipt). Self-check it: `python3 skills/_shared/scripts/check-receipt.py receipt {sidecar path} .`; fix any printed `VIOLATION` line before returning.
 7. Return the envelope per Output Contract.
 
 ## Output Contract
 
-Writes `threat-model.md` / `audit-report.md` at the injected `report_destination` (resolved
-relative to `project_root`) — mandatory from the orchestrator's side for every review-plane
+Writes the report AT the injected `report_destination` — a FILE path ending in `.md`, resolved
+relative to `project_root` — mandatory from the orchestrator's side for every review-plane
 delegation (`orchestrator-protocol.md` → Critical Context Forwarding); optional only from this
-skill's own write step, i.e. it writes nothing when no destination is injected. No fixed path,
-no separate `.ai-team/` artifact. Returns:
+skill's own write step, i.e. it writes nothing when no destination is injected. In `code-audit`
+mode, also writes a `.json` sidecar at the identical path with `.md` replaced by `.json` — the
+Review Receipt security-lens fragment `{ kind: "security-fragment", tier, tier_reason, lenses: {
+security } }`; `threat-model` mode writes no sidecar (Execution Steps). No fixed filename, no
+separate `.ai-team/` artifact. Returns:
 
 ```yaml
 status: ok | warning | blocked
 executive_summary: "..."
 mode: threat-model | code-audit
-artifacts: []                    # only when report_destination was written this run
+artifacts: []                    # only when report_destination was written this run — code-audit: both the .md report and its .json sidecar; threat-model: the .md report only
 security_lens:                   # shaped for direct Review Receipt lenses.security merge
   status: pass | findings
   findings:                      # CAP 20 entries — on overflow keep the highest severity-then-confidence entries and note the omitted count in risks ("findings omitted at cap: N")

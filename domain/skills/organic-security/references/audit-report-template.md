@@ -1,6 +1,14 @@
 # Audit Report Output Template
 
-Use this template when writing `audit-report.md` at the injected `report_destination`.
+Use this template when writing `audit-report.md` at the injected `report_destination`. In the
+same step, write a `.json` sidecar next to it (`report_destination` with `.md` replaced by
+`.json`) serializing `{ kind: "security-fragment", tier, tier_reason, lenses: { security: security_lens } }`
+— the Review Receipt security-lens fragment this mode contributes; the top-level `kind` is
+REQUIRED (it is the only discriminator the validator accepts — a fragment without it is
+rejected as a truncated full receipt) (`_shared/result-envelope.md` → Review
+Receipt). That sidecar, not this `.md` narrative, is what the orchestrator's Citation audit
+validates (`_shared/scripts/check-receipt.py`). `threat-model` mode writes no sidecar (SKILL.md,
+Execution Steps, threat-model Step 6).
 
 ## Template
 
@@ -46,13 +54,14 @@ Files audited: {group_files}
 
 ## Per-Finding Structure
 
-Each finding MUST include all eleven fields:
+Each finding MUST include all twelve fields:
 
 | Field | Description |
 |-------|-------------|
 | `id` | F-1, F-2, ... (sequential, stable within a single artifact) |
 | `category` | One of the 5 vulnerability categories or `enforcement-wiring` |
-| `file_line` | `path/to/file.ts:42` — mandatory per Evidence Protocol Rule 1 |
+| `file` | `path/to/file.ts` — repo-relative, mandatory per Evidence Protocol Rule 1; the `.md` may print it joined with `line` as `path:line` for humans, but the JSON sidecar carries `file` and `line` as two separate fields |
+| `line` | `42` — integer ≥ 1, the line the finding cites |
 | `severity` | CRITICAL \| MAJOR \| MINOR |
 | `confidence` | high \| medium \| low — every finding is recorded regardless of confidence (coverage; see SKILL.md Hard Rules) |
 | `evidence` | `executed` \| `read` — `executed` = a command, mutation probe, scenario, or measurement against real data demonstrated the defect; `read` = the finding rests on code reading alone |

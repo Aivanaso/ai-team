@@ -1,8 +1,12 @@
 # Review Report Format — organic-reviewer
 
-> Load at Step 7, only when `report_destination` is injected. This is the on-disk report
+> Load at Step 7, only when `report_destination` is injected. This is the on-disk `.md` report
 > template; the envelope's Review Receipt (see `_shared/result-envelope.md`) is the record
-> of authority — this file is a durable copy written into the target repo.
+> of authority — this file is a durable, human-readable copy written into the target repo.
+> Alongside it, in the same step, write a `.json` sidecar (`report_destination` with `.md`
+> replaced by `.json`) serializing the Review Receipt object verbatim — that sidecar, not this
+> `.md` narrative, is what the orchestrator's BLOCKING Citation audit validates
+> (`_shared/scripts/check-receipt.py`, `orchestrator-protocol.md` → Evidence-Tier Review).
 
 ````markdown
 # Review Report: {group_id}
@@ -52,13 +56,18 @@ table; the gap is noted in the envelope's `risks` instead — for an unrunnable 
 
 ## Per-Finding Structure
 
-Expand each finding inside its lens section using this structure:
+Expand each finding inside its lens section using this structure. `file` and `line` are two
+separate fields — the Review Receipt sidecar (`_shared/result-envelope.md` → Review Receipt)
+carries them split, and `check-receipt.py` validates them split (a joined `path:line` string
+would not resolve as either field). This `.md` narrative MAY still print them joined as
+`path:line` for a human reader; that rendering choice never changes what the sidecar carries.
 
 | Field | Description |
 |-------|-------------|
 | `id` | `F-1`, `F-2`, … (sequential, stable within the report) |
 | `lens` | One of: business-logic \| state-transitions \| concurrency \| resource-lifecycle \| error-handling \| gate (a failing `review_gates` entry — objective, always `confidence: high`; not a sixth correctness lens, see SKILL.md Hard Rules) |
-| `file_line` | `path/to/file:42` — mandatory (Evidence Protocol Rule 1); for a `gate` finding this is the gate's declaring entry in `.ai-team/config.yaml` |
+| `file` | `path/to/file` — mandatory (Evidence Protocol Rule 1); for a `gate` finding this is the gate's declaring entry in `.ai-team/config.yaml` |
+| `line` | integer ≥ 1 — the line inside `file` the claim cites |
 | `severity` | CRITICAL \| MAJOR \| MINOR |
 | `confidence` | high \| medium \| low — every finding is recorded regardless of confidence (coverage; see SKILL.md Hard Rules); for a `gate` finding this is always `high` (objective exit-code evidence) |
 | `evidence` | `executed` \| `read` — `executed` = a command, mutation probe, scenario, or measurement against real data demonstrated the defect; `read` = the finding rests on code reading alone; for a `gate` finding this is always `executed` |
@@ -78,7 +87,10 @@ field can cite `F-N` by reference.
 
 Used only for a DELTA MODE pass (`prior_report` injected, Execution Step 2). Replaces the
 full five-lens template above with a compact report chained to the prior pass — the delta pass
-does not re-render the prior pass's clean lenses.
+does not re-render the prior pass's clean lenses. The `.json` sidecar rule above applies
+identically here: `verdict_history` and `not_reverified` live in the sidecar (the exact Review
+Receipt fields, `_shared/result-envelope.md` → Review Receipt) — this `.md` narrative's "Chain"
+line and "Not Re-Verified" section are the human-readable mirror, never the validated copy.
 
 ````markdown
 # Delta Review Report: {group_id}
