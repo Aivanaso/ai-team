@@ -117,10 +117,12 @@ For **Medium and Large** tasks — this is the route firing for every non-trivia
 2. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected;
    on return, verify the proposal against the **Scope Verification Checklist** in
    `~/.config/opencode/skills/_shared/orchestrator-protocol.md` and adopt it into the Task
-   Brief's `expected_files`/`acceptance_checks` — verify, never recompose (recompose-with-checklist only when discovery returned no `scope_proposal` block — fallback branch, see the protocol).
+   Brief's `expected_files`/`acceptance_checks` — verify, never recompose (recompose-with-checklist only when discovery returned no `scope_proposal` block — fallback branch, see the protocol). The scout's optional `constraints_candidates` block is verified and adopted into the Task Brief's `constraints` the same way — checked against its `file:line` evidence, then copied in verbatim, never invented from the orchestrator's own reading.
 3. **Delegate implementation — this is the default:** `task({agent: "organic-implementer", …})`
    with a Task Brief (canonical definition: **Task Brief** in
-   `~/.config/opencode/skills/_shared/orchestrator-protocol.md`). Inline implementation
+   `~/.config/opencode/skills/_shared/orchestrator-protocol.md`) — its seven elements include
+   `constraints`: design decisions already taken that the worker honors and never re-decides
+   (an empty list is legal, meaning "none declared"). Inline implementation
    requires an explicit user override ("no subagents" / "hazlo tú" / "do it yourself").
 4. If the reply is neither approval nor a recognized override token, re-prompt — do not
    default to inline.
@@ -140,6 +142,20 @@ nothing — only this post-candidate classification is authoritative, and a mism
 two is normal. Remediation may chain through delta re-validation instead of a full re-review — only when it touches solely receipt-covered files and adds no new surface, and at most 2 consecutive delta passes per objective (orchestrator-counted; a full pass resets the count);
 the resulting receipt's `verdict_history` chains prior passes and its FINAL entry is the gate
 `work-unit-commits` reads.
+
+The Review Receipt lives on disk as a JSON sidecar next to the lens's `.md` report — the same
+path, `.md` replaced by `.json`. That sidecar, never the `.md` narrative, is what the BLOCKING
+Citation audit validates before a `review-clear`/`review-blocked` verdict is accepted:
+
+    python3 ~/.config/opencode/skills/_shared/scripts/check-receipt.py receipt <sidecar> .
+
+Exit 0 accepts the verdict; exit 1 re-engages `organic-reviewer` once with the printed
+`VIOLATION` lines inlined; exit 2 means the sidecar itself could not be validated (missing,
+unreadable, not an object) and the lens is re-delegated to produce a correct one — never fall
+back to reading the `.md` report by hand as the gate. Before delegating review, read the
+implementer's `decisions_taken` (if any) and cross-check each entry against the brief's
+`constraints` — a contradiction is inlined into the reviewer prompt as a focus item. Full rules:
+protocol's **Citation audit** and **Receipt** sections.
 
 ### Execution gears
 

@@ -5,7 +5,10 @@ Installs the ai-team organic evidence-tiered delegation framework into OpenCode 
 ## Prerequisites
 
 - [OpenCode](https://opencode.ai/) installed
-- [`jq`](https://jqlang.github.io/jq/) installed (`brew install jq` / `apt install jq`)
+- `python3` on PATH — used by `skills/_shared/scripts/check-receipt.py`, the review-plane's
+  BLOCKING structural gate; never used for the merge below
+- [`jq`](https://jqlang.github.io/jq/) installed (`brew install jq` / `apt install jq`) — used
+  only for the `opencode.json` deep-merge
 
 ## Install
 
@@ -52,6 +55,8 @@ Remove manually:
 rm -f ~/.config/opencode/AGENTS.md
 rm -rf ~/.config/opencode/skills/organic-implementer ~/.config/opencode/skills/organic-reviewer \
        ~/.config/opencode/skills/organic-scout ~/.config/opencode/skills/organic-security \
-       ~/.config/opencode/skills/work-unit-commits ~/.config/opencode/skills/_shared
+       ~/.config/opencode/skills/work-unit-commits ~/.config/opencode/skills/organic-retro \
+       ~/.config/opencode/skills/_shared
+rm -f ~/.config/opencode/.ai-team-manifest
 # Edit ~/.config/opencode/opencode.json to remove this framework's agent entries
 ```

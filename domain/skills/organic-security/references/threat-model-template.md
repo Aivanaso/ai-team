@@ -1,6 +1,11 @@
 # Threat Model Output Template
 
-Use this template when writing `threat-model.md` at the injected `report_destination`.
+Use this template to write the report at the injected `report_destination` — a FILE path
+ending in `.md` (e.g. `.ai-team/reviews/YYYY-MM-DD-<slug>-threat-model.md`), never a directory
+to write a fixed filename into. This mode writes no `.json` sidecar: `threat-model` findings
+carry no `verdict`/`lenses.correctness` object and never feed the Review Receipt or the commit
+gate (SKILL.md, Hard Rules + Execution Steps, threat-model Step 6) — the report includes a
+one-line "no receipt sidecar in this mode" note instead.
 
 ## Template
 
@@ -10,6 +15,7 @@ Use this template when writing `threat-model.md` at the injected `report_destina
 **Date:** {ISO 8601}
 **Mode:** threat-model
 **Touchpoints triggered:** {comma-separated list, or "none"}
+**Receipt sidecar:** none — no receipt sidecar in this mode (threat-model findings never feed the Review Receipt)
 
 ## Summary
 

@@ -1,8 +1,9 @@
 # Audit Report Output Template
 
-Use this template when writing `audit-report.md` at the injected `report_destination`. In the
-same step, write a `.json` sidecar next to it (`report_destination` with `.md` replaced by
-`.json`) serializing `{ kind: "security-fragment", tier, tier_reason, lenses: { security: security_lens } }`
+Use this template to write the report at the injected `report_destination` — a FILE path
+ending in `.md` (e.g. `.ai-team/reviews/YYYY-MM-DD-<slug>-audit-report.md`), never a directory
+to write a fixed filename into. In the same step, write a `.json` sidecar next to it
+(`report_destination` with `.md` replaced by `.json`) serializing `{ kind: "security-fragment", tier, tier_reason, lenses: { security: security_lens } }`
 — the Review Receipt security-lens fragment this mode contributes; the top-level `kind` is
 REQUIRED (it is the only discriminator the validator accepts — a fragment without it is
 rejected as a truncated full receipt) (`_shared/result-envelope.md` → Review
