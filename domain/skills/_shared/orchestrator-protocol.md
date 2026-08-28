@@ -201,7 +201,7 @@ The canonical, author-side contract the orchestrator composes and inlines into t
 | target repo | Absolute path to the single repository the worker writes in. All other brief paths are relative to it. | `target_repo` |
 | allowed edit roots | Repo-relative directories the worker may write inside. Validated with the within-roots (segment-prefix) definition in **Roots Computation** below. | `allowed_edit_roots` |
 | expected files | The files the brief expects to exist or change afterwards, each with its action. Contributes to `group_files` when a lens or `work-unit-commits` is activated — see **Logical group — canonical definition** in `common-rules.md`. | `expected_files` |
-| acceptance checks | Runnable commands the worker executes and the orchestrator can re-run, each with its expected outcome. An adjective ("works correctly") is not a check. | `acceptance_checks` |
+| acceptance checks | Runnable commands the worker executes and the orchestrator can re-run, each with its expected outcome. An adjective ("works correctly") is not a check. When the objective's fix touches state one run leaves for the next (a branch, worktree, lock, or file shared between executions), the checks include a **second-run** check from the first brief — set up the state the fix leaves behind, then exercise the next run's entry path against it (error-reporting retro F1: three MAJOR regressions, all in the un-checked second-run path). | `acceptance_checks` |
 | out-of-scope | Explicit non-goals — what the worker must not do even if it looks adjacent. | `out_of_scope` |
 | constraints | Design decisions already taken that the worker honors and never re-decides — error semantics, validations NOT to add, defaults, timeouts/retries, where a behavior is documented. Each entry is verifiable by the reviewer without judgment. An empty list is legal and means "none declared". | `constraints` |
 
@@ -241,6 +241,7 @@ Each item names its evidence; none may be skipped silently. **Failure consequenc
 2. **Construction sites swept** — with a proposal, the proposal declares the sweep (`construction_sites_swept: true`) and the orchestrator spot-checks at least one construction site with its own grep; without a proposal, the orchestrator sweeps construction sites of every touched type itself, with its own grep, before closing `expected_files`.
 3. **Checks runnable** — with a proposal, every `acceptance_checks.command` carries its `verified:` evidence and the orchestrator re-runs at least one side-effect-free check itself; without a proposal, the orchestrator verifies every check runnable itself — executing it read-only when side-effect-free, or citing the declaring target's `file:line` otherwise.
 4. **Criteria mapped** — every acceptance criterion of the objective maps to an `acceptance_checks` entry or a named test in the brief; an unmapped criterion means either the criterion is out of scope or the brief is incomplete.
+   - When the fix touches state one run leaves for the next, the mapped checks include the second-run check (**Task Brief** table, `acceptance checks` row above).
 5. **Raw evidence wins** — where any sub-agent conclusion contradicts command output the orchestrator itself produced, the command output prevails and the conflict is resolved before delegating.
 6. **Invariant reconciliation** — when the objective introduces or tightens an invariant in a shared contract, grep every existing statement of the invariant it replaces or constrains, and cite the reconciliation in the brief itself — or, on the brief-less retro-application route, in the applying record (Retro trigger below): the sites the candidate must also update, or an explicit no-conflict note. A new rule shipped in the same candidate as an unretired rule that contradicts it is a recurrent CRITICAL class on this route (organic-v2 retro: 3 of its 8 CRITICALs) — the sweep belongs in the same candidate, never a follow-up phase.
 7. **Constraints declared** — every design decision the objective already fixes (from the user's request, the Brief File's Amendments, or the scout's `constraints_candidates`) appears in `constraints`; an explicitly empty list carries a one-line note in the Brief File's Amendments saying why none apply.
@@ -461,6 +462,36 @@ Execution Steps. Where it does not, or the paused worker's session dies before t
 arrives, that is a death that returned one envelope but not a terminal one — route it through
 **Infra-death policy** below, which now governs exactly this case.
 
+#### Recommendation ingestion
+
+This subsection binds the orchestrator's own initiative; the user may request any re-brief or
+accept any recommendation as-is at any time, and that request is recorded in the Brief File's
+Amendments like any other user decision.
+
+1. **A recommendation is a hypothesis.** A finding's `recommendation` (report templates) and an
+   envelope's `next_recommended` are proposals the lens did not verify — the lens verified the
+   DEFECT, not the FIX. Before any of them becomes an instruction in a `## Re-engage Reason`
+   block, the orchestrator either re-derives the edge case that motivated the finding itself
+   (what input/state reaches the cited line? does the proposed line handle it?) or delegates
+   that verification explicitly. Two recurrences from the corpus: (eco-1066 retro F1: an
+   unguarded `format(...)` one-liner copied verbatim from a prior MINOR became a CRITICAL that
+   emptied a form) and (fifo retro F1-F3: a `next_recommended` pair adopted in bloc, presented as
+   recommended, verified after approval — and verified wrong).
+2. **Name the case, not the patch.** The re-brief instruction names the edge case the fix must
+   handle and the check that proves it, never the proposed code line verbatim.
+3. **A lens's scope qualifier is binding.** When the lens itself marks a recommendation "out of
+   scope here" / "follow-up" / "independent of this deploy", the orchestrator records it as a
+   deferred item (named later candidate) and never pulls it into the current re-brief on its own
+   judgment; only the user reopens it, explicitly. What is deferred is the PATCH, never the
+   FINDING: the finding keeps whatever disposition Verdict handling gives it — a blocking
+   finding stays blocking and its re-brief instruction is re-authored per rule 2 without the
+   scoped-out patch; a non-blocking one follows the named-criterion list as usual.
+4. **Unbundle.** A package of remedies is presented to the user one line per piece, each stating
+   what it alone covers (which finding it closes, what scenario it protects) — never as a single
+   approve/deny unit. Cross-reference: the Verdict handling paragraph's `named criterion` list
+   and bulk disposition remain the authority on WHETHER to re-engage; this subsection governs HOW
+   a recommendation enters a re-brief once re-engaging is decided.
+
 #### Infra-death policy
 
 A delegation that dies without returning a **terminal envelope** (`ok | warning | needs_input |
@@ -535,6 +566,14 @@ and it verifies its own eligibility against the actual diff before trusting the 
 `verdict: review-blocked` rather than a silently widened review. The resulting receipt CHAINS:
 it carries `verdict_history` referencing the prior receipt(s) (`result-envelope.md` → Review
 Receipt); the chain's FINAL verdict is the gate input for `work-unit-commits`.
+
+**Delta budget.** When a re-brief closes ≥1 finding on an error-handling, signal/trap,
+timeout/retry, or idempotency path, the `## Re-engage Reason` block states the expected
+delta budget — "1-2 new findings in the same lens are expected; new MINOR `evidence: read`
+findings with no named trigger default to the bulk disposition (Verdict handling)" — so the delta pass is budgeted
+as discovery, not treated as pure confirmation (measured three times — preflight retro F2
+~1:1, sentry-500 retro F2 2:1 on `trap` handling, error-reporting retro F1/F4
+regression-on-regression at 63 % of task cost — proposed twice, never applied until now).
 
 **Full re-review required** when: remediation adds surface beyond the prior receipt's coverage;
 a delta pass itself files a CRITICAL finding; or the objective has already had 2 CONSECUTIVE
@@ -623,7 +662,7 @@ When a delegated worker's envelope carries a non-null `failure_class` (its own d
 
 When `organic-implementer` returns `status: blocked` with `scope_report.kind: out-of-roots`, present the user a **widen-or-stop** decision: (a) **widen** — approve the attempted path; if it has a containing directory, add that directory to `allowed_edit_roots` — a top-level, no-`/` path adds no root and is permitted by its own exact-path declaration in `expected_files` instead (Roots Computation) — re-delegate with the wider roots (and the extended `expected_files` entry) re-injected; or (b) **stop** — treat the write as scope creep, keep the current roots and record the rejection. Either way this counts against the shared re-brief budget.
 
-**Re-engage prompt block.** Every re-delegation for the same objective inlines a `## Re-engage Reason` block into the fresh delegation prompt, naming: the prior run's outcome (`status` + one-line cause), the specific evidence (file:line, command + exit code, or finding IDs), and the exact fix expected. This keeps a re-brief a single self-contained delegation rather than a live-agent addendum (see Synchronous delegation below). A re-brief carries the ORIGINAL delegation prompt VERBATIM — including its `## Skill and Protocol Paths`, `## Injected Context`, and every other injected block — with the `## Re-engage Reason` prepended, **except the always-fresh injected-context fields, which are re-resolved at every re-engage: `current_iso_utc`, `amendment_requests_used`, and `amendments_denied`** (the paused-death replay's carve-out, Infra-death policy step 2 above, is one instance of this general rule); re-writing a re-brief from scratch loses fields silently (this is also the recovery path an infra-death or a paused-worker death falls back to — see Infra-death policy and Amendment ingestion above).
+**Re-engage prompt block.** Every re-delegation for the same objective inlines a `## Re-engage Reason` block into the fresh delegation prompt, naming: the prior run's outcome (`status` + one-line cause), the specific evidence (file:line, command + exit code, or finding IDs), the exact fix expected, and the delta budget line when Delta budget applies (Delta re-validation above). Instructions derived from lens recommendations enter this block only via Recommendation ingestion (above) — as named cases to handle, never as copied patches. This keeps a re-brief a single self-contained delegation rather than a live-agent addendum (see Synchronous delegation below). A re-brief carries the ORIGINAL delegation prompt VERBATIM — including its `## Skill and Protocol Paths`, `## Injected Context`, and every other injected block — with the `## Re-engage Reason` prepended, **except the always-fresh injected-context fields, which are re-resolved at every re-engage: `current_iso_utc`, `amendment_requests_used`, and `amendments_denied`** (the paused-death replay's carve-out, Infra-death policy step 2 above, is one instance of this general rule); re-writing a re-brief from scratch loses fields silently (this is also the recovery path an infra-death or a paused-worker death falls back to — see Infra-death policy and Amendment ingestion above).
 
 ## Model Routing
 

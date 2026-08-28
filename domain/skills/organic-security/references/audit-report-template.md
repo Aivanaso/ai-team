@@ -59,7 +59,7 @@ Each finding MUST include all eleven fields:
 | `trigger` | One line naming the concrete input/command/state that reaches the cited line and produces the defect. Optional in general; REQUIRED when `severity` is MAJOR or CRITICAL and `evidence` is `read` — a `read` finding with no `trigger` is emitted at MINOR as maximum (see SKILL.md Hard Rules) |
 | `description` | 1-3 sentences: what the issue is |
 | `exploit_scenario` | One paragraph: how an attacker would use this |
-| `recommendation` | One paragraph or fix snippet |
+| `recommendation` | One paragraph or fix sketch — an unverified hypothesis: the lens verified the defect, not this fix; the orchestrator re-derives the edge case before acting on it (`orchestrator-protocol.md` → Recommendation ingestion) |
 | `confidence_rationale` | One sentence: why this confidence level |
 
 ## Scope Semantics

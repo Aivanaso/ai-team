@@ -64,7 +64,7 @@ Expand each finding inside its lens section using this structure:
 | `evidence` | `executed` \| `read` — `executed` = a command, mutation probe, scenario, or measurement against real data demonstrated the defect; `read` = the finding rests on code reading alone; for a `gate` finding this is always `executed` |
 | `trigger` | One line naming the concrete input/command/state that reaches the cited line and produces the defect. Optional in general; REQUIRED when `severity` is MAJOR or CRITICAL and `evidence` is `read` — a `read` finding with no `trigger` is emitted at MINOR as maximum (see SKILL.md Hard Rules) |
 | `description` | 1–3 sentences: the defect |
-| `recommendation` | One paragraph or fix sketch |
+| `recommendation` | One paragraph or fix sketch — an unverified hypothesis: the lens verified the defect, not this fix; the orchestrator re-derives the edge case before acting on it (`orchestrator-protocol.md` → Recommendation ingestion) |
 | `confidence_rationale` | One sentence: why this confidence level. For a `gate` finding: N/A — objective evidence (command + exit code), not a judgment call. |
 
 All five lens sections are always present in the output report ("No findings" if clean for

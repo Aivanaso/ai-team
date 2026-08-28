@@ -54,7 +54,9 @@ channel a skill's own contract may authorize — see "Intermediate envelope — 
 ### `next_recommended` (REQUIRED, may be empty)
 
 - Suggested next actions (e.g., "re-run this check after the dependent change lands")
-- The orchestrator uses this as a hint, not a command
+- An unverified hypothesis — the sub-agent verified the underlying defect/gap, not this fix —
+  the orchestrator verifies it before acting on it (`orchestrator-protocol.md` → Recommendation
+  ingestion), never treating it as a command
 - Free-text, one line per suggestion — this route has no fixed phase vocabulary to reference
 
 ### `questions` (OPTIONAL)
