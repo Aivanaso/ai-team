@@ -46,7 +46,7 @@ Files audited: {group_files}
 
 ## Per-Finding Structure
 
-Each finding MUST include all nine fields:
+Each finding MUST include all eleven fields:
 
 | Field | Description |
 |-------|-------------|
@@ -55,6 +55,8 @@ Each finding MUST include all nine fields:
 | `file_line` | `path/to/file.ts:42` — mandatory per Evidence Protocol Rule 1 |
 | `severity` | CRITICAL \| MAJOR \| MINOR |
 | `confidence` | high \| medium \| low — every finding is recorded regardless of confidence (coverage; see SKILL.md Hard Rules) |
+| `evidence` | `executed` \| `read` — `executed` = a command, mutation probe, scenario, or measurement against real data demonstrated the defect; `read` = the finding rests on code reading alone |
+| `trigger` | One line naming the concrete input/command/state that reaches the cited line and produces the defect. Optional in general; REQUIRED when `severity` is MAJOR or CRITICAL and `evidence` is `read` — a `read` finding with no `trigger` is emitted at MINOR as maximum (see SKILL.md Hard Rules) |
 | `description` | 1-3 sentences: what the issue is |
 | `exploit_scenario` | One paragraph: how an attacker would use this |
 | `recommendation` | One paragraph or fix snippet |

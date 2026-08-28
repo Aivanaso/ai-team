@@ -81,6 +81,26 @@ model_used: "sonnet"
 context_resolution: self-loaded
 ```
 
+## Variant 4b: code-audit (tier-2 lens), findings with an evidence spread
+
+```yaml
+status: ok
+executive_summary: "Code audit complete for payment-webhook. 1 MAJOR (evidence: executed), 1 MAJOR (evidence: read, trigger named), 1 MINOR (evidence: read, no trigger — bulk-disposition candidate)."
+mode: code-audit
+artifacts: []
+security_lens:
+  status: findings
+  findings:
+    - { id: "F-1", severity: MAJOR, confidence: high, evidence: executed, file: "src/webhook/verify.ts", line: 22, claim: "Signature check probed with a tampered payload; the handler accepted it — verification bypass confirmed." }
+    - { id: "F-2", severity: MAJOR, confidence: medium, evidence: read, trigger: "a request whose 'Content-Length' header disagrees with the actual body size reaching parse.ts:47", file: "src/webhook/parse.ts", line: 47, claim: "Body size is trusted from the header without re-validating the actual stream length." }
+    - { id: "F-3", severity: MINOR, confidence: low, evidence: read, file: "src/webhook/log.ts", line: 9, claim: "Possible verbose logging of the raw payload; could not confirm whether it reaches a persisted log sink." }
+security_requirements: []
+next_recommended: []
+risks: []
+model_used: "sonnet"
+context_resolution: self-loaded
+```
+
 ## Variant 5: blocked (invalid mode)
 
 ```yaml

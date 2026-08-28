@@ -42,9 +42,9 @@ lenses:
   correctness:
     status: findings
     findings:
-      - { id: "F-1", severity: MAJOR, confidence: high, file: "src/processor.ts", line: 84, claim: "Exception caught but swallowed; no log or re-throw." }
-      - { id: "F-2", severity: MAJOR, confidence: medium, file: "src/db.ts", line: 112, claim: "Connection acquired but not released on the error path." }
-      - { id: "F-3", severity: MINOR, confidence: low, file: "src/db.ts", line: 118, claim: "Possible off-by-one in the retry counter; could not confirm the caller's max-retry contract." }
+      - { id: "F-1", severity: MAJOR, confidence: high, evidence: read, trigger: "any request whose handler throws inside the try block at processor.ts:84 — the catch swallows it silently", file: "src/processor.ts", line: 84, claim: "Exception caught but swallowed; no log or re-throw." }
+      - { id: "F-2", severity: MAJOR, confidence: medium, evidence: read, trigger: "a request that hits the error path at db.ts:112 before the connection is released", file: "src/db.ts", line: 112, claim: "Connection acquired but not released on the error path." }
+      - { id: "F-3", severity: MINOR, confidence: low, evidence: read, file: "src/db.ts", line: 118, claim: "Possible off-by-one in the retry counter; could not confirm the caller's max-retry contract." }
 verification:
   - { command: "<test suite>", exit_code: 0, outcome: pass }
 overrides: []
@@ -69,7 +69,7 @@ lenses:
   correctness:
     status: findings
     findings:
-      - { id: "F-1", severity: CRITICAL, confidence: low, file: "src/cache.ts", line: 57, claim: "Shared mutable counter incremented without synchronization; data race under concurrent requests." }
+      - { id: "F-1", severity: CRITICAL, confidence: low, evidence: read, trigger: "two concurrent requests both incrementing the shared counter at cache.ts:57 with no lock between read and write", file: "src/cache.ts", line: 57, claim: "Shared mutable counter incremented without synchronization; data race under concurrent requests." }
 verification:
   - { command: "<test suite>", exit_code: 0, outcome: pass }
 overrides: []
@@ -95,7 +95,7 @@ lenses:
   correctness:
     status: findings
     findings:
-      - { id: "F-1", severity: CRITICAL, confidence: high, file: ".ai-team/config.yaml", line: 34, claim: "review_gates entry 'coverage' ('<coverage check>') exited 1." }
+      - { id: "F-1", severity: CRITICAL, confidence: high, evidence: executed, file: ".ai-team/config.yaml", line: 34, claim: "review_gates entry 'coverage' ('<coverage check>') exited 1." }
 verification:
   - { command: "<test suite>", exit_code: 0, outcome: pass }
   - { command: "<coverage check>", exit_code: 1, outcome: fail, gate: "coverage" }

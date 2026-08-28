@@ -28,6 +28,15 @@ Rationale: a self-filtered report trains the orchestrator to trust a clean audit
 hid its own uncertainty. Reporting every low-confidence finding, tagged as such, gives the
 orchestrator the same signal without dropping a possible real defect.
 
+**Evidence axis vs. confidence axis — precedence** (code-audit mode only; N/A in threat-model
+mode). These are two independent axes; do not conflate low confidence with `evidence: read`.
+The evidence cap applies at emission, before any downstream verdict computation: a `read`
+finding without a named `trigger` is emitted at MINOR as maximum. The confidence rule then
+applies unchanged to the severity actually emitted — low confidence never downgrades an emitted
+severity. Consequently a CRITICAL or MAJOR with `evidence: read` always carries a `trigger`. A
+finding can be simultaneously `confidence: low` and `evidence: executed` — that finding's
+severity is never capped by the evidence rule.
+
 ## Edge Case 3: group_files Empty or None Exist (code-audit mode)
 
 **Condition:** The injected `group_files` list is empty, or none of the declared paths exist

@@ -25,6 +25,16 @@ findings reported at low confidence — none suppressed; verdict follows the sta
 Nothing is hidden from the orchestrator: low confidence is visible per-finding for its own
 triage.
 
+**Evidence axis vs. confidence axis — precedence.** These are two independent axes; do not
+conflate low confidence with `evidence: read`. The evidence cap applies at emission, before the
+verdict is computed: a `read` finding without a named `trigger` is emitted at MINOR as maximum.
+The confidence rule then applies unchanged to the severity actually emitted — low confidence
+never downgrades an emitted severity, and a CRITICAL at any confidence still blocks.
+Consequently a CRITICAL or MAJOR with `evidence: read` always carries a `trigger`. A finding can
+be simultaneously `confidence: low` and `evidence: executed` (an uncertain interpretation of a
+demonstrated result) — that finding's severity is never capped by the evidence rule, only by
+whatever the lens itself judges the defect to warrant.
+
 ## Missing group_files (not injectable)
 
 **Condition:** `group_files` is absent from injected context.

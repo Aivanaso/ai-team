@@ -75,6 +75,9 @@ security_requirements:
 
 ## Per-Finding Structure
 
+`evidence`/`trigger` are N/A in threat-model mode — these findings route through
+`security_requirements`, never into the Review Receipt or the commit gate.
+
 Each finding MUST include all nine fields:
 
 | Field | Description |

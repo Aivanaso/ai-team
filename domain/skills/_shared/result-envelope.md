@@ -191,15 +191,16 @@ lenses:
   correctness:
     status: pass | findings
     findings:
-      - { id: "F-1", severity: CRITICAL | MAJOR | MINOR, confidence: high | medium | low, file: "<path>", line: <int>, claim: "<one line>" }
+      - { id: "F-1", severity: CRITICAL | MAJOR | MINOR, confidence: high | medium | low, evidence: executed | read, trigger: "<one line — optional; REQUIRED when severity is MAJOR or CRITICAL and evidence is read>", file: "<path>", line: <int>, claim: "<one line>" }
   security:                # present only when the diff activated organic-security (tier 2)
     status: pass | findings
     findings:
-      - { id: "F-2", severity: CRITICAL | MAJOR | MINOR, confidence: high | medium | low, file: "<path>", line: <int>, claim: "<one line>" }
+      - { id: "F-2", severity: CRITICAL | MAJOR | MINOR, confidence: high | medium | low, evidence: executed | read, trigger: "<one line — optional; REQUIRED when severity is MAJOR or CRITICAL and evidence is read>", file: "<path>", line: <int>, claim: "<one line>" }
 verification:
   - { command: "<verbatim>", exit_code: 0, outcome: pass | fail, gate: "<name>" }  # gate: optional, present only for review_gates outcomes
 overrides:                 # user-accepted findings, if any — omit entirely when empty
-  - { finding_id: "F-1", justification: "<user-supplied, one sentence>" }
+  - { finding_id: "F-1", justification: "<user-supplied, one sentence>" }   # singular form — one finding
+  - { finding_ids: ["F-3", "F-6"], justification: "<user-supplied, one sentence>" }   # bulk form — see Rules below
 verdict_history:           # optional — present only on a delta-mode receipt; omit entirely on a full-pass receipt
   - { pass: full | delta, report: "<path to that pass's on-disk report>", verdict: review-clear | review-blocked, note: "<one line>" }
 not_reverified:            # optional — present only on a delta-mode receipt; omit entirely on a full-pass receipt
@@ -211,6 +212,9 @@ findings_addressed:        # optional — orchestrator-authored addendum for an 
 **Rules:**
 - `tier_reason` is REQUIRED and non-empty for tier 1 and tier 2 — review cost is never unexplained.
 - Every finding carries its own `confidence: high | medium | low` alongside `severity`. Coverage, not self-filtering, is the contract: a lens reports every finding it identifies — including ones it is uncertain about or considers low-severity — and never withholds one for importance or confidence; the orchestrator's downstream triage (accept-and-proceed, re-brief, delta re-validation) is the filter, not the lens itself. A `confidence: low` finding still counts fully toward the verdict below — low confidence narrows the recommended remediation path, never the verdict (fail closed).
+- Every finding also carries `evidence: executed | read` — `executed` means the lens ran something (command, mutation probe, scenario, measurement against real data) whose observed result demonstrates the defect; `read` means the finding rests on code reading alone. `trigger` (optional in general) names the concrete input/command/state that reaches the cited line and produces the defect; it is REQUIRED whenever `severity` is MAJOR or CRITICAL and `evidence: read`. A `read` finding with no named `trigger` is emitted at `MINOR` as maximum — this caps the severity a lens may claim from reading alone, it never gates coverage: the finding is still reported, at every confidence level, exactly as the bullet above requires.
+- **Precedence between the evidence cap and the confidence-fail-closed rule:** the evidence cap applies at emission, before the verdict is computed: a `read` finding without a named `trigger` is emitted at MINOR as maximum. The confidence rule then applies unchanged to the severity actually emitted — low confidence never downgrades an emitted severity, and a CRITICAL at any confidence still blocks. Consequently a CRITICAL or MAJOR with `evidence: read` always carries a `trigger`.
+- `overrides` bulk form: an entry carries EITHER `finding_id: "F-1"` (singular) OR `finding_ids: ["F-3", "F-6", ...]` (list), never both, plus the existing `justification`. The bulk form is valid ONLY for findings that are `severity: MINOR` AND `evidence: read` without a `trigger`. Authorship is unchanged regardless of form — orchestrator-authored only, never the lens (see Principle 4, `common-rules.md`).
 - `verdict` is REQUIRED for tier ≥ 1: `review-blocked` when ≥ 1 CRITICAL finding exists in `organic-reviewer`'s own lenses, at ANY confidence level; `review-clear` otherwise (MAJOR/MINOR findings alone do not block, regardless of confidence). `organic-reviewer` alone computes and emits this field (`organic-reviewer/SKILL.md` → Hard Rules); `work-unit-commits` gates its commit on it (see `work-unit-commits/SKILL.md` → Decision Gates).
 - `lenses.security` is present only when Evidence-Tier Review activated `organic-security` (tier 2); omit it entirely for tier 1.
 - Every `findings[]` entry's `claim` MUST resolve to a `file:line` citation — this is the receipt-side half of the Citation audit in `orchestrator-protocol.md` → "Evidence-Tier Review"; a claim without a resolvable citation is a contract violation.

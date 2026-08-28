@@ -29,6 +29,9 @@
 #    rely on this to skip citing an actual finding. Coverage model (skill-style-guide.md →
 #    "Coverage over self-filtering"): every finding is reported with its own `confidence`
 #    field regardless of severity; no suppression-tally report section exists to exempt one.
+#    Finding blocks may also carry `evidence:`/`trigger:` fields (result-envelope.md → Review
+#    Receipt) — this parser ignores both; the citation requirement above is unchanged and this
+#    script does not enforce the evidence→severity coupling.
 #
 # Usage: check-verify-citations.sh <report.md> [repo-root] [tasks-md] [test-log]
 #        tasks-md defaults to tasks.md next to the report;

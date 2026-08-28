@@ -84,7 +84,9 @@ orchestrator-side counterpart):
 - **Coverage over self-filtering.** A lens skill (`organic-reviewer`, `organic-security`) never
   suppresses a finding by confidence — it reports every finding with its own `confidence` field
   and lets the orchestrator's downstream triage filter (see `result-envelope.md` → Review
-  Receipt).
+  Receipt). The evidence axis (`evidence: executed | read`, `result-envelope.md` → Review
+  Receipt) never narrows this either — it governs the SEVERITY a `read`-only finding may carry
+  (MINOR as maximum without a named `trigger`), never whether the finding is reported.
 
 ---
 

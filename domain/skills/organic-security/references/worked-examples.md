@@ -19,6 +19,9 @@ Brief must implement.
 
 **Finding that would have been emitted:**
 
+`evidence`/`trigger` are N/A in threat-model mode — these findings route through
+`security_requirements`, never into the Review Receipt or the commit gate.
+
 ```
 id: F-1
 category: temporal-invariant-sweep
