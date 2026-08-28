@@ -46,6 +46,23 @@ The table below governs the orchestrator's own auxiliary actions (classify, veri
 
 Anti-patterns -- reading 4+ files or writing/testing multi-file changes inline, or reading files as prep and then editing inline instead of delegating the whole thing together -- ALWAYS inflate context without need.
 
+**Credential hygiene on the orchestrator's own writes.** Before the orchestrator itself
+creates any copy, backup, or rename of a file that holds or may hold a live secret
+(`.env*`, key/token files, and equivalents), it runs `git check-ignore -v <target-path>`
+first: no match means the new copy is NOT covered by `.gitignore` — stop and fix
+`.gitignore` before creating the copy, never after. `git check-ignore -v` only answers
+whether the NEW path would be excluded going forward — it says nothing about whether the
+SOURCE file is already tracked (already committed, secret already in history), so pair it
+with `git ls-files --error-unmatch <source-path>` before the copy: a tracked source means
+the secret is already exposed — stop and remediate the history, do not compound it by
+copying. The same sweep also names editor/tool backup artifacts (`*.swp`, `*~`, `.#*`,
+`*.bak`) as an out-of-band case: no single orchestrator action triggers them, so treat
+their presence near a secret-bearing file as a periodic-sweep item rather than a
+pre-action gate. Any `.gitignore` edit made outside a delegation this way is declared in
+the Brief File's Amendments the same turn, as a one-line audit event (a live-token backup
+file readable by other users, created by the orchestrator itself and caught only by
+`organic-security` rather than by this rule, is exactly the failure this closes).
+
 ## Mandatory Classification Gate
 
 **STOP before acting on ANY feature, change, or implementation request.** Classify FIRST — starting to code or entering plan mode before classification risks irreversible changes before scope is confirmed.
@@ -239,7 +256,7 @@ Each item names its evidence; none may be skipped silently. **Failure consequenc
 
 1. **Chain to the leaves** — every link in the objective's described flow has an `expected_files` entry, or an explicit open question. Prose promising more than the file list authorizes is the known failure mode (a worker honoring the list will block, at full delegation cost).
 2. **Construction sites swept** — with a proposal, the proposal declares the sweep (`construction_sites_swept: true`) and the orchestrator spot-checks at least one construction site with its own grep; without a proposal, the orchestrator sweeps construction sites of every touched type itself, with its own grep, before closing `expected_files`.
-3. **Checks runnable** — with a proposal, every `acceptance_checks.command` carries its `verified:` evidence and the orchestrator re-runs at least one side-effect-free check itself; without a proposal, the orchestrator verifies every check runnable itself — executing it read-only when side-effect-free, or citing the declaring target's `file:line` otherwise.
+3. **Checks runnable and able to fail** — with a proposal, every `acceptance_checks.command` carries its `verified:` evidence and the orchestrator re-runs at least one side-effect-free check itself; without a proposal, the orchestrator verifies every check runnable itself — executing it read-only when side-effect-free, or citing the declaring target's `file:line` otherwise. Runnable is not enough: a check is calibrated against a known positive (the pre-change failing state, or a synthetic failing fixture) before its green counts, and a zero-work output (`No files analyzed`, `No tests found`, 0 suites, `0 findings checked`) is never accepted as a pass — `_shared/evidence-protocol.md` → Rule 7.
 4. **Criteria mapped** — every acceptance criterion of the objective maps to an `acceptance_checks` entry or a named test in the brief; an unmapped criterion means either the criterion is out of scope or the brief is incomplete.
    - When the fix touches state one run leaves for the next, the mapped checks include the second-run check (**Task Brief** table, `acceptance checks` row above).
 5. **Raw evidence wins** — where any sub-agent conclusion contradicts command output the orchestrator itself produced, the command output prevails and the conflict is resolved before delegating.
@@ -337,11 +354,21 @@ below) — see "Amendment ingestion" below; plus, separately, any mid-task gear 
 logged as a one-line audit event rather than a scope amendment (**Execution gears** above).
 "none" until the first entry of any of these kinds.)
 ## Close
-(written when status flips to done: totals — agents, tokens; re-brief count with causes;
-receipt reference(s); commit hashes)
+(written when status flips to done — the two canonical, machine-readable totals below may
+appear anywhere in this section, not by bullet position; every other line is free-form prose)
+- delegations: <int>          # MUST equal the Cost Ledger's row count
+- subagent_tokens: <int>       # MUST equal the sum of the Cost Ledger's tokens column; plain integer, no thousands separator
+(then free prose: re-brief count with causes; receipt reference(s); commit hashes)
 ```
 
 Created at the task's first delegation; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption, session end mid-task, or an `unattended`-gear pending question) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
+
+**Brief File structural check (orchestrator, before the status:done flip):** before flipping
+`status` to `done`, the orchestrator confirms against the Cost Ledger itself that `delegations:`
+equals the ledger's row count, that `subagent_tokens:` equals the sum of its tokens column, and
+that a `work-unit-commits` row is present. A mechanical gate over a machine-readable (JSON)
+ledger is a named later candidate; until it lands this check is performed by hand and recorded
+in the `## Close` prose.
 
 ### Retro trigger
 
@@ -614,7 +641,7 @@ Every claim in a review result must cite `file:line` evidence — a reviewer's o
 bash skills/_shared/scripts/check-verify-citations.sh {review-report-path} .
 ```
 
-- Exit 0 → accept the review verdict.
+- Exit 0 → accept the review verdict — AND `finding_checked` ≥ 1 whenever the receipt itself declares ≥1 finding; a zero-work pass (`0 severity findings checked`) against a receipt that claims findings is not acceptance — treat it as an unresolved gate exactly like an `UNRESOLVED` line below (the script's own zero-work guard raises this as `UNRESOLVED ... zero-work` when it fires; a bare exit 0 alone is never sufficient evidence that the intended findings were actually scanned).
 - Any `UNRESOLVED` line → re-engage `organic-reviewer` once with the unresolved lines inlined: "downgrade these to unverified or cite resolvable evidence." Still unresolved after re-engage → escalate to the user; treat the affected claim as unverified for gating.
 - Script missing at `{install_dir}` → run `scripts/install.sh`, or check manually: extract `path::evidence` citation tokens from the report, verify the path exists and the citation greps in the file with `grep -F`.
 
@@ -692,6 +719,7 @@ Use `subagent_type` matching the skill name (`organic-implementer`, `organic-rev
 3. Inject the `## Injected Context` YAML block directly into the prompt — session state the sub-agent cannot derive from disk.
 4. Include `references_dir` in the paths block when the skill has one.
 5. If `strict_tdd: true` and the worker writes application code, append: "STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. Follow red → green → triangulate → refactor."
+6. **Pre-send checklist for a lens or `work-unit-commits` delegation** (`organic-reviewer`, `organic-security`, `work-unit-commits`): before sending, mechanically tick each field the Critical Context Forwarding table below already declares mandatory for that worker — `group_files`; `report_destination` (lenses); `tier` and `tier_reason`; `prior_report` plus `delta_scope.prior_verdict_history` (delta passes only); `decisions_taken` (when the implementer envelope reported ≥1 entry); the Review Receipt verbatim (`work-unit-commits` only). A missing item is fixed BEFORE sending — never discovered later by the worker's own `blocked` return on a missing-context gate.
 
 **Why disk-read over inline:** inlining a SKILL.md plus its shared protocols consumes context budget needed for source files and leaves protocols stale by the time the agent needs them (lost-in-the-middle effect after many tool calls). JIT loading keeps each protocol fresh at the step that needs it. Pattern validated by gentle-ai (`skill-resolver.md`).
 

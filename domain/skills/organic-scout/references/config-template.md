@@ -71,8 +71,12 @@ commit_strategy: auto  # commit strategy for work-unit-commits skill: auto | man
 #   at the lens (see `_shared/result-envelope.md` → Review Receipt). A failing blocking gate
 #   (blocking: true, or blocking absent) is a CRITICAL finding (verdict: review-blocked);
 #   blocking: false is a MAJOR finding that documents but does not block. An unrunnable gate is
-#   omitted from `verification` and noted in `risks` — never fabricated pass/fail. See
-#   config/schema.yaml for the full field reference.
+#   omitted from `verification` and noted in `risks` — never fabricated pass/fail. Calibration
+#   (`_shared/evidence-protocol.md` -> Rule 7): whoever hand-adds a gate here first runs it
+#   against a known-failing state (or a synthetic fixture) to confirm it CAN fail, and runs it
+#   twice to rule out a cached green; a zero-work result (e.g. "0 files analyzed", "no tests
+#   matched") is never accepted as a passing gate. See config/schema.yaml for the full field
+#   reference.
 
 # retro: on-signal
 #   Optional, safe-absent default: on-signal. Read by the orchestrator when a task's Brief File

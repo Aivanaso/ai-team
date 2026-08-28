@@ -9,17 +9,18 @@ user-invocable: false
 
 Run when the orchestrator invokes after `organic-implementer`'s acceptance checks pass and,
 for a tier ≥ 1 candidate, `organic-reviewer` returns `review-clear` (or the user recorded an
-override in the receipt's `overrides` field). Produce: a git commit (auto mode) or commit
-instructions (manual mode) covering the candidate's changed files. Never activate on a
-`review-blocked` verdict that has no recorded override, and never activate on a declared
-tier ≥ 1 candidate whose receipt is absent.
+override covering every blocking CRITICAL finding — Decision Gates — in the receipt's
+`overrides` field). Produce: a git commit (auto mode) or commit instructions (manual mode)
+covering the candidate's changed files. Never activate on a `review-blocked` verdict whose
+`overrides` does not cover every blocking CRITICAL, and never activate on a declared tier ≥ 1
+candidate whose receipt is absent.
 
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
 - Receipt gate: when the delegation prompt declares `tier >= 1`, a Review Receipt (schema: `_shared/result-envelope.md` → Review Receipt) MUST be present in the prompt — absent → `status: blocked`, no commit. `tier: 0`, or an explicit "review off" kill-switch declaration by the orchestrator, commits under ordinary policy with no receipt required. -- because fabricating an implicit tier-0 pass would let any undeclared commit bypass the review plane this gate exists to enforce.
 - Neither a tier declaration nor a "review off" declaration present in the delegation prompt is never treated as tier 0 — it is a missing-context block (Decision Gates). An undeclared tier does not default to "no review needed".
-- Activate only after the candidate's own acceptance checks pass and, for tier ≥ 1, the receipt shows `review-clear` or a recorded override. -- because a commit created before review completes breaks the review-then-commit order the receipt gate exists to enforce.
+- Activate only after the candidate's own acceptance checks pass and, for tier ≥ 1, the receipt shows `review-clear` or an override covering every blocking CRITICAL finding (Decision Gates). -- because a commit created before review completes breaks the review-then-commit order the receipt gate exists to enforce.
 - Staging discovery prefers the injected `group_files`: stage exactly those paths, individually, with `git add {file}`. A dirty path under `project_root` that is NOT in `group_files` is left unstaged and reported as a WARNING (never swept in). When `group_files` is absent, fall back to enumerating `git status --porcelain` under `project_root` (tracked modifications + untracked adds) and say so in a WARNING. Staging by glob (`git add .` or `git add -A`) is never used — it may include debug artifacts, `.env`, or files from other branches.
 - Resolve mode from `.ai-team/config.yaml.commit_strategy`; if missing, default auto and surface a WARNING.
 - Convention-first commit message resolution: before applying the default subject rule, resolve git/commit conventions from sources in this precedence order (earlier source wins for the fields it explicitly addresses): (1) `{project_root}/.claude/skills/commit/SKILL.md` (project commit skill); (2a) `{project_root}/CLAUDE.md`, (2b) `{project_root}/AGENTS.md` (same rank — on a same-field conflict between the two, `CLAUDE.md` wins); (3) `~/.claude/skills/commit/SKILL.md` (user commit skill); (4) `~/.claude/CLAUDE.md`, following its `@`-imports and excluding any framework-injected marker block (e.g. `<!-- ai-team:orchestrator -->…`); (5) the default floor rule below.
@@ -36,7 +37,7 @@ tier ≥ 1 candidate whose receipt is absent.
 | Delegation prompt declares `tier >= 1` AND no Review Receipt is present | `status: blocked`, reason: "tier {N} candidate missing its review receipt" |
 | Neither a tier declaration nor a "review off" declaration is present in the prompt | `status: blocked`, reason: "no tier declaration and no review-off declaration — cannot determine the commit gate" |
 | `tier: 0`, or "review off" declared | Proceed to commit under ordinary policy; no receipt required |
-| Receipt present with `verdict: review-blocked` AND no entry in `overrides` | `status: blocked`, reason: "review-blocked with no recorded override" |
+| Receipt present with `verdict: review-blocked` AND `overrides` lacks a singular `finding_id` entry naming EVERY blocking CRITICAL finding across BOTH `lenses.correctness` and `lenses.security` | `status: blocked`, reason names the uncovered CRITICAL id(s) — e.g. "review-blocked: no singular override entry for CRITICAL F-2 (lenses.security)". A bulk `finding_ids` entry NEVER counts toward covering a CRITICAL — `_shared/result-envelope.md` → Review Receipt already restricts the bulk form to MINOR/`evidence: read`/no-`trigger` findings, so it is structurally incapable of covering the CRITICAL that blocked the receipt. |
 | Receipt present with `verdict_history` (a delta-chained receipt, `_shared/result-envelope.md` → Review Receipt) | Gate reads the chain's LAST entry, not any earlier one, and cross-checks it against the top-level `verdict` field: match + `review-clear` → satisfies the gate, proceed; match + anything else → same handling as a bare `review-blocked` receipt (row above); **mismatch between the two** → `status: blocked`, reason: "verdict_history/verdict mismatch — receipt integrity failure" (fail closed, never a permissive pick of either field) |
 | Orchestrator did not pass `group_id` | `status: blocked`, reason: "missing group_id in injected context" |
 | `config.yaml` not found at `.ai-team/config.yaml` | `status: blocked`, reason: "config.yaml not found" |
@@ -72,7 +73,7 @@ left unstaged outside `group_files`, truncated subject, missing commit_strategy)
 
 ## References
 
-- [references/envelope-examples.md](references/envelope-examples.md) — ok (auto), ok (manual), failed (hook reject), blocked (config missing), blocked (receipt missing), blocked (no tier/review-off declaration), blocked (review-blocked, no override), ok (tier 0 / review off) variants.
+- [references/envelope-examples.md](references/envelope-examples.md) — ok (auto), ok (manual), failed (hook reject), blocked (config missing), blocked (receipt missing), blocked (no tier/review-off declaration), blocked (review-blocked, no override), blocked (review-blocked, override does not cover CRITICAL), ok (tier 0 / review off) variants.
 - [references/commit-message-examples.md](references/commit-message-examples.md) — pure feat, mixed feat+fix, convention-first override worked examples.
 - [references/edge-cases.md](references/edge-cases.md) — pre-commit hook reject, file missing, merge conflict, undeclared file, convention contradiction, manual mode pending, receipt gate outcomes, findings_addressed integrity.
 - `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always).

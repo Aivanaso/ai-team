@@ -176,6 +176,20 @@ This rule covers the orchestrator's responsibility *after* receiving an envelope
 
 **Out of scope**: trivial single-file briefs (1 file, no cross-module scope, no resolved open question) — their evidence requirements are covered by Rules 1-3 alone.
 
+## Rule 7 — Declared Checks Must Be Able to Fail
+
+A check or gate declared in a Task Brief's `acceptance_checks`, an `organic-scout` `scope_proposal`'s `acceptance_checks`, or a `.ai-team/config.yaml` `review_gates`/`test_commands` entry MUST be calibrated against a known positive before its green counts as evidence — the pre-change state that should fail, or (when no pre-change failing state exists yet) a synthetic failing fixture built for exactly that purpose. A check that has never been observed to fail is not verified to test anything; it is only verified to run.
+
+**Calibration checklist:**
+
+1. **Run against a known failure first.** Before trusting a green result, confirm the same check fails against the pre-change state, or against a synthetic fixture built to trigger the failure the check exists to catch.
+2. **Run twice to expose cache hits.** A test runner, linter, or static analyzer that reports green because it cached a prior (possibly stale) result looks identical to a green result from actually re-running the check — running twice in a row, and confirming both runs actually executed work, surfaces a silent cache hit that a single run cannot.
+3. **Reject zero-work outputs as green.** `No files analyzed`, `No tests found`, `0 suites`, `0 findings checked`, and equivalent zero-work digests are never accepted as a passing result — they are indistinguishable from "the check never ran against real content". A zero-work result has exactly ONE disposition, canonical across every consumer of this rule: it DID execute, so it is recorded as `outcome: fail` in the verification/check-results evidence (fail closed — a fail contradicting a worker's claimed `pass` is then the existing discrepancy finding, which is the intended consequence), with the zero-work nature named in `risks`. Never omitted from the evidence, never recorded as `pass`, and never conflated with a check that genuinely could not be run at all (missing tool, unreachable command) — that distinct, separately-named failure mode is handled elsewhere in each consuming skill's own gates.
+
+**Relationship to Rules 3 and 6:** Rule 3 requires `organic-implementer` to execute the integration tests it wrote before declaring `status: ok`; Rule 6 bullet 3 ("Test discovery sanity") gives the orchestrator's post-hoc symptom for the same failure class (a flat global test counter despite new test files on disk). Rule 7 generalizes both: it is not limited to test execution, and it applies at the moment a check is DECLARED (brief authoring, `scope_proposal` composition, `config.yaml` bootstrap or hand-edit) rather than only at the moment it is later re-run.
+
+**Why this exists**: three separate repositories produced four checks that could report green without ever having the capacity to fail — a static analyzer accepting `No files analyzed` as a clean pass, a test command matching zero test files while reporting success, and a cached linter run reporting a stale green after the underlying rule was already broken (eco-1066 retro F2, inputbag retro F3, deep-link retro F2). A check nobody has watched fail is a check nobody has verified.
+
 ## Recording Evidence in Artifacts
 
 When composing a Task Brief, a result envelope, a Review Receipt, or a discovery report:

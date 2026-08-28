@@ -1,7 +1,7 @@
 # Envelope Examples — work-unit-commits
 
-> Load-on-demand reference for Step 8. Eight envelope variants covering the main outcomes,
-> including the four receipt-gate outcomes from the Decision Gates table.
+> Load-on-demand reference for Step 8. Nine envelope variants covering the main outcomes,
+> including the five receipt-gate outcomes from the Decision Gates table.
 
 ## ok (auto mode)
 
@@ -110,6 +110,22 @@ group_id: "billing-export"
 artifacts: []
 risks:
   - "review-blocked with no recorded override"
+model_used: "sonnet"
+context_resolution: "self-loaded"
+```
+
+## blocked (review-blocked verdict, override present but does not cover the blocking CRITICAL)
+
+**Scenario:** the injected Review Receipt carries `verdict: review-blocked` with a CRITICAL finding (`F-2`) in `lenses.security`. The `overrides` field is present but only carries a bulk `finding_ids` entry for two unrelated MINOR findings — a bulk entry can never cover a CRITICAL (`_shared/result-envelope.md` → Review Receipt), so the blocking CRITICAL remains uncovered.
+
+```yaml
+status: blocked
+executive_summary: "review-blocked: no singular override entry for CRITICAL F-2 (lenses.security) — no commit created for billing-export"
+group_id: "billing-export"
+artifacts: []
+risks:
+  - "review-blocked: no singular override entry for CRITICAL F-2 (lenses.security)"
+  - "overrides carries only a bulk finding_ids entry for F-4, F-5 (MINOR) — structurally incapable of covering a CRITICAL"
 model_used: "sonnet"
 context_resolution: "self-loaded"
 ```

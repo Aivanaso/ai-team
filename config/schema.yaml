@@ -70,7 +70,11 @@
 #   review-blocked); blocking: false is MAJOR (documents, does not block). An unrunnable gate is
 #   omitted from `verification` and noted in `risks` — never fabricated pass/fail, same rule as
 #   an unrunnable acceptance_checks entry. Safe-absent: no gates declared -> organic-reviewer's
-#   verification re-run behaves exactly as before this key existed.
+#   verification re-run behaves exactly as before this key existed. Calibration guidance for
+#   whoever hand-adds a gate (run against a known-failing state first, run twice to rule out a
+#   cached green, never accept a zero-work result as passing) is NOT duplicated here — this
+#   file's own header disclaimer names domain/skills/organic-scout/references/config-template.md
+#   as the canonical, annotated source; read the calibration note there.
 
 # retro: always | on-signal | off
 #   Optional, safe-absent default: on-signal. Read by the orchestrator when a task's Brief File
