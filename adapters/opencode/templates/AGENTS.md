@@ -117,7 +117,7 @@ For **Medium and Large** tasks — this is the route firing for every non-trivia
 2. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected;
    on return, verify the proposal against the **Scope Verification Checklist** in
    `~/.config/opencode/skills/_shared/orchestrator-protocol.md` and adopt it into the Task
-   Brief's `expected_files`/`acceptance_checks` — verify, never recompose (recompose-with-checklist only when discovery returned no `scope_proposal` block — fallback branch, see the protocol). The scout's optional `constraints_candidates` block is verified and adopted into the Task Brief's `constraints` the same way — checked against its `file:line` evidence, then copied in verbatim, never invented from the orchestrator's own reading.
+   Brief's `expected_files`/`acceptance_checks` — verify, never recompose (recompose-with-checklist only when discovery returned no `scope_proposal` block — fallback branch, see the protocol). The scout's optional `constraints_candidates` block is verified and adopted into the Task Brief's `constraints` the same way — checked against its `file:line` evidence, then copied in verbatim, never invented from the orchestrator's own reading. For Large, the scout's `plan_proposal` is adopted into the Brief File's `## Plan` the same way — verified, never recomposed — and the plan is re-presented for approval before any implementation delegation.
 3. **Delegate implementation — this is the default:** `task({agent: "organic-implementer", …})`
    with a Task Brief (canonical definition: **Task Brief** in
    `~/.config/opencode/skills/_shared/orchestrator-protocol.md`) — its seven elements include

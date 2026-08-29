@@ -11,10 +11,10 @@ runs before commit.
 
 ```
 User ↔ Claude Code (orchestrator)                                User ↔ OpenCode (orchestrator agent)
-           │                                                     │
-           ├── Small: delegate (no gate)                         ├── Small: delegate (no gate)
-           ├── Medium: plan of briefs + delegate                 ├── Medium: plan of briefs + delegate
-           └── Large: plan of briefs + optional discovery pass   └── Large: plan of briefs + optional discovery pass
+│                                                                │
+├── Small: delegate (no gate)                                    ├── Small: delegate (no gate)
+├── Medium: plan of briefs + delegate                            ├── Medium: plan of briefs + delegate
+└── Large: plan of briefs + optional discovery pass              └── Large: plan of briefs + optional discovery pass
                          ↓                                             ↓
                     domain/skills/    ←─── shared skills ───→    domain/skills/
 ```
