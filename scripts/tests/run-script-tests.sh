@@ -112,6 +112,24 @@
 # examine severity -- that is the protocol's own F-9 gate, not this
 # validator's).
 #
+# NINTH exception (ledger `plan[]`, the Brief File's machine-checkable mirror
+# of `## Plan`/`## Phases`): ledger-plan-*.json fixtures cite nothing on disk
+# at all -- no new citation exception is needed, since every rule the `plan`
+# field adds is a pure shape/arithmetic check over already-parsed JSON (no
+# filesystem access). Each negative fixture is derived from ledger-good.json's
+# ledger/close shape (a few extended to carry a second work-unit-commits row
+# and a second commit, so `plan`'s two-entry fixtures have enough rows/commits
+# to satisfy the at-Close count rules on their own) and isolates to exactly
+# one rule: ledger-plan-not-list (plan not a list), ledger-plan-entry-not-object
+# (an entry that is not an object), ledger-plan-n-gap (n skips a value),
+# ledger-plan-n-not-int (n is the float 1.0 -- the one non-int shape the n-sequence rule alone cannot catch, so the strict-int guard is the sole rule that rejects it), ledger-plan-title-empty,
+# ledger-plan-done-not-bool, ledger-plan-not-done-at-close (an entry not done
+# when close is present), ledger-plan-fewer-commit-rows (fewer
+# work-unit-commits ledger rows than plan entries) and ledger-plan-fewer-commits
+# (fewer close.commits entries than plan entries). ledger-plan-good and
+# ledger-plan-null are the two positives -- plan absent/null validates exactly
+# as a legacy sidecar always did (D-D).
+#
 # Runs known-NEGATIVE fixtures FIRST (must exit 1) and known-EXIT-2 fixtures
 # next (must exit 2 -- usage/parse failures that prevent validation from
 # running at all, never a shape violation), THEN known-POSITIVE fixtures LAST
@@ -463,6 +481,21 @@ assert_violation_count "receipt-degenerate-root-absolute-file-still-checked (gen
 assert_exit "receipt-findings-addressed-id-not-string" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-id-not-string.json" "$REPO_ROOT"
 assert_exit "receipt-overrides-unknown-id" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-overrides-unknown-id.json" "$REPO_ROOT"
 
+# --- ledger `plan[]` calibration (NINTH exception above): each negative
+#     fixture isolates to exactly one rule -- assert_violation_count pins both
+#     the exit code and the single VIOLATION line, proving calibration
+#     isolation the same way the degenerate-root short-circuit assertions do. ---
+
+assert_violation_count "ledger-plan-not-list" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-not-list.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-entry-not-object" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-entry-not-object.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-n-gap" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-n-gap.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-n-not-int" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-n-not-int.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-title-empty" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-title-empty.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-done-not-bool" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-done-not-bool.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-not-done-at-close" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-not-done-at-close.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-fewer-commit-rows" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-fewer-commit-rows.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-fewer-commits" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-fewer-commits.json" "$REPO_ROOT"
+
 # --- Known-positive fixtures LAST: each must exit 0. ---
 
 assert_exit "receipt-good" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-good.json" "$REPO_ROOT"
@@ -492,6 +525,13 @@ assert_exit "ledger-inline-closures-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledge
 #     since it is NFD/NFD and already byte-identical). ---
 
 assert_exit "ledger-inline-closures-mixed-nfd-nfc" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-mixed-nfd-nfc.json" "$REPO_ROOT"
+
+# --- ledger `plan[]` positives: plan absent OR explicit null validates
+#     exactly as a legacy sidecar always did (D-D); ledger-plan-good.json is a
+#     fully populated, all-done plan consistent with its ledger/close rows. ---
+
+assert_exit "ledger-plan-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-good.json" "$REPO_ROOT"
+assert_exit "ledger-plan-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-null.json" "$REPO_ROOT"
 
 echo ""
 if (( fail_count > 0 )); then

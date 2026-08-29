@@ -285,8 +285,9 @@ findings_addressed:        # optional — orchestrator-authored addendum for an 
 The orchestrator maintains this sidecar next to a Brief File — `.ai-team/briefs/YYYY-MM-DD-
 <slug>.json`, same slug as the `.md` Brief File — mirroring the `## Cost Ledger` table and
 `## Close` section byte-for-byte in field meaning (`orchestrator-protocol.md` → Task Brief →
-"Brief File (durable copy)"). No delegated skill writes this file; it is orchestrator-authored
-only, exactly like the Brief File itself.
+"Brief File (durable copy)"), kept in sync at every ledger append, at every `## Plan` approval
+or `## Phases` checkbox change, and at the `## Close` write. No delegated skill writes this
+file; it is orchestrator-authored only, exactly like the Brief File itself.
 
 ```json
 {
@@ -301,9 +302,18 @@ only, exactly like the Brief File itself.
     "inline_closures": [
       { "receipt": "<repo-relative path to a receipt .json sidecar>", "finding_ids": ["F-1", "..."] }
     ]
-  }
+  },
+  "plan": [
+    { "n": 1, "title": "<one line>", "done": true }
+  ]
 }
 ```
+
+`plan` is OPTIONAL and a top-level sibling of `ledger`/`close`, not nested under either — the
+machine-checkable mirror of the `.md` Brief File's `## Plan` (the entry list) and `## Phases`
+(the `done` flags): `done` mirrors that entry's `## Phases` checkbox. Absent or explicit `null`
+means "not recorded" — a Small task's single-entry plan, or any Brief File written before this
+field existed, validates exactly as it always did (D-D).
 
 `close` is written only once `status` flips to `done` (mirrors the `.md` file's `## Close`
 section — absent while the task is `active`/`paused`) — and the gate below has exactly one
@@ -344,6 +354,22 @@ a future change to `validate_ledger` updates this list in the same commit):
   entry that is not a non-empty string (including a non-hashable JSON array/object) is its own
   VIOLATION and is simply excluded from the coverage comparison — never a crash, never escalated
   to exit 2.
+- `plan` is OPTIONAL — absent OR explicit `null` means not recorded; every ledger sidecar
+  written before this field existed validates exactly as it always did (this doc follows the
+  code, never the reverse — a future change to `_check_plan` updates this list in the same
+  commit). When present it must be a list; every entry must be an object. Each entry's `n` must
+  be a strict integer forming the sequence 1..N in order (entry `i` has `n == i + 1` — a gap, a
+  repeat, a wrong start, or an out-of-order value is ONE violation naming the entry); `title`
+  must be a non-empty string; `done` must be a strict boolean (`isinstance(v, bool)` —
+  `"yes"`/`1`/`0` are violations, never coerced).
+- When `close` is present as an object (the gate's one prescribed invocation, immediately
+  before the `status:done` flip): every `plan` entry's `done` must be `true` (each `false` entry
+  is its own violation naming the entry); the count of `ledger` rows whose `agent` is EXACTLY
+  `"work-unit-commits"` must be ≥ `plan`'s entry count; and, when `close.commits` is a list, its
+  length must be ≥ `plan`'s entry count too — one brief, one commit. Before `close` (absent or
+  not an object) none of these three run. Every `plan` check is a pure shape/arithmetic check
+  over already-parsed JSON — NO FILESYSTEM ACCESS, run unconditionally regardless of the
+  degenerate-root rule above.
 
 ## Rules
 

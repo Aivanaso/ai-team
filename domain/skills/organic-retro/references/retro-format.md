@@ -63,6 +63,10 @@ written yet).
   section, so a legacy Brief File's `## Amendments` narrative is prose, not a ledger figure —
   `organic-retro/SKILL.md`'s own rule against estimating applies here exactly as everywhere
   else in this file.
+- **Plan size and completion**: when the sidecar carries `plan` (`_shared/result-envelope.md` →
+  Brief File Ledger JSON sidecar), render "plan: N briefs, M done" from its entries; when the
+  sidecar exists but has no `plan`, or no sidecar exists, render "plan: not recorded in the
+  ledger sidecar" and nothing else — never estimate it from the `.md` `## Plan` prose.
 - **Totals**: sum only the ledger's own token/duration/agent-count columns.
 
 ## Watch-items for the next task

@@ -1,0 +1,61 @@
+{
+  "ledger": [
+    {
+      "n": 1,
+      "agent": "organic-implementer",
+      "model": "sonnet",
+      "tokens": 50000,
+      "tool_uses": 12,
+      "duration_s": 300,
+      "outcome": "ok"
+    },
+    {
+      "n": 2,
+      "agent": "work-unit-commits",
+      "model": "sonnet",
+      "tokens": 5000,
+      "tool_uses": 3,
+      "duration_s": 60,
+      "outcome": "ok"
+    },
+    {
+      "n": 3,
+      "agent": "organic-implementer",
+      "model": "sonnet",
+      "tokens": 50000,
+      "tool_uses": 12,
+      "duration_s": 300,
+      "outcome": "ok"
+    },
+    {
+      "n": 4,
+      "agent": "work-unit-commits",
+      "model": "sonnet",
+      "tokens": 5000,
+      "tool_uses": 3,
+      "duration_s": 60,
+      "outcome": "ok"
+    }
+  ],
+  "close": {
+    "delegations": 4,
+    "subagent_tokens": 110000,
+    "commits": [
+      "a1b2c3d",
+      "e4f5a6b"
+    ],
+    "re_briefs": 0
+  },
+  "plan": [
+    {
+      "n": 1,
+      "title": "Add billing export endpoint",
+      "done": false
+    },
+    {
+      "n": 2,
+      "title": "Wire billing export into the API router",
+      "done": true
+    }
+  ]
+}

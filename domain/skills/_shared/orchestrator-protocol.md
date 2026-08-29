@@ -133,7 +133,7 @@ wherever the two conflict:
 4. Each plan entry carries a title plus the three elements named in the `## Plan` template below: behavior + demonstrating check, contract left to the next brief, decisions taken.
 5. Chaining: brief N's contract enters brief N+1's `constraints` verbatim, and brief N's created/modified files are named in brief N+1's orientation as already existing — the reviewer of brief N verifies the contract exists before brief N+1 is composed. When brief N had no reviewer (a tier 0 candidate, or the review plane switched off), the orchestrator itself confirms the contract exists with an executed check — recorded in the Brief File's Amendments — before composing brief N+1, mirroring the no-discovery fallback (**Task Brief** below).
 6. Expansion is mechanical: behavior → `objective`; demonstrating check → `acceptance_checks`; inherited contract + decisions → `constraints`; scope → `expected_files`/`allowed_edit_roots` per the Scope Verification Checklist — nothing is invented between plan and brief.
-7. Approval: `normal` gear = the user approves each brief before its delegation — the checkpoint after brief N's commit presents brief N+1 for approval; `fast-forward` = one approval of the whole `## Plan`, then the briefs chain (**Execution gears** below); Small = a single-entry plan with no added ceremony.
+7. Approval: `normal` gear = the user approves each brief before its delegation — the checkpoint after brief N's commit presents brief N+1 for approval; `fast-forward` = one approval of the DEFINITIVE `## Plan` — after adoption when a discovery pass ran — then the briefs chain (**Execution gears** below); Small = a single-entry plan with no added ceremony.
 8. Authorship: the orchestrator composes the plan for Small and Medium from its own reading and closes the checklist itself; for Large, when a discovery pass ran, the scout's `plan_proposal` (`organic-scout`'s Output Contract, inside `scope_proposal`) is the SOURCE of `## Plan`: the orchestrator verifies every entry — its demonstrating check per Scope Verification Checklist item 3 (runnable, or failing today for the named reason), plus two plan-specific criteria the checklist does not carry: each file exists or cites its insertion site, and `files` ⊆ `expected_files` — and copies it in; it does not recompose the slices from its own reading. A pass that returns no `plan_proposal` (an older installed scout) routes to the no-discovery branch: the orchestrator composes `## Plan` itself from the discovery report and records the gap in the Brief File's Amendments.
 
 ### After classification
@@ -141,7 +141,7 @@ wherever the two conflict:
 For **Small** implementation tasks: a trivial mechanical edit goes inline per the trivial-edit floor, no delegation; otherwise delegate directly to `organic-implementer` with a minimal Task Brief — no plan gate — and review the returned envelope per **Organic Delegation Route → What comes back**.
 
 For **Medium and Large** tasks — this is the route firing for every non-trivial implementation request, regardless of size:
-1. Get user approval of the plan's first brief (normal gear) or of the whole plan (fast-forward) — and, for Large, of the optional discovery pass.
+1. Get user approval of the plan's first brief (normal gear) or of the whole plan (fast-forward) — and, for Large, of the optional discovery pass; when that pass is accepted, the plan approval (first brief or whole plan) moves to step 3, after adoption, and the gate approves only the discovery pass.
 2. Exit plan mode.
 3. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected — unless a read-only scout pass was already hosted inside plan mode (**Harness coexistence** above), whose returned proposal enters here the same way; on return, verify the proposal per the **Scope Verification Checklist** below and adopt it as the brief's `expected_files`/`acceptance_checks`; adopt its `plan_proposal` into `## Plan` (Plan of briefs point 8) and re-present the plan for approval — brief 1 in normal gear, the whole plan in fast-forward — before step 4.
 4. **Delegate implementation — this is the default.** Compose a Task Brief (see **Task Brief** below) by expanding the approved `## Plan` entry (Plan of briefs above) and delegate to `organic-implementer`. Implementing inline on your own turn requires an explicit user override in the vocabulary of the User Override section: "no subagents" / "hazlo tú" / "do it yourself".
@@ -160,8 +160,10 @@ stops for the user.
   the user stops, per size. No rule changes; this only names the default gear.
 - **`fast-forward`**: entered ONLY on explicit user request ("fast-forward", "tira hasta el
   final") or a one-time confirmation of a well-structured ticket. After ONE confirmation of the
-  whole `## Plan`, every brief of the plan executes chained to completion — no per-brief
-  approval stop, no contract-approval pause. Unchanged: the review plane runs FULLY intact (Evidence-Tier Review,
+  DEFINITIVE `## Plan` — for a Large task with an accepted discovery pass, the plan re-presented
+  after adopting the scout's `plan_proposal`, the gate itself having approved only the discovery
+  pass — every brief of the plan executes chained to completion — no per-brief approval stop,
+  no contract-approval pause. Unchanged: the review plane runs FULLY intact (Evidence-Tier Review,
   receipts, re-briefs, the amendment channel, every budget); public contracts and the Scope
   Verification Checklist still apply at composition; Brief File checkboxes are still marked per
   group, so the user can interrupt at any group boundary and the task pauses cleanly.
@@ -325,7 +327,7 @@ One brief = one repo = one worker. For a change spanning more than one repositor
 
 #### Brief File (durable copy)
 
-The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the SESSION project root (the repo the orchestrator session opened in), never one per target repo. A cross-repo task (**Multi-repo lane rule** above) still keeps exactly one Brief File there: each per-repo Task Brief block already records its own `target_repo`, and gains its own `base_ref` line whenever it differs from the frontmatter's (frontmatter `base_ref` names the primary/first repo's). The Cost Ledger and Close totals also live in a JSON sidecar at `.ai-team/briefs/YYYY-MM-DD-<slug>.json` — same slug — kept in sync by the orchestrator at every ledger append and at the Close write; the `.md` file stays the human-readable narrative, the `.json` sidecar is what the structural check below reads. Brief Resume Check (Session Init) scans only the session project root. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
+The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the SESSION project root (the repo the orchestrator session opened in), never one per target repo. A cross-repo task (**Multi-repo lane rule** above) still keeps exactly one Brief File there: each per-repo Task Brief block already records its own `target_repo`, and gains its own `base_ref` line whenever it differs from the frontmatter's (frontmatter `base_ref` names the primary/first repo's). The Cost Ledger and Close totals also live in a JSON sidecar at `.ai-team/briefs/YYYY-MM-DD-<slug>.json` — same slug — kept in sync by the orchestrator at every ledger append, at every `## Plan` approval or `## Phases` checkbox change, and at the Close write; the `.md` file stays the human-readable narrative, the `.json` sidecar is what the structural check below reads. Brief Resume Check (Session Init) scans only the session project root. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
 
 ```markdown
 ---
@@ -338,13 +340,14 @@ base_ref: "<branch or commit the work builds on>"
 created_by: { tool: "<harness>", model: "<orchestrator model>" }
 ---
 ## Plan
-(definition only, never status: the task's briefs in execution order, one numbered entry each —
-title; the behavior it delivers and the runnable check/test that demonstrates it; the contract
-it leaves to the next brief — a signature, event, schema, or user-visible outcome the next brief
-may assume; the decisions already taken that the brief's `constraints` will carry. Composed at
-the Medium/Large gate, before any implementation delegation — for a Small task, which has no gate, at its first
-delegation, holding exactly one entry. Approval is recorded here as a one-line note per entry —
-approved brief by brief (normal) or once for the whole plan (fast-forward).)
+(definition only, never status: the task's briefs in execution order, one numbered entry
+each — title; the behavior it delivers and the runnable check/test that demonstrates it; the
+contract it leaves to the next brief — a signature, event, schema, or user-visible outcome
+the next brief may assume; the decisions already taken that the brief's `constraints` will
+carry. Composed at the Medium/Large gate, before any implementation delegation — for a Small
+task, which has no gate, at its first delegation, holding exactly one entry. Approval is
+recorded here as a one-line note per entry — approved brief by brief (normal) or once for
+the whole plan (fast-forward).)
 ## Task Brief
 (verbatim copy of every seven-element YAML block delegated for this task; one block per
 objective, appended as the task progresses; a cross-repo objective's block is preceded by a
@@ -390,22 +393,27 @@ Created when the plan is composed — at the Medium/Large gate, before any imple
 
 **Brief File structural check (orchestrator, before the status:done flip):** the orchestrator
 maintains a JSON sidecar next to the Brief File — `.ai-team/briefs/YYYY-MM-DD-<slug>.json`,
-same slug, updated at every Cost Ledger row append and at the `## Close` write — schema:
+same slug, updated at every Cost Ledger row append, at every `## Plan` approval or `## Phases`
+checkbox change, and at the `## Close` write — schema:
 `{ "ledger": [ {"n", "agent", "model", "tokens", "tool_uses", "duration_s", "outcome"} ],
-"close": {"delegations", "subagent_tokens", "commits", "re_briefs", "inline_closures"} }` (field
-names mirror the `## Cost Ledger` table and `## Close` prose exactly — `inline_closures` is
-OPTIONAL, present only when this objective recorded an inline closure (Evidence-Tier Review →
-Delta re-validation → "Inline closure"); the `.md` file remains the human-readable narrative,
-the `.json` sidecar is what the gate below reads). Before flipping `status` to `done`, run:
+"close": {"delegations", "subagent_tokens", "commits", "re_briefs", "inline_closures"},
+"plan": [ {"n", "title", "done"} ] }` (field names mirror the `## Cost Ledger` table and
+`## Close` prose exactly — `inline_closures` is OPTIONAL, present only when this objective
+recorded an inline closure (Evidence-Tier Review → Delta re-validation → "Inline closure");
+`plan` is OPTIONAL too — a top-level sibling of `ledger`/`close`, the machine-checkable mirror
+of `## Plan` + `## Phases`, absent or `null` for a task that never recorded one; the `.md` file
+remains the human-readable narrative, the `.json` sidecar is what the gate below reads). Before
+flipping `status` to `done`, run:
 
 ```
 python3 skills/_shared/scripts/check-receipt.py ledger {brief-file-path with .md replaced by .json} [project_root]
 ```
 
-Exit 0 → `delegations`, `subagent_tokens`, the `work-unit-commits` row, and every
-`close.inline_closures` entry (receipt on disk under the root, ids covered) are all confirmed
-consistent; flip to `done`. Exit 1 → fix the sidecar (or the `## Close` prose it mirrors) per
-the printed `VIOLATION` lines before flipping. Exit 2 → the sidecar could not be validated at all: missing on
+Exit 0 → `delegations`, `subagent_tokens`, the `work-unit-commits` row, every
+`close.inline_closures` entry (receipt on disk under the root, ids covered), and, when `plan` is
+present, its shape and its at-Close rules (every entry done; ≥ N work-unit-commits rows; ≥ N
+commits) are all confirmed consistent; flip to `done`. Exit 1 → fix the sidecar (or the
+`## Close`/`## Plan` prose it mirrors) per the printed `VIOLATION` lines before flipping. Exit 2 → the sidecar could not be validated at all: missing on
 disk (never written), unreadable, not valid UTF-8, a top-level JSON value that is not an
 object, or any other failure that stops validation before a shape check runs — read the single
 `ERROR` line, fix the sidecar (writing it from the Cost Ledger's own rows when it is missing),

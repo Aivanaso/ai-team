@@ -122,6 +122,27 @@ wrong extension) is likewise a VIOLATION (exit 1), never the exit-2
 catch-all. A degenerate project_root (see above) short-circuits this whole
 check before any cited receipt is opened -- the degenerate-root VIOLATION
 is recorded and no further filesystem access is attempted in ledger mode.
+
+plan: OPTIONAL on a ledger sidecar -- absent OR explicit null means "not
+recorded" (every ledger sidecar written before this field existed, or any
+Small task that never composed one, validates exactly as it always did).
+When present it must be a list of { n, title, done } objects: n is a strict
+integer forming the sequence 1..N in order (entry i has n == i+1 -- a gap, a
+repeat, a wrong start, or an out-of-order value is ONE violation naming the
+entry); title is a non-empty string; done is a strict boolean
+(isinstance(v, bool) -- "yes"/1/0 are violations, never coerced). This is a
+pure mirror of the Brief File's `## Plan` (the list) and `## Phases` (the
+done flags) -- the .md sections stay authoritative, this field is only what
+a script can check without parsing prose. THREE further invariants apply
+only when close is present as an object (the gate's one prescribed
+invocation, immediately before the status:done flip): every entry's done
+must be true (each false entry is its own violation naming plan[i]); the
+count of ledger rows whose agent is EXACTLY WORK_UNIT_COMMITS_AGENT must be
+>= len(plan); and, when close.commits is a list, its length must be >=
+len(plan) too (one brief, one commit). Before close (absent or not an
+object) none of these three run. NO FILESYSTEM ACCESS: every plan check is a
+pure shape/arithmetic check over already-parsed JSON, run unconditionally --
+regardless of degenerate_root.
 """
 
 import argparse
@@ -723,6 +744,80 @@ def _check_inline_closures(close, project_root, violations):
                 )
 
 
+def _check_plan(data, ledger_rows, close, violations):
+    """Validate the OPTIONAL top-level `plan` field -- see the module
+    docstring's `plan` paragraph for the full contract. NO FILESYSTEM ACCESS:
+    every rule below is a pure shape/arithmetic check over already-parsed
+    JSON values, run unconditionally regardless of degenerate_root.
+
+    ledger_rows: the same `ledger` list validate_ledger already parsed (may
+    contain malformed rows -- those already produced their own violations
+    elsewhere; this function simply ignores any row that is not a dict when
+    counting work-unit-commits rows, never crashes on it).
+
+    close: data.get("close") as validate_ledger already computed it -- may be
+    None, a non-dict, or a dict. The at-Close invariants (every entry done;
+    enough work-unit-commits rows; enough close.commits entries) run ONLY
+    when close is a dict; before close (absent or not an object) none of them
+    run, per D-C above.
+    """
+    plan = data.get("plan")
+    if plan is None:
+        return
+    if not isinstance(plan, list):
+        violations.append("plan must be a list when present")
+        return
+
+    close_is_dict = isinstance(close, dict)
+
+    for i, entry in enumerate(plan):
+        where = "plan[%d]" % i
+        if not isinstance(entry, dict):
+            violations.append("%s must be an object" % where)
+            continue
+
+        n = entry.get("n")
+        if not _is_strict_int(n):
+            violations.append("%s.n must be an integer (got %r)" % (where, n))
+        elif n != i + 1:
+            violations.append(
+                "%s.n must be %d -- plan entries must number 1..N in order (got %r)"
+                % (where, i + 1, n)
+            )
+
+        title = entry.get("title")
+        if not isinstance(title, str) or not title:
+            violations.append("%s.title must be a non-empty string" % where)
+
+        done = entry.get("done")
+        done_is_bool = isinstance(done, bool)
+        if not done_is_bool:
+            violations.append("%s.done must be a boolean (got %r)" % (where, done))
+        elif close_is_dict and not done:
+            violations.append(
+                "%s.done must be true -- close is present but this entry is not done" % where
+            )
+
+    if close_is_dict:
+        wuc_rows = sum(
+            1
+            for row in ledger_rows
+            if isinstance(row, dict) and row.get("agent") == WORK_UNIT_COMMITS_AGENT
+        )
+        if wuc_rows < len(plan):
+            violations.append(
+                "plan has %d entries but only %d work-unit-commits ledger row(s) (one brief, "
+                "one commit)" % (len(plan), wuc_rows)
+            )
+
+        commits = close.get("commits")
+        if isinstance(commits, list) and len(commits) < len(plan):
+            violations.append(
+                "plan has %d entries but close.commits has only %d entries (one brief, one "
+                "commit)" % (len(plan), len(commits))
+            )
+
+
 def validate_ledger(data, project_root="."):
     violations = []
 
@@ -828,6 +923,11 @@ def validate_ledger(data, project_root="."):
         # cited receipt against an unbounded root (SEC F-5).
         if not degenerate_root:
             _check_inline_closures(close, project_root, violations)
+
+    # _check_plan runs unconditionally, regardless of degenerate_root -- every
+    # plan rule is a pure shape/arithmetic check over already-parsed JSON, no
+    # filesystem access at all (D-B).
+    _check_plan(data, ledger, close, violations)
 
     return violations, []
 
