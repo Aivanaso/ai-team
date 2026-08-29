@@ -54,7 +54,55 @@ treated as a full receipt.
 project_root: must not resolve to the filesystem root -- containment against
 "/" is a tautology, so a degenerate project_root is itself a VIOLATION. This
 rule applies identically in ledger mode, against ledger mode's own
-project_root argument.
+project_root argument. In receipt mode, a degenerate project_root ALSO
+short-circuits the on-disk resolution+existence half of every per-finding
+file-containment probe (lenses.*.findings[].file) -- mirroring ledger mode's
+own close.inline_closures short-circuit below -- so a degenerate root can
+never be used as an unbounded on-disk existence oracle (does this
+absolute/traversal path exist anywhere on the filesystem?) via a finding's
+file citation. The pure-string os.path.isabs rejection on that same field is
+NOT part of the skipped probe -- it touches no filesystem, so it keeps
+running even under a degenerate root (REV F-5): an absolute citation under
+project_root "/" still produces its own violation alongside the
+degenerate-root one (2 total). Every other per-finding shape check (id,
+severity, confidence, evidence, line, claim, trigger) and every receipt-level
+shape check (kind, lenses, duplicate ids, overrides, findings_addressed,
+verdict_history) still runs under a degenerate root, exactly as before --
+only the on-disk resolution+existence walk is skipped.
+
+findings_addressed[].finding_id cross-check (F-7): UNCONDITIONAL for every
+receipt that declares findings_addressed (full, delta, and fragment alike).
+An entry's finding_id must be a non-empty string -- a missing, null, empty,
+blank, or non-string value (e.g. a JSON number) is "finding_id must be a
+non-empty string" and never reaches the cross-check below (SEC F-1: this
+single predicate replaces what used to be a separate truthy-only "is
+required" check, which a truthy non-string id like 42 could pass while also
+skipping the cross-check entirely). A finding_id that IS a non-empty string,
+after Unicode NFC normalization, must match the NFC-normalized id of some
+finding in lenses.correctness.findings[] OR lenses.security.findings[] of the
+SAME receipt document -- else "finding_id %r not found in
+lenses.*.findings[].id". "Not found" is emitted ONLY when the id is absent
+entirely from both lenses -- an id that IS present but whose finding failed
+its own severity-enum check is never confused with an absent id (REV F-4:
+known_findings membership, not a None-valued lookup, is the discriminator). A
+finding_id that DOES resolve but names a CRITICAL finding is also a
+VIOLATION -- "finding_id %r names a CRITICAL finding -- inline closure is not
+permitted" -- CRITICAL findings are never eligible for the mechanical
+inline-closure path.
+
+overrides[].finding_id / overrides[].finding_ids[] cross-check (SEC F-4):
+whichever form is present on an override entry is cross-checked (after the
+same NFC normalization and non-empty-string filter) against the SAME
+known_findings map F-7 uses above. An id absent from both lenses is
+"overrides[i].finding_id %r not found in lenses.*.findings[].id" (or the
+finding_ids[j] analogue for the bulk form). Severity is deliberately NOT
+examined here -- an override naming a CRITICAL finding is governed by
+work-unit-commits' Decision Gates (work-unit-commits/SKILL.md, the
+"verdict: review-blocked AND overrides lacks a singular finding_id entry
+naming EVERY blocking CRITICAL" row), not this validator. An entry whose id is
+non-string, or whose finding_ids is not a list, has no shape violation
+defined for that malformation today (unchanged, out of scope for this lot) --
+it is simply excluded from this cross-check, never crashes it.
 
 close.inline_closures: OPTIONAL on a ledger sidecar's close object -- absent
 OR explicit null means no inline closures happened (every legacy sidecar
@@ -133,8 +181,22 @@ def _check_containment(project_root, file_field):
     return True, None
 
 
-def _check_finding(where, finding, project_root, violations):
-    """Validate one finding object. Returns (id, severity) -- either may be None."""
+def _check_finding(where, finding, project_root, violations, skip_containment=False):
+    """Validate one finding object. Returns (id, severity) -- either may be None.
+
+    skip_containment (F-6): when the caller has already determined project_root
+    is degenerate (validate_receipt's own root check), the on-disk resolution+
+    existence half of the file-containment probe below is skipped -- it is the
+    one sub-check that touches the filesystem, and running it against a
+    degenerate root turns "does this finding's file exist" into an unbounded
+    on-disk existence oracle (any absolute/traversal path resolves "contained"
+    once the root is "/"). The pure-string os.path.isabs rejection on the same
+    `file` field is NOT gated by skip_containment (REV F-5) -- it touches no
+    filesystem, so it keeps running even under a degenerate root. Every other
+    field on the finding (id, severity, confidence, evidence, line, claim,
+    trigger) is likewise a pure shape check and keeps running regardless --
+    mirrors validate_ledger's own short-circuit, scoped to the one on-disk
+    probe."""
     if not isinstance(finding, dict):
         violations.append("%s must be an object" % where)
         return None, None
@@ -165,7 +227,14 @@ def _check_finding(where, finding, project_root, violations):
     file_field = finding.get("file")
     if not isinstance(file_field, str) or not file_field:
         violations.append("%s.file must be a non-empty string" % where)
-    else:
+    elif os.path.isabs(file_field):
+        # REV F-5: a pure string check -- touches no filesystem, so it is NOT
+        # part of the on-disk probe skip_containment guards below and keeps
+        # running even under a degenerate root.
+        violations.append(
+            "%s.file %r: absolute paths are not permitted as citations" % (where, file_field)
+        )
+    elif not skip_containment:
         ok, reason = _check_containment(project_root, file_field)
         if not ok:
             violations.append("%s.file %r: %s" % (where, file_field, reason))
@@ -189,16 +258,20 @@ def _check_finding(where, finding, project_root, violations):
     return fid, severity
 
 
-def _check_lens(lens_name, lenses, project_root, violations):
-    """Walk one lens ('correctness' or 'security'). Returns (ids, any_critical)."""
+def _check_lens(lens_name, lenses, project_root, violations, skip_containment):
+    """Walk one lens ('correctness' or 'security'). Returns (ids, any_critical,
+    id_severities) -- id_severities is a list of (id, severity) pairs for every
+    finding with a valid id, used by the findings_addressed cross-check (F-7)
+    to know each candidate id's severity without re-walking the findings."""
     ids = []
+    id_severities = []
     any_critical = False
     lens = lenses.get(lens_name)
     if lens is None:
-        return ids, any_critical
+        return ids, any_critical, id_severities
     if not isinstance(lens, dict):
         violations.append("lenses.%s must be an object" % lens_name)
-        return ids, any_critical
+        return ids, any_critical, id_severities
 
     status = lens.get("status")
     if status not in ("pass", "findings"):
@@ -213,9 +286,10 @@ def _check_lens(lens_name, lenses, project_root, violations):
 
     for i, finding in enumerate(findings):
         where = "lenses.%s.findings[%d]" % (lens_name, i)
-        fid, severity = _check_finding(where, finding, project_root, violations)
+        fid, severity = _check_finding(where, finding, project_root, violations, skip_containment)
         if fid:
             ids.append(fid)
+            id_severities.append((fid, severity))
         if severity == "CRITICAL":
             any_critical = True
 
@@ -227,7 +301,7 @@ def _check_lens(lens_name, lenses, project_root, violations):
     if status == "findings" and len(findings) == 0:
         violations.append("lenses.%s.status is 'findings' but findings is empty" % lens_name)
 
-    return ids, any_critical
+    return ids, any_critical, id_severities
 
 
 def _check_duplicate_ids(correctness_ids, security_ids, violations):
@@ -247,7 +321,13 @@ def _check_duplicate_ids(correctness_ids, security_ids, violations):
         violations.append("duplicate finding id (after Unicode normalization): %r" % dup)
 
 
-def _check_overrides(data, violations):
+def _check_overrides(data, violations, known_findings):
+    """known_findings: same {NFC-normalized id: severity} map F-7 uses
+    (validate_receipt) -- backs the SEC F-4 cross-check below for BOTH the
+    singular finding_id and the bulk finding_ids[] override forms. Severity
+    is deliberately not examined here: an override naming a CRITICAL finding
+    is governed by work-unit-commits' Decision Gates (work-unit-commits/SKILL.md),
+    not this validator."""
     overrides = data.get("overrides")
     if overrides is None:
         return
@@ -267,8 +347,37 @@ def _check_overrides(data, violations):
         if not isinstance(justification, str) or not justification.strip():
             violations.append("%s.justification must be a non-empty string" % where)
 
+        # SEC F-4: cross-check whichever single form is present against
+        # known_findings. A non-string id, or a non-list finding_ids, has no
+        # shape violation defined for it today (unchanged, out of scope for
+        # this lot) -- it is simply excluded from this cross-check rather
+        # than crashing it.
+        if has_single and not has_bulk:
+            finding_id = entry.get("finding_id")
+            if isinstance(finding_id, str) and finding_id.strip():
+                key = unicodedata.normalize("NFC", finding_id)
+                if key not in known_findings:
+                    violations.append(
+                        "%s.finding_id %r not found in lenses.*.findings[].id" % (where, finding_id)
+                    )
+        elif has_bulk and not has_single:
+            finding_ids = entry.get("finding_ids")
+            if isinstance(finding_ids, list):
+                for j, fid in enumerate(finding_ids):
+                    if isinstance(fid, str) and fid.strip():
+                        key = unicodedata.normalize("NFC", fid)
+                        if key not in known_findings:
+                            violations.append(
+                                "%s.finding_ids[%d] %r not found in lenses.*.findings[].id"
+                                % (where, j, fid)
+                            )
 
-def _check_findings_addressed(data, violations):
+
+def _check_findings_addressed(data, violations, known_findings):
+    """known_findings: {NFC-normalized id: severity} built from BOTH lenses
+    (validate_receipt) -- backs the F-7 cross-check below. F-7 is
+    UNCONDITIONAL: it runs for every findings_addressed entry that carries a
+    finding_id string, regardless of receipt kind (full/delta/fragment)."""
     entries = data.get("findings_addressed")
     if entries is None:
         return
@@ -280,8 +389,28 @@ def _check_findings_addressed(data, violations):
         if not isinstance(entry, dict):
             violations.append("%s must be an object" % where)
             continue
-        if not entry.get("finding_id"):
-            violations.append("%s.finding_id is required" % where)
+        finding_id = entry.get("finding_id")
+        if not (isinstance(finding_id, str) and finding_id.strip()):
+            # SEC F-1: one predicate rejects missing, null, empty, blank, and
+            # non-string (e.g. a JSON number) finding_id alike -- this merges
+            # what used to be a separate truthy-only "is required" check,
+            # which a truthy non-string id (e.g. 42) could pass while also
+            # skipping the F-7 cross-check below entirely.
+            violations.append("%s.finding_id must be a non-empty string" % where)
+        else:
+            key = unicodedata.normalize("NFC", finding_id)
+            if key not in known_findings:
+                # REV F-4: membership, not a None-valued lookup -- an id that
+                # IS present but whose finding failed its own severity-enum
+                # check must never be reported as "not found".
+                violations.append(
+                    "%s.finding_id %r not found in lenses.*.findings[].id" % (where, finding_id)
+                )
+            elif known_findings[key] == "CRITICAL":
+                violations.append(
+                    "%s.finding_id %r names a CRITICAL finding -- inline closure is not permitted"
+                    % (where, finding_id)
+                )
         files = entry.get("files")
         if not isinstance(files, list) or len(files) == 0:
             violations.append("%s.files must be a non-empty list" % where)
@@ -329,7 +458,8 @@ def validate_receipt(data, project_root):
     infos = []
 
     real_root = os.path.realpath(project_root)
-    if real_root == os.path.abspath(os.sep) or not os.path.isdir(real_root):
+    degenerate_root = real_root == os.path.abspath(os.sep) or not os.path.isdir(real_root)
+    if degenerate_root:
         violations.append(
             "project_root %r resolves to %r -- must be an existing directory other than the "
             "filesystem root (containment against the root is a tautology)" % (project_root, real_root)
@@ -374,14 +504,25 @@ def validate_receipt(data, project_root):
                 "lenses.correctness is required unless the top-level kind: \"security-fragment\" is declared"
             )
 
-    correctness_ids, any_critical_correctness = (
-        _check_lens("correctness", lenses, project_root, violations) if correctness_valid else ([], False)
+    correctness_ids, any_critical_correctness, correctness_severities = (
+        _check_lens("correctness", lenses, project_root, violations, degenerate_root)
+        if correctness_valid else ([], False, [])
     )
-    security_ids, any_critical_security = (
-        _check_lens("security", lenses, project_root, violations) if security_valid else ([], False)
+    security_ids, any_critical_security, security_severities = (
+        _check_lens("security", lenses, project_root, violations, degenerate_root)
+        if security_valid else ([], False, [])
     )
 
     _check_duplicate_ids(correctness_ids, security_ids, violations)
+
+    # F-7: known_findings maps each valid finding id (NFC-normalized) to its
+    # severity, across BOTH lenses -- the union findings_addressed[].finding_id
+    # must resolve against. Last-writer-wins on an id collision is acceptable
+    # here: a genuine id collision across lenses is already its own
+    # duplicate-id violation above, so this map is never the sole signal.
+    known_findings = {}
+    for fid, severity in correctness_severities + security_severities:
+        known_findings[unicodedata.normalize("NFC", fid)] = severity
 
     verdict = data.get("verdict")
 
@@ -472,8 +613,8 @@ def validate_receipt(data, project_root):
                     violations.append("not_reverified[%d] must be a non-empty string" % i)
 
     _check_verdict_history(data, violations)
-    _check_overrides(data, violations)
-    _check_findings_addressed(data, violations)
+    _check_overrides(data, violations, known_findings)
+    _check_findings_addressed(data, violations, known_findings)
 
     return violations, infos
 
@@ -556,7 +697,12 @@ def _check_inline_closures(close, project_root, violations):
             for fa in addressed:
                 if isinstance(fa, dict):
                     fid = fa.get("finding_id")
-                    if isinstance(fid, str) and fid:
+                    # Same "empty id" predicate as the ledger side's own
+                    # finding_ids[] check above (isinstance + .strip()) --
+                    # behaviour-neutral for every entry reachable today, since
+                    # a finding_id that is a non-empty string but all
+                    # whitespace was never a legitimate id either way.
+                    if isinstance(fid, str) and fid.strip():
                         covered_ids.add(unicodedata.normalize("NFC", fid))
 
         # Membership test restricted to entries already validated as non-empty

@@ -659,7 +659,9 @@ anyway once (1) holds; (3) the closure touches ONLY files already in the receipt
 all three hold, the orchestrator MAY close the findings inline. **Seniority carve-out:** it
 re-runs ONLY the receipt's already-named verification gates itself to evidence the closure
 (`common-rules.md` → Principle 4 Boundary cell names this exception) — every other execution
-stays delegated. It records a `findings_addressed` addendum in the receipt: one entry per
+stays delegated. It records a `findings_addressed` addendum in the receipt whose lens emitted
+the finding — the correctness sidecar for a correctness finding, the `kind: security-fragment`
+sidecar for a security finding — never the other one; `finding_id` resolves against that same document's own `lenses.*.findings[].id`, never across sidecars. The eligibility precondition ("verdict already `review-clear`") is read from the correctness receipt's top-level `verdict` — the combined tier-2 verdict — for BOTH sidecars, since a fragment carries none of its own. One entry per
 finding closed — `finding_id`, the REQUIRED `files` list (repo-relative paths the closure
 touched, every one inside the receipt's `group_files`), `fix_evidence` (exact `path:line` or
 command-output digest), and `gate_results` (schema: `result-envelope.md` → Review Receipt) — an
@@ -857,7 +859,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `review_reports` | the task's on-disk review-report paths, read from the Brief File's receipt records | organic-retro (retro mode) | always in retro mode (may be an empty list; unreadable entries are noted in the skill's `risks`) |
 | `source_material` | the correction/friction context conventions are drawn from | organic-retro (conventions mode) | always in conventions mode — absent → the skill returns `needs_input` |
 | `tier` / `tier_reason` | Evidence-Tier Review classifier | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits |
-| Review Receipt | `organic-reviewer`'s returned receipt (schema: `result-envelope.md` → Review Receipt) | work-unit-commits | verbatim, when `tier >= 1` — the receipt gate `work-unit-commits` enforces reads this injection |
+| Review Receipt | `organic-reviewer`'s returned receipt (schema: `result-envelope.md` → Review Receipt) | work-unit-commits | verbatim, when `tier >= 1` — the receipt gate `work-unit-commits` enforces reads this injection
 
 Inject all fields from the table above as a `## Injected Context (from orchestrator)` block at the top of the delegation prompt. The sub-agent treats this block as the source of truth for paths and flags — it does NOT re-derive them from disk.
 

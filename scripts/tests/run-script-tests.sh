@@ -33,9 +33,9 @@
 # the rule under test. Every negative ledger-inline-closures-*.json fixture
 # still isolates to exactly one rule (calibration isolation) by keeping this
 # sibling-fixture receipt reference valid except in the fixtures whose rule
-# under test IS the receipt reference or the coverage check itself
+# under test lives in the coverage comparison itself
 # (ledger-inline-closures-{missing-receipt,id-not-covered,unhashable-id,receipt-not-string,
-# receipt-not-object,receipt-not-json,receipt-not-json-ext}.json).
+# id-not-string,receipt-not-object,receipt-not-json,receipt-not-json-ext}.json).
 #
 # FOURTH exception, extended (re-brief): two more citation classes reuse
 # existing or new sibling fixtures where the rule under test IS the cited
@@ -49,9 +49,68 @@
 # extension), isolates the ".json"-extension rule in
 # ledger-inline-closures-receipt-not-json-ext.json -- it is a `.txt` file
 # deliberately, since the rule under test IS the extension itself.
-# receipt-findings-addressed-nfc-id.json is a further sibling (NFC-composed
-# finding_id) isolating the Unicode-normalization rule in
-# ledger-inline-closures-nfc-id.json.
+# receipt-findings-addressed-nfc-id.json is a further sibling (NFD-decomposed
+# finding_id -- "e" + combining acute U+0301, not the precomposed U+00E9)
+# isolating the Unicode-normalization rule in ledger-inline-closures-nfc-id.json.
+#
+# FIFTH exception (F-6 receipt-mode degenerate-root short-circuit,
+# receipt-degenerate-root-single-violation.json): cites a guaranteed-absent
+# path (domain/skills/does-not-exist-anywhere-degenerate.xyz) so that running
+# it against a HEALTHY root produces a second (containment) violation, while
+# the degenerate-root short-circuit keeps a degenerate-root run at exactly
+# one violation -- the same distinguishing shape as the ledger-mode
+# short-circuit fixture below (SEC F-5), mirrored on the receipt side (F-6).
+#
+# SIXTH exception (F-7 findings_addressed cross-check, and the new
+# receipt-citation containment fixtures for close.inline_closures[].receipt):
+# receipt-findings-addressed-unknown-id.json and
+# -critical-id.json are full valid receipts whose findings_addressed[0]
+# cites, respectively, an id absent from both lenses and a CRITICAL finding's
+# id -- each isolates to exactly the one new F-7 violation it names.
+# receipt-findings-addressed-nfc-composed-id.json is a further sibling, cited
+# only from ledger-inline-closures-mixed-nfd-nfc.json (never receipt-validated
+# directly): its finding_id is genuinely NFC-precomposed (U+00E9), pairing
+# with that ledger fixture's NFD-decomposed (U+0301) id to exercise BOTH
+# normalization call sites at once -- the pre-existing nfc-id pair below is
+# NFD on both sides (byte-identical already), so it alone would still match
+# even with normalization removed entirely; this mixed pair is what actually
+# proves the normalization calls are load-bearing.
+#
+# SEVENTH exception (REV F-1/F-8/F-6, re-brief 1/2 -- close.inline_closures[].
+# receipt containment, all THREE shapes now GENERATED at test time, no static
+# fixture): the prior static fixtures cited a fixed, never-created
+# /tmp path, so deleting _check_containment fell through to FileNotFoundError
+# -- which still appends ONE violation, hiding the mutant the absolute and
+# traversal assertions exist to catch (REV F-1 CRITICAL: "1/76 red" instead of
+# 3/76). ESCAPE_TARGET (below) is a single covering receipt this runner writes
+# once into TMP_WORKDIR (never a fixed/predictable path -- REV F-8) with a
+# findings_addressed entry covering "F-1"; all three escape shapes cite THIS
+# SAME file, generated as a ledger JSON via _build_inline_closure_ledger(): an
+# absolute path to it (isabs guard), a REPO_ROOT-relative "../" chain reaching
+# it (os.path.relpath, traversal guard), and a symlink named escape-link.json
+# inside the throwaway FAKE_ROOT (built below for the receipt-mode symlink
+# case and reused here) pointing at it (symlink-escape guard). Because the
+# cited file genuinely exists, parses, and covers the closed id, deleting
+# _check_containment now makes all three fall through to a clean exit 0 (0
+# violations) -- the discriminating mutant REV F-1 asked for. No fixture ever
+# lives under scripts/tests/fixtures/ for these three shapes, and no symlink
+# is ever created inside the tracked fixtures directory (REV F-6): the ledger
+# JSON bodies and the symlink both live under TMP_WORKDIR / FAKE_ROOT, cleaned
+# up by the existing trap on TMP_WORKDIR alone -- no separate ESCAPE_LINK
+# variable or cleanup step is needed anymore.
+#
+# EIGHTH exception (SEC F-1, REV F-7, re-brief 1/2 -- findings_addressed[]
+# .finding_id and overrides[].finding_id/finding_ids[] type/identity
+# cross-checks): receipt-findings-addressed-id-not-string.json cites a
+# numeric (non-string) finding_id against a CRITICAL finding, isolating the
+# tightened "must be a non-empty string" predicate (which now also rejects a
+# truthy non-string id that used to dodge both the old "is required" check
+# and the F-7 cross-check in one move). receipt-overrides-unknown-id.json
+# cites an id absent from lenses.*.findings[].id via the singular
+# overrides[].finding_id form, isolating the new SEC F-4 cross-check (which
+# reuses the same known_findings map F-7 builds, and deliberately does not
+# examine severity -- that is the protocol's own F-9 gate, not this
+# validator's).
 #
 # Runs known-NEGATIVE fixtures FIRST (must exit 1) and known-EXIT-2 fixtures
 # next (must exit 2 -- usage/parse failures that prevent validation from
@@ -68,9 +127,12 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-VALIDATOR="$REPO_ROOT/domain/skills/_shared/scripts/check-receipt.py"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+# VALIDATOR_OVERRIDE lets a mutation probe point this suite at a scratchpad
+# COPY of check-receipt.py without touching the repo file -- never set in
+# normal use, where it defaults to the candidate validator in place.
+VALIDATOR="${VALIDATOR_OVERRIDE:-$REPO_ROOT/domain/skills/_shared/scripts/check-receipt.py}"
 FIXTURES="$SCRIPT_DIR/fixtures"
 
 TMP_WORKDIR="$(mktemp -d)"
@@ -84,7 +146,7 @@ assert_exit() {
   local label="$1" expected="$2"
   shift 2
   local out actual=0
-  out="$(mktemp)"
+  out="$(mktemp -p "$TMP_WORKDIR")"
   python3 "$@" >"$out" 2>&1 || actual=$?
   total=$((total + 1))
   if [[ "$actual" -eq "$expected" ]]; then
@@ -107,7 +169,7 @@ assert_violation_count() {
   local label="$1" expected_exit="$2" expected_count="$3"
   shift 3
   local out actual_exit=0 actual_count
-  out="$(mktemp)"
+  out="$(mktemp -p "$TMP_WORKDIR")"
   python3 "$@" >"$out" 2>&1 || actual_exit=$?
   actual_count="$(grep -c '^VIOLATION ' "$out" || true)"
   total=$((total + 1))
@@ -185,6 +247,21 @@ d["lenses"]["correctness"]["findings"][0]["file"] = "etc/passwd"
 json.dump(d, open(dst, "w"))
 PY
 assert_exit "receipt-degenerate-root (generated)" 1 "$VALIDATOR" receipt "$DEGENERATE_FILE" "/"
+
+# --- F-6 receipt-mode degenerate-root SHORT-CIRCUIT (mirrors ledger mode's
+#     own SEC F-5 short-circuit below): receipt-degenerate-root-single-
+#     violation.json cites a guaranteed-absent file. Under a degenerate root
+#     the per-finding containment probe never runs, so only the degenerate-
+#     root violation itself is printed (count 1); under a healthy root the
+#     probe DOES run and the guaranteed-absent citation fails it (still count
+#     1, but a DIFFERENT violation) -- assert_violation_count pins both
+#     shapes so a short-circuit that fired unconditionally (even under a
+#     healthy root) or not at all (even under "/") would turn one of these
+#     red. ---
+
+assert_violation_count "receipt-degenerate-root-single-violation (degenerate root)" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-degenerate-root-single-violation.json" "/"
+assert_violation_count "receipt-degenerate-root-single-violation (healthy root)" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-degenerate-root-single-violation.json" "$REPO_ROOT"
+
 assert_exit "receipt-not-reverified-garbage" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-not-reverified-garbage.json" "$REPO_ROOT"
 assert_exit "receipt-file-nul" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-file-nul.json" "$REPO_ROOT"
 assert_exit "receipt-verification-reason-with-entries" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-verification-reason-with-entries.json" "$REPO_ROOT"
@@ -202,6 +279,15 @@ assert_exit "receipt-findings-addressed-no-id" 1 "$VALIDATOR" receipt "$FIXTURES
 assert_exit "receipt-findings-addressed-empty-files" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-empty-files.json" "$REPO_ROOT"
 assert_exit "receipt-findings-addressed-no-evidence" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-no-evidence.json" "$REPO_ROOT"
 assert_exit "receipt-findings-addressed-no-gate" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-no-gate.json" "$REPO_ROOT"
+
+# --- F-7 findings_addressed[].finding_id cross-check (unconditional): the
+#     cited id must resolve, after NFC normalization, against the union of
+#     lenses.correctness/security findings[].id, and the resolved finding
+#     must not be CRITICAL. Each fixture is otherwise a full valid receipt
+#     isolating to exactly the one new violation. ---
+
+assert_exit "receipt-findings-addressed-unknown-id" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-unknown-id.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-critical-id" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-critical-id.json" "$REPO_ROOT"
 
 # --- ledger close.inline_closures[] calibration (new field): not-a-list,
 #     missing/unreadable receipt, finding_ids not covered by the cited
@@ -290,6 +376,93 @@ cat > "$FAKE_ROOT/receipt.json" <<'EOF'
 EOF
 assert_exit "receipt-symlink-escape (generated)" 1 "$VALIDATOR" receipt "$FAKE_ROOT/receipt.json" "$FAKE_ROOT"
 
+# --- F-6-style containment on close.inline_closures[].receipt itself (the
+#     citation slot, not the cited receipt's own content): absolute path,
+#     relative traversal, and a real symlink each escape project_root and
+#     must fail the SAME containment guard as receipt-mode file citations.
+#     REV F-1/F-8 (re-brief): all three cite ESCAPE_TARGET, a single covering
+#     receipt this runner writes into TMP_WORKDIR (never a fixed/predictable
+#     path) with a findings_addressed entry that covers "F-1" -- so a
+#     mutant that deletes _check_containment makes all three fall through to
+#     a REAL, parseable, covering receipt (0 violations, red) rather than a
+#     FileNotFoundError that would still (wrongly) count as 1 violation and
+#     hide the mutant. The symlink case reuses FAKE_ROOT (built above for the
+#     receipt-mode symlink test) rather than the tracked fixtures/ directory
+#     (REV F-6) -- no symlink is ever created outside TMP_WORKDIR. Each ledger
+#     body is generated at test time (SEVENTH exception above), never a
+#     static fixture; each fails by exactly one rule (calibration isolation);
+#     assert_violation_count pins the count at 1. ---
+
+ESCAPE_TARGET="$TMP_WORKDIR/escape-target.json"
+cat > "$ESCAPE_TARGET" <<'EOF'
+{"findings_addressed": [{"finding_id": "F-1"}]}
+EOF
+
+_build_inline_closure_ledger() {
+  # $1 = the close.inline_closures[0].receipt citation to embed, $2 = destination path.
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+receipt, dst = sys.argv[1:3]
+ledger = {
+    "ledger": [
+        {"n": 1, "agent": "organic-implementer", "model": "sonnet", "tokens": 50000, "tool_uses": 12, "duration_s": 300, "outcome": "ok"},
+        {"n": 2, "agent": "organic-reviewer", "model": "opus", "tokens": 30000, "tool_uses": 8, "duration_s": 200, "outcome": "review-clear"},
+        {"n": 3, "agent": "work-unit-commits", "model": "sonnet", "tokens": 5000, "tool_uses": 3, "duration_s": 60, "outcome": "ok"},
+    ],
+    "close": {
+        "delegations": 3,
+        "subagent_tokens": 85000,
+        "commits": ["a1b2c3d"],
+        "re_briefs": 0,
+        "inline_closures": [{"receipt": receipt, "finding_ids": ["F-1"]}],
+    },
+}
+json.dump(ledger, open(dst, "w"))
+PY
+}
+
+ABSOLUTE_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-absolute.json"
+_build_inline_closure_ledger "$ESCAPE_TARGET" "$ABSOLUTE_LEDGER"
+assert_violation_count "ledger-inline-closures-receipt-absolute (generated)" 1 1 "$VALIDATOR" ledger "$ABSOLUTE_LEDGER" "$REPO_ROOT"
+
+TRAVERSAL_RECEIPT_REL="$(python3 -c "import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))" "$ESCAPE_TARGET" "$REPO_ROOT")"
+TRAVERSAL_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-traversal.json"
+_build_inline_closure_ledger "$TRAVERSAL_RECEIPT_REL" "$TRAVERSAL_LEDGER"
+assert_violation_count "ledger-inline-closures-receipt-traversal (generated)" 1 1 "$VALIDATOR" ledger "$TRAVERSAL_LEDGER" "$REPO_ROOT"
+
+ln -sf "$ESCAPE_TARGET" "$FAKE_ROOT/escape-link.json"
+SYMLINK_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-symlink.json"
+_build_inline_closure_ledger "escape-link.json" "$SYMLINK_LEDGER"
+assert_violation_count "ledger-inline-closures-receipt-symlink (generated)" 1 1 "$VALIDATOR" ledger "$SYMLINK_LEDGER" "$FAKE_ROOT"
+
+# --- REV F-5 (re-brief): the os.path.isabs arm of findings[].file is a pure
+#     string check and must keep running under a degenerate root, unlike the
+#     filesystem-touching containment probe it used to live inside of --
+#     /etc/passwd under project_root "/" must print BOTH the degenerate-root
+#     violation AND the absolute-path violation (2 total), never just the
+#     one. No static fixture exists for this combination anywhere above
+#     (receipt-degenerate-root-single-violation.json cites a RELATIVE path,
+#     so isabs never fires there), so this is generated here to give the
+#     rule its own assertion. ---
+
+DEGENERATE_ABS_FILE="$TMP_WORKDIR/receipt-degenerate-abs.json"
+python3 - "$FIXTURES/receipt-good.json" "$DEGENERATE_ABS_FILE" <<'PY'
+import json, sys
+src, dst = sys.argv[1:3]
+d = json.load(open(src))
+d["lenses"]["correctness"]["findings"][0]["file"] = "/etc/passwd"
+json.dump(d, open(dst, "w"))
+PY
+assert_violation_count "receipt-degenerate-root-absolute-file-still-checked (generated)" 1 2 "$VALIDATOR" receipt "$DEGENERATE_ABS_FILE" "/"
+
+# --- SEC F-1 / REV F-4 findings_addressed[].finding_id predicate tightening,
+#     and SEC F-4 overrides[].finding_id cross-check (re-brief additions):
+#     each isolated to one fixture (calibration isolation, EIGHTH exception
+#     above). ---
+
+assert_exit "receipt-findings-addressed-id-not-string" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-id-not-string.json" "$REPO_ROOT"
+assert_exit "receipt-overrides-unknown-id" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-overrides-unknown-id.json" "$REPO_ROOT"
+
 # --- Known-positive fixtures LAST: each must exit 0. ---
 
 assert_exit "receipt-good" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-good.json" "$REPO_ROOT"
@@ -302,11 +475,23 @@ assert_exit "ledger-inline-closures-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledge
 # --- ledger close.inline_closures[] calibration, re-brief positives:
 #     null-tolerance (REV F-7 -- inline_closures: null mirrors
 #     findings_addressed's own null-tolerance) and Unicode NFC coverage
-#     matching (REV F-4 -- ledger id in NFD form, cited receipt's id in NFC
-#     form, must still match after normalizing both sides). ---
+#     matching (REV F-4 -- both the ledger id and the cited receipt's id are
+#     NFD-decomposed and already byte-identical, so this pair alone would
+#     still match even with normalization removed entirely; see D-3 below for
+#     the pair that actually requires normalizing both sides). ---
 
 assert_exit "ledger-inline-closures-nfc-id" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-nfc-id.json" "$REPO_ROOT"
 assert_exit "ledger-inline-closures-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-null.json" "$REPO_ROOT"
+
+# --- D-3: a genuinely MIXED pair -- ledger-inline-closures-mixed-nfd-nfc.json
+#     carries its finding_id NFD-decomposed, receipt-findings-addressed-
+#     nfc-composed-id.json's matching finding_id is genuinely NFC-precomposed
+#     -- byte-different on both sides, so this is the pair that actually
+#     exercises both unicodedata.normalize("NFC", ...) call sites in
+#     _check_inline_closures (the pre-existing nfc-id pair above does not,
+#     since it is NFD/NFD and already byte-identical). ---
+
+assert_exit "ledger-inline-closures-mixed-nfd-nfc" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-mixed-nfd-nfc.json" "$REPO_ROOT"
 
 echo ""
 if (( fail_count > 0 )); then
