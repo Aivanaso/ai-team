@@ -82,6 +82,9 @@ discovery_report:
       - "InvoiceService never returns partial results on a failed batch item — it fails the whole export instead (src/billing/services/InvoiceService.ts:55)"
     open_scope_questions:
       - "Retention policy for generated exports has no existing caller — cannot cite evidence for a cleanup job path."
+    plan_proposal:
+      - { title: "Repository can find invoices for export", behavior: "InvoiceRepository exposes findForExport(ids) and its test double builds it", demonstrating_check: { command: "npm run typecheck", verified: "executed read-only, exit 0 on the current tree; goes red the moment InvoiceRepository gains findForExport until tests/Double/billing/InvoiceRepositoryStub.ts:8 implements it — this slice's red", expect: "exit 0" }, contract_left: "InvoiceRepository.findForExport(ids: string[]): Promise<Invoice[]> — src/billing/repositories/InvoiceRepository.ts:12", decisions_candidates: [], files: ["src/billing/repositories/InvoiceRepository.ts", "tests/Double/billing/InvoiceRepositoryStub.ts"] }
+      - { title: "ExportService exports a batch of invoices", behavior: "ExportService.export(invoiceIds) returns an ExportResult using the repository query from slice 1", demonstrating_check: { command: "npm test -- tests/billing/services/ExportService.test.ts", verified: "fails today because src/billing/services/ExportService.ts does not exist yet — a CREATE slice's red (target exists at package.json:14)", expect: "exit 0" }, contract_left: "ExportService.export(invoiceIds: string[]): Promise<ExportResult> — created by this brief: src/billing/services/ExportService.ts", decisions_candidates: ["a failed batch item fails the whole export, never partial results (src/billing/services/InvoiceService.ts:55)"], files: ["src/billing/services/ExportService.ts", "tests/billing/services/ExportService.test.ts"] }
 next_recommended: []
 model_used: "sonnet"
 context_resolution: "self-loaded"
