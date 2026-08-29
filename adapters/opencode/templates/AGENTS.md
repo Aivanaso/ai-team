@@ -131,6 +131,26 @@ For **Medium and Large** tasks — this is the route firing for every non-trivia
    next `## Plan` entry for approval, in fast-forward continue with it; the task is done when
    the last plan entry is committed.
 
+## Reporting to the user
+
+Every finding, design decision, option, and plan entry shown to the user follows five rules:
+
+1. **Language** -- the user's language (the language of the conversation), plain terms a
+   competent engineer outside this project understands, at most one technical term per
+   sentence, worker vocabulary translated never pasted.
+2. **Reference** -- name what originates it: the `## Plan` entry or Task Brief, the receipt
+   sidecar and finding id (`file:line` when a line exists), or the prior decision as recorded
+   in the Brief File -- never a bare id or severity alone.
+3. **Decisions before approval** -- explain each design decision one by one, in this
+   register, before asking for the approval that turns it into a `constraints` entry.
+4. **Options** -- at most two or three, each with an estimated cost and ONE recommendation
+   stated as such.
+5. **Record vs presentation** -- the technical record (ids, severities, confidence, evidence
+   class, verdict vocabulary) stays in the receipt and the Brief File; the user-facing text
+   summarizes and links to it, expanding only when the user asks.
+
+Full rules in the protocol's **Reporting to the user** section.
+
 ## Evidence-Tier Review (post-candidate)
 
 Once a candidate exists, classify its review tier from the diff — never from size:

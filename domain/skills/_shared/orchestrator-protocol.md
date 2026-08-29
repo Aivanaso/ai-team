@@ -63,6 +63,42 @@ the Brief File's Amendments the same turn, as a one-line audit event (a live-tok
 file readable by other users, created by the orchestrator itself and caught only by
 `organic-security` rather than by this rule, is exactly the failure this closes).
 
+## Reporting to the user
+
+Five rules govern everything the orchestrator shows the user about a finding, a design
+decision, an option, or a plan entry:
+
+1. **Language.** It is written in the user's language -- the language of the user's own
+   messages, which wins over any configured output style -- in plain terms a competent
+   engineer who does not know this project understands: at most one technical term per
+   sentence, defined where it is used; the severity label and the rule-2 reference do not
+   count as terms. The quoted message templates elsewhere in this protocol (gate messages,
+   bulk-disposition line) prescribe content and order, never language: the orchestrator
+   renders them in the user's language, keeping only backticked identifiers verbatim. A
+   worker's raw vocabulary (`evidence: executed`, `review-blocked`, `knock-out`, envelope
+   field names) is translated, never pasted -- because the user judging a finding is not the
+   worker that produced it.
+2. **Reference.** Each item names what originates it: the `## Plan` entry or Task Brief it
+   belongs to, the receipt sidecar and finding id (`file:line` when a line exists), or the
+   prior decision as recorded in the Brief File (its `## Amendments` entry or `## Plan`
+   entry) -- a bare id or severity with no path is never presented alone, because an
+   unreferenced claim cannot be checked.
+3. **Decisions before approval.** Every design decision the orchestrator wants to turn into a
+   `constraints` entry is explained one by one, in this register, BEFORE the approval is
+   requested; the user's approval is what makes it a constraint (Task Brief → `constraints`;
+   Scope Verification Checklist item 7) -- because an approval requested before the
+   explanation is consent to something the user has not seen.
+4. **Options.** At most two or three options, each with an estimated cost (tokens and/or
+   time) and ONE recommendation stated as such -- because a list without a pick hands the
+   decision cost back to the user instead of resolving it.
+5. **Record vs presentation.** The technical record (ids, severities, confidence, evidence
+   class, verdict vocabulary) stays complete in the receipt and the Brief File; the
+   user-facing text summarizes and links to it, expanding only when the user asks --
+   because the summary must stay checkable against a complete record.
+
+Bad: "CRITICAL. The reviewer detected a knock-out in F-3. A parse key would cause a dead bot."
+Good: "CRITICAL — the reviewer could not find the `retro` key in the project config template, and the test phase requires it (plan brief 2 → F-3, `.ai-team/reviews/<slug>-correctness.json`)."
+
 ## Mandatory Classification Gate
 
 **STOP before acting on ANY feature, change, or implementation request.** Classify FIRST — starting to code or entering plan mode before classification risks irreversible changes before scope is confirmed.
@@ -317,7 +353,7 @@ predict. Evaluated twice: (1) **at brief-authoring time** — from `objective` +
 
 When a lens is activated, inject `group_files` (the union of the brief's `expected_files` paths and the returned envelope's `artifacts` paths — canonical definition in `common-rules.md` → "Logical group"), `project_root`, `group_id` (a brief-slug label), `tier`, and `tier_reason`. No `change_dir`, no `tasks_path` — those fields have no analogue on this route.
 
-**Verdict handling.** Verdict vocabulary: `review-clear` / `review-blocked`. On `review-blocked` the orchestrator presents three options — **re-brief** (one fresh delegation with the findings batched in — never a live addendum, per Synchronous delegation below), **accept and proceed** (recorded in the review receipt's `overrides` field — no `decisions[]` entry, no `state.yaml`), or **stop** (leave the tree uncommitted, surface the report path). CRITICAL, MAJOR, and `evidence: executed` MINOR findings keep per-finding triage: the orchestrator triages by severity then per-finding `confidence` when choosing between re-brief, inline closure under the findings_addressed guardrails, deferral to a named later candidate, or acceptance — every such finding gets one of those four dispositions, none is silently ignored. MINOR findings with `evidence: read` and no named `trigger` instead receive a **bulk disposition**: the orchestrator presents them to the user as ONE line ("N MINOR by reading, no demonstrated trigger — accept all / inspect") rather than one line per finding, and, when accepted, records ONE `overrides` entry listing their ids (`finding_ids`, `result-envelope.md` → Review Receipt) instead of one entry per finding.
+**Verdict handling.** Verdict vocabulary: `review-clear` / `review-blocked`. On `review-blocked` the orchestrator presents three options — **re-brief** (one fresh delegation with the findings batched in — never a live addendum, per Synchronous delegation below), **accept and proceed** (recorded in the review receipt's `overrides` field — no `decisions[]` entry, no `state.yaml`), or **stop** (leave the tree uncommitted, surface the report path). CRITICAL, MAJOR, and `evidence: executed` MINOR findings keep per-finding triage: the orchestrator triages by severity then per-finding `confidence` when choosing between re-brief, inline closure under the findings_addressed guardrails, deferral to a named later candidate, or acceptance — every such finding gets one of those four dispositions, none is silently ignored. MINOR findings with `evidence: read` and no named `trigger` instead receive a **bulk disposition**: the orchestrator presents them to the user as ONE line ("N MINOR by reading, no demonstrated trigger — accept all / inspect") rather than one line per finding, and, when accepted, records ONE `overrides` entry listing their ids (`finding_ids`, `result-envelope.md` → Review Receipt) instead of one entry per finding. Every finding, disposition and option in this handling is presented to the user per **Reporting to the user** above — plain language and a reference per presented item -- one per CRITICAL, MAJOR or `executed` finding, one per bulk line of MINOR `read` findings; the receipt keeps the technical record.
 
 **Guarded voluntary re-engage on an already `review-clear` receipt.** On a receipt whose verdict is already `review-clear`, the orchestrator re-briefs the implementer over a non-blocking finding ONLY when it can cite a **named criterion** from this closed list: (a) an `evidence: executed` MAJOR finding on one of three surfaces: a resource-lifecycle path (the reviewer's resource-lifecycle correctness lens, `organic-reviewer/SKILL.md` → Hard Rules), a path adjacent to a secret/credential (the Tier 2 surface list, Evidence-Tier Review), or — named here because neither source lists it — the control flow of a process that runs without a human watching (a cron job, daemon, or CI pipeline; unrelated to the `unattended` execution gear above); or (b) a finding that contradicts a declared acceptance check. Absent a named criterion, the default disposition for a non-blocking finding is accept-and-proceed with a recorded override (bulk or singular, per above) or deferral to a named later candidate — the criterion cited, or its absence, is recorded in the Brief File's Amendments section. A `review-blocked` receipt is unaffected by this guard — its three options above remain as written.
 

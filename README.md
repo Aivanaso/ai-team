@@ -55,7 +55,7 @@ only; nothing is retroactively resurrected.
 | Gear | Behavior |
 |------|----------|
 | `normal` (default) | Ceremony per task size, exactly as above |
-| `fast-forward` | One confirmation of the whole `## Plan`, then every brief chains to completion — review plane stays fully intact, pausable at any brief boundary |
+| `fast-forward` | One confirmation of the whole `## Plan` (the definitive one, after adoption when a discovery pass ran), then every brief chains to completion; the review plane stays fully intact, pausable at any brief boundary |
 | `unattended` | Fast-forward, plus never self-approves — pauses with the pending question recorded for the next session |
 
 Set via the Brief File's `mode:` field; any non-`normal` gear — at task start or mid-task — requires explicit user instruction.
