@@ -54,6 +54,8 @@ Rationale: mocking a framework boundary (e.g., `MessageBusInterface` as a spy) m
 
 **Exception:** if the project's test infrastructure genuinely cannot run an integration test locally (e.g., requires external services not available in the sandbox), report it as a risk in the envelope rather than silently skipping (the orchestrator decides whether to defer or override).
 
+Under the STRICT TDD MODE directive the same discipline covers each test's red run: a red is evidence only when it is a valid red per `organic-implementer`'s Output Contract (`tdd_cycles`) — Rule 7 item 3 applies to a red exactly as to a green.
+
 ## Rule 4 — Validate Assumed Invariants at Brief-Authoring / Discovery Time
 
 When a Task Brief or a discovery report depends on a **codebase-wide invariant** (a naming convention, a regex, a contract, a "consistency" assumption), the party asserting it — the orchestrator composing the Task Brief, or `organic-scout` running discovery — MUST validate it with greps before finalizing the brief or the report. The `scope_proposal` block (`organic-scout`, discover mode) is this rule's natural artifact: an invariant the proposal relies on is validated — or listed as an open question — before the brief is composed.

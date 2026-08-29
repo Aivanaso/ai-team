@@ -41,8 +41,16 @@ conventions:
 commit_strategy: auto  # commit strategy for work-unit-commits: auto | manual
 
 # strict_tdd: true
-#   Optional, safe-absent default: false. When true, the orchestrator appends the
-#   STRICT TDD MODE directive to organic-implementer delegations.
+#   Optional, safe-absent default: false. The orchestrator appends the
+#   STRICT TDD MODE directive to organic-implementer delegations only when three
+#   conditions hold together: strict_tdd: true, test_commands.unit is declared
+#   below, and the objective changes behavior in a testable artifact the
+#   declared runner can exercise (never prose/docs/config/templates/skill
+#   definitions). strict_tdd: true with test_commands.unit absent sends no
+#   directive -- the orchestrator tells the user and records the gap in the
+#   Brief File, never inventing a runner command. organic-implementer then
+#   returns tdd_cycles evidence for each red -> green cycle
+#   (red -> green -> triangulate -> refactor).
 
 # test_commands:
 #   unit: "{command}"       # e.g. "npm test" | "pytest" | "phpunit"

@@ -154,7 +154,9 @@ Exit 0 accepts the verdict; exit 1 re-engages `organic-reviewer` once with the p
 unreadable, not an object) and the lens is re-delegated to produce a correct one — never fall
 back to reading the `.md` report by hand as the gate. Before delegating review, read the
 implementer's `decisions_taken` (if any) and cross-check each entry against the brief's
-`constraints` — a contradiction is inlined into the reviewer prompt as a focus item. Full rules:
+`constraints` — a contradiction is inlined into the reviewer prompt as a focus item. When the
+STRICT TDD MODE directive was sent, forward `strict_tdd` and the implementer's `tdd_cycles` (or
+`tdd_not_applicable`) to the reviewer the same way. Full rules:
 protocol's **Citation audit** and **Receipt** sections.
 
 ### Execution gears

@@ -34,6 +34,7 @@ envelope.
 - Amendment denylist: `proposed_expected_files` never names a protected-class path (VCS internals, CI/CD config, agent-config roots, framework/tooling scripts, git hooks, or any class `common-rules.md` Principle 2 already names read-only — full authoritative list: `_shared/result-envelope.md` → "Intermediate envelope — paused"). A gap that seems to require one is `kind: scope-large` (terminal), never an amendment — this rule governs proposals only, never the brief's own original `expected_files`, which the orchestrator already declared outside this channel. -- because the write-scope boundary common-rules Principle 2 sets must hold for a worker-proposed widening exactly as it holds for the original brief.
 - Proposed-check safety: a `proposed_checks` entry is a side-effect-free verification command built from project-declared tooling wherever one exists (`.ai-team/config.yaml` → `test_commands`, or a package-manifest script); it never proposes network access, state mutation outside the target repo, privilege escalation, or an interpreter one-liner executing remote or generated content — the orchestrator content-gates every proposal before approval (`_shared/orchestrator-protocol.md` → Amendment ingestion), but this skill never offers a refused-class command in the first place. -- because the proposer already holds Bash execution privilege over the target repo; an unreviewed command it authors and the orchestrator later re-runs verbatim is a self-authorizing privilege-escalation channel.
 - Declare, never hide: every behavioral decision the brief did not fix is listed in `decisions_taken` — an undeclared decision the reviewer finds is a finding against the candidate.
+- Test-first when directed: when the delegation prompt carries the STRICT TDD MODE directive, every behavior the objective adds or changes in a testable artifact is driven by a test written first, observed red for a valid reason (Output Contract → `tdd_cycles`), made green by the smallest production change, then refactored with the test re-run; each cycle records its red and green runs in `tdd_cycles`. Without the directive this rule imposes nothing (the field MAY still be reported). -- because a test never seen red proves only that it runs, not that it tests anything (`_shared/evidence-protocol.md` → Rule 7).
 
 ## Decision Gates
 
@@ -49,6 +50,8 @@ envelope.
 | ≥1 acceptance check fails and it tests the brief's own objective | `status: blocked`, `kind: check-failed`, failing command + exit code in `check_results`. Never `ok`. |
 | ≥1 acceptance check fails but the failure is pre-existing (same check fails on files this run did not touch — evidence required) | `status: warning`, `kind: check-failed`, evidence cited in the entry's `digest`. |
 | A declared check cannot be executed in this environment | `status: needs_input`, `kind: check-unrunnable`, naming the command and the error. Never mark it `pass`. |
+| STRICT TDD MODE directive present, the objective changes behavior in a testable artifact, and the declared test runner cannot be executed in this environment | `status: needs_input`, `kind: check-unrunnable`, naming the runner command and the error — never a fabricated red/green, never a silent fallback to implementing without tests. |
+| Directive present but the objective changed no testable behavior (prose/config/template-only candidate) | `tdd_cycles: []` plus a one-line `tdd_not_applicable`; status follows the other rows. |
 | All checks pass, all writes inside roots, no scope gap | `status: ok` |
 
 ## Execution Steps
@@ -57,7 +60,7 @@ envelope.
 2. Validate the Task Brief against the consumer-side checklist — the seven elements it must supply: objective, target repo, allowed edit roots, expected files, acceptance checks, out-of-scope, constraints (names only; full definitions live in the protocol's canonical Task Brief section — see References). Any element missing → the brief-incomplete gate, EXCEPT `constraints`: a brief without the field is treated as `constraints: []` — a pre-existing brief replayed verbatim across a framework upgrade never trips this gate on an element it was never composed against.
 3. Read `{target_repo}/.ai-team/config.yaml` if present (conventions, declared commands). Read in full every SKILL.md under `## Skills to load before work`; report `skill_resolution` (`paths-injected` / `path-missing` / `none`).
 4. Orient: read the already-existing files in the expected-files set, plus at most **10** further files (direct callers/neighbours) needed to write correct code. Exceeding the budget → the scope-large gate.
-5. Implement. Before every write, check the target against the brief's allowed edit roots using the within-roots definition in the orchestrator protocol's **Roots Computation (`allowed_edit_roots`)** section — this skill defines no matching rule of its own. Write only paths in the expected-files set, resolved relative to the brief's `target_repo` root. Honor every `constraints` entry; a constraint that cannot be honored while meeting the objective is `status: needs_input` with the conflict named in `questions[]` — never silently re-decided.
+5. Implement. Before every write, check the target against the brief's allowed edit roots using the within-roots definition in the orchestrator protocol's **Roots Computation (`allowed_edit_roots`)** section — this skill defines no matching rule of its own. Write only paths in the expected-files set, resolved relative to the brief's `target_repo` root. Honor every `constraints` entry; a constraint that cannot be honored while meeting the objective is `status: needs_input` with the conflict named in `questions[]` — never silently re-decided. Under the STRICT TDD MODE directive, implement per the Test-first Hard Rule — test → red run → production change → green run — recording each cycle.
 6. Scope-amendment channel: when the objective needs a file the expected-files set does not declare, count from the injected `amendment_requests_used` (0 if absent) plus this delegation's own count; clear of the denylist and of any gap already denied — this delegation or per the injected `amendments_denied` — and under the cap, return `status: paused` with `amendment_request` (`artifacts` lists every file already written) per the Decision Gates and wait for the orchestrator's single continuation message. `AMENDMENT APPROVED ...` carries the COMPLETE updated `expected_files` and `allowed_edit_roots` — adopt both verbatim, never compute or derive roots from the restated entries; the within-roots check at step 5 still runs, now against the adopted lists — resume at step 5. `AMENDMENT DENIED ...` means finish within the original scope if the objective still holds, else return terminal `blocked` with a `scope_report` composed from the denied `amendment_request`. A denied gap, or a third gap for the objective, never pauses again — it is terminal `blocked`.
 7. Run every acceptance check verbatim, in declared order — including any `proposed_checks` an approved amendment added to `acceptance_checks` — capturing each exit code. Re-run any check invalidated by a later edit.
 8. Compose the bounded envelope per the Output Contract (caps enforced, truncation marked).
@@ -68,8 +71,9 @@ envelope.
 The bounded envelope below is `organic-implementer`'s complete Output Contract — a separate,
 bounded variant from the base schema in `_shared/result-envelope.md` (see References):
 bounded evidence (`check_results`, capped digests) instead of a raw-stdout evidence field,
-`scope_report` instead of a structured deviation block, and `decisions_taken` (the behavioral
-decisions the brief left open, CAP 5) which the base schema does not carry.
+`scope_report` instead of a structured deviation block, `decisions_taken` (the behavioral
+decisions the brief left open, CAP 5) and `tdd_cycles` (the red → green cycles the STRICT TDD MODE
+directive required, CAP 5), which the base schema does not carry.
 
 ```yaml
 status: ok | warning | needs_input | blocked | failed | paused (intermediate — see result-envelope.md)
@@ -92,6 +96,10 @@ scope_report:                    # present only on needs_input / blocked / warni
 decisions_taken:                 # terminal envelopes only (ok|warning|needs_input|blocked|failed) — present when non-empty; never on status: paused
   - { what: "<one line — the behavioral decision>", where: "<repo-relative path:line>", why: "<one line — why the brief left it open>" }
 decisions_omitted: 0             # >0 only when the CAP 5 was hit
+tdd_cycles:                       # REQUIRED when the STRICT TDD MODE directive was in the prompt, MAY appear without it — terminal-only, never on status: paused — CAP 5 entries
+  - { test: "<repo-relative path[::test name]>", red: { command: "<verbatim, ≤200 chars>", exit_code: <int>, digest: "<one line, ≤200 chars — the failing assertion or the missing production symbol>" }, green: { command: "<verbatim, ≤200 chars>", exit_code: 0, digest: "<one line, ≤200 chars>" } }
+tdd_cycles_omitted: 0             # >0 only when the CAP 5 was hit
+tdd_not_applicable: "<one line>"  # ONLY when the directive was sent and tdd_cycles is empty — why no testable behavior changed
 amendment_request:               # present only on status: paused — schema: result-envelope.md
   kind: scope-amendment
   reason: "<one sentence>"
@@ -128,6 +136,17 @@ carries no such field). A decision is NOT a scope gap (route that through the am
 or `scope_report` instead) and NOT uncertainty (that belongs in `risks`); the Declare-never-hide
 Hard Rule above governs it.
 
+`tdd_cycles` records each red → green cycle the STRICT TDD MODE directive required (Hard Rules →
+Test-first when directed). It is REQUIRED when the directive was present in the delegation
+prompt, MAY appear when it was not (self-reported test-first discipline), and is terminal-only —
+never on `status: paused` (mirrors `decisions_taken`'s own terminal-only rule above). Cap
+arithmetic: 5 cycles × 3 lines + 2 = 17 lines, inside the unchanged ≤ 120-line whole-envelope
+bound. A red counts only when the test ran and failed on its own assertion, or failed to
+compile/load because it calls production code that does not exist yet; a zero-work output (`No
+tests found`, `0 suites`, a runner or configuration error) is never a red — it is a test that did
+not run (`_shared/evidence-protocol.md` → Rule 7 item 3). `red.digest` MUST name which of the two
+valid reasons applies.
+
 **Worked example** (one compact instance, the `ok` path):
 
 ```yaml
@@ -143,6 +162,9 @@ checks_omitted: 0
 decisions_taken:
   - { what: "Empty export batch returns 200 with an empty result list rather than 404", where: "services/billing/export.py:52", why: "brief's acceptance_checks did not specify empty-batch behavior" }
 decisions_omitted: 0
+tdd_cycles:
+  - { test: "services/billing/tests/test_export.py::test_empty_batch_returns_200", red: { command: "<unit test command>", exit_code: 1, digest: "test module failed to load: production symbol export_batch does not exist yet" }, green: { command: "<unit test command>", exit_code: 0, digest: "1 passed" } }
+tdd_cycles_omitted: 0
 risks: []
 next_recommended: []
 model_used: "sonnet"

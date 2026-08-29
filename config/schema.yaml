@@ -44,8 +44,15 @@
 
 # strict_tdd: true | false
 #   Read by the orchestrator before delegating organic-implementer
-#   (orchestrator-protocol.md -> "Sub-Agent Delegation" step 5); when true,
-#   the delegation prompt is appended with the STRICT TDD MODE directive.
+#   (orchestrator-protocol.md -> "Sub-Agent Delegation" step 5). The STRICT TDD
+#   MODE directive is appended only when three conditions hold together:
+#   strict_tdd: true, test_commands.unit is declared below, and the objective
+#   changes behavior in a testable artifact the declared runner can exercise
+#   (never prose/docs/config/templates/skill definitions). strict_tdd: true
+#   with test_commands.unit absent sends no directive -- the orchestrator
+#   tells the user and records the gap, never inventing a runner command.
+#   organic-implementer then returns tdd_cycles evidence for each red -> green
+#   cycle (see domain/skills/organic-implementer/SKILL.md -> Output Contract).
 
 # test_commands:
 #   unit: "<command>"       # the strict_tdd test runner the orchestrator cites
