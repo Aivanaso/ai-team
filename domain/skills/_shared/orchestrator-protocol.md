@@ -88,9 +88,9 @@ Evaluate these four signals:
 
 **Small** (question, typo, config, single-file fix): no gate output, no plan approval — questions and explanations get answered directly; a trivial mechanical edit (typo-level, zero analysis) is done inline per the trivial-edit floor; any other implementation work gets a minimal Task Brief delegated to `organic-implementer` immediately.
 
-**Medium** (multi-file change, new component, 50-300 lines): STOP. Say `"**Medium** -- [brief reason]. Plan: [2-3 bullets]. Proceed?"` and wait for confirmation before any implementation.
+**Medium** (multi-file change, new component, 50-300 lines): STOP. Say ``"**Medium** -- [brief reason]. Plan: N briefs — [one line per brief: behavior · contract left · decisions]. Approve brief 1? (or `fast-forward` to approve the whole plan)"`` and wait for confirmation before any implementation.
 
-**Large** (multi-module, >300 lines, uncertain scope, new domain): STOP. Say `"**Large** -- [brief reason]. Plan: [2-3 bullets]. Optional discovery pass first (organic-scout) to cut scope uncertainty before the brief is written? Proceed?"` and wait for confirmation. Offer the discovery pass only when the "needs discovery" signal actually fired; skip the offer when scope is merely large but clear.
+**Large** (multi-module, >300 lines, uncertain scope, new domain): STOP. Say ``"**Large** -- [brief reason]. Plan: N briefs — [one line per brief: behavior · contract left · decisions]. Optional discovery pass first (organic-scout) to cut scope uncertainty before the brief is written? Approve brief 1? (or `fast-forward` to approve the whole plan)"`` and wait for confirmation. Offer the discovery pass only when the "needs discovery" signal actually fired; skip the offer when scope is merely large but clear.
 
 ### Gate does NOT apply to
 
@@ -125,17 +125,29 @@ wherever the two conflict:
   requires (cross-reference **Execution gears** below) — the Medium/Large plan gate reduces to
   confirming the classification; announce the reduction, never apply it silently.
 
+### Plan of briefs
+
+1. A Medium/Large task is decomposed into an ordered plan of briefs BEFORE any delegation.
+2. Each brief is a VERTICAL SLICE: it crosses every layer the behavior needs, leaves the application working and committable on its own, and carries a runnable check or test that demonstrates the behavior — never a layer-by-layer split (entity, then repository, then controller).
+3. NO size cap: a brief is never split for line count alone — a vertical slice that is logically one behavior stays one brief however many files it touches (`common-rules.md` → Logical group: one brief = one group, one candidate, one review, one commit — cite, do not restate).
+4. Each plan entry carries a title plus the three elements named in the `## Plan` template below: behavior + demonstrating check, contract left to the next brief, decisions taken.
+5. Chaining: brief N's contract enters brief N+1's `constraints` verbatim, and brief N's created/modified files are named in brief N+1's orientation as already existing — the reviewer of brief N verifies the contract exists before brief N+1 is composed. When brief N had no reviewer (a tier 0 candidate, or the review plane switched off), the orchestrator itself confirms the contract exists with an executed check — recorded in the Brief File's Amendments — before composing brief N+1, mirroring the no-discovery fallback (**Task Brief** below).
+6. Expansion is mechanical: behavior → `objective`; demonstrating check → `acceptance_checks`; inherited contract + decisions → `constraints`; scope → `expected_files`/`allowed_edit_roots` per the Scope Verification Checklist — nothing is invented between plan and brief.
+7. Approval: `normal` gear = the user approves each brief before its delegation — the checkpoint after brief N's commit presents brief N+1 for approval; `fast-forward` = one approval of the whole `## Plan`, then the briefs chain (**Execution gears** below); Small = a single-entry plan with no added ceremony.
+8. Authorship: the orchestrator composes the plan for Small and Medium from its own reading and closes the checklist itself; for Large, when a discovery pass ran, it composes the plan FROM the scout's discovery report (its `scope_proposal` block — in particular its `public_contracts` field) — never contradicting cited evidence — until the scout's own plan proposal exists (named follow-up: plan brief 2 of `.ai-team/briefs/2026-08-29-plan-of-briefs-1.md`; a rule may not cite a scout output no worker honors yet).
+
 ### After classification
 
 For **Small** implementation tasks: a trivial mechanical edit goes inline per the trivial-edit floor, no delegation; otherwise delegate directly to `organic-implementer` with a minimal Task Brief — no plan gate — and review the returned envelope per **Organic Delegation Route → What comes back**.
 
 For **Medium and Large** tasks — this is the route firing for every non-trivial implementation request, regardless of size:
-1. Get user confirmation on the plan (and, for Large, on the optional discovery pass).
+1. Get user approval of the plan's first brief (normal gear) or of the whole plan (fast-forward) — and, for Large, of the optional discovery pass.
 2. Exit plan mode.
 3. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected — unless a read-only scout pass was already hosted inside plan mode (**Harness coexistence** above), whose returned proposal enters here the same way; on return, verify the proposal per the **Scope Verification Checklist** below and adopt it as the brief's `expected_files`/`acceptance_checks`.
-4. **Delegate implementation — this is the default.** Compose a Task Brief (see **Task Brief** below) and delegate to `organic-implementer`. Implementing inline on your own turn requires an explicit user override in the vocabulary of the User Override section: "no subagents" / "hazlo tú" / "do it yourself".
+4. **Delegate implementation — this is the default.** Compose a Task Brief (see **Task Brief** below) by expanding the approved `## Plan` entry (Plan of briefs above) and delegate to `organic-implementer`. Implementing inline on your own turn requires an explicit user override in the vocabulary of the User Override section: "no subagents" / "hazlo tú" / "do it yourself".
 5. If the user's reply is neither an approval nor a recognized override token, re-prompt for an explicit choice — do NOT silently fall back to inline.
 6. Review the returned envelope per **Organic Delegation Route → What comes back**.
+7. After the brief's commit, checkpoint: mark its `## Phases` box; in normal gear present the next `## Plan` entry for approval, in fast-forward continue with it; the task is done when the last plan entry is committed.
 
 ### Execution gears
 
@@ -147,9 +159,9 @@ stops for the user.
 - **`normal`** (default): exactly the ceremony above — `### Gate behavior by size` decides where
   the user stops, per size. No rule changes; this only names the default gear.
 - **`fast-forward`**: entered ONLY on explicit user request ("fast-forward", "tira hasta el
-  final") or a one-time confirmation of a well-structured ticket. After ONE plan confirmation,
-  every phase/logical group of the task executes chained to completion — no per-phase stop, no
-  contract-approval pause. Unchanged: the review plane runs FULLY intact (Evidence-Tier Review,
+  final") or a one-time confirmation of a well-structured ticket. After ONE confirmation of the
+  whole `## Plan`, every brief of the plan executes chained to completion — no per-brief
+  approval stop, no contract-approval pause. Unchanged: the review plane runs FULLY intact (Evidence-Tier Review,
   receipts, re-briefs, the amendment channel, every budget); public contracts and the Scope
   Verification Checklist still apply at composition; Brief File checkboxes are still marked per
   group, so the user can interrupt at any group boundary and the task pauses cleanly.
@@ -325,14 +337,25 @@ pending_question: null  # unattended only — set when paused on a stop-on-quest
 base_ref: "<branch or commit the work builds on>"
 created_by: { tool: "<harness>", model: "<orchestrator model>" }
 ---
+## Plan
+(definition only, never status: the task's briefs in execution order, one numbered entry each —
+title; the behavior it delivers and the runnable check/test that demonstrates it; the contract
+it leaves to the next brief — a signature, event, schema, or user-visible outcome the next brief
+may assume; the decisions already taken that the brief's `constraints` will carry. Composed at
+the Medium/Large gate, before any delegation — for a Small task, which has no gate, at its first
+delegation, holding exactly one entry. Approval is recorded here
+as a one-line note per entry — approved brief by brief (normal) or once for the whole plan
+(fast-forward).)
 ## Task Brief
 (verbatim copy of every seven-element YAML block delegated for this task; one block per
 objective, appended as the task progresses; a cross-repo objective's block is preceded by a
 `base_ref:` annotation line, outside the seven-element block itself, only when that repo's base
 differs from the frontmatter's)
 ## Phases
-(checkbox list of the task's logical groups; the orchestrator checks items as groups
-complete — this is the pause/resume state)
+(checkbox list — the SINGLE status list of the task: one checkbox per `## Plan` entry, same
+order and titles, plus the non-brief phases (review, commit, retro) as today; the orchestrator
+checks items as they complete — this is the pause/resume state; `## Plan` never carries status
+marks)
 ## Cost Ledger
 | # | agent | model | tokens | tool_uses | duration | outcome |
 (one row per delegation, appended at envelope ingestion; for an `organic-reviewer` delegation
@@ -364,7 +387,7 @@ the structural check below — kept in sync with this section, never diverging f
 (then free prose: re-brief count with causes; receipt reference(s); commit hashes)
 ```
 
-Created at the task's first delegation; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption, session end mid-task, or an `unattended`-gear pending question) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
+Created when the plan is composed — at the Medium/Large gate, before any delegation; for a Small task, at its first delegation; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption, session end mid-task, or an `unattended`-gear pending question) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
 
 **Brief File structural check (orchestrator, before the status:done flip):** the orchestrator
 maintains a JSON sidecar next to the Brief File — `.ai-team/briefs/YYYY-MM-DD-<slug>.json`,

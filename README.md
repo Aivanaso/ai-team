@@ -10,11 +10,11 @@ and lets the evidence in the resulting diff — not the task's size — decide h
 runs before commit.
 
 ```
-User ↔ Claude Code (orchestrator)          User ↔ OpenCode (orchestrator agent)
-           │                                             │
-           ├── Small: delegate (no gate)                 ├── Small: delegate (no gate)
-           ├── Medium: plan + delegate                    ├── Medium: plan + delegate
-           └── Large: plan + optional discovery pass       └── Large: plan + optional discovery pass
+User ↔ Claude Code (orchestrator)                                User ↔ OpenCode (orchestrator agent)
+           │                                                     │
+           ├── Small: delegate (no gate)                         ├── Small: delegate (no gate)
+           ├── Medium: plan of briefs + delegate                 ├── Medium: plan of briefs + delegate
+           └── Large: plan of briefs + optional discovery pass   └── Large: plan of briefs + optional discovery pass
                          ↓                                             ↓
                     domain/skills/    ←─── shared skills ───→    domain/skills/
 ```
@@ -24,8 +24,8 @@ User ↔ Claude Code (orchestrator)          User ↔ OpenCode (orchestrator age
 | Size | Signals | Ceremony |
 |------|---------|----------|
 | **Small** | 1 file, <50 lines, fully clear scope | Delegate directly, no gate (trivial mechanical edits run inline) |
-| **Medium** | 2-5 files, 50-300 lines | Present a plan, wait for confirmation, then delegate |
-| **Large** | 6+ files, crosses modules, needs discovery | Present a plan, offer an optional `organic-scout` discovery pass, wait, then delegate |
+| **Medium** | 2-5 files, 50-300 lines | Present a plan of briefs (vertical slices), approve brief by brief or fast-forward, then delegate |
+| **Large** | 6+ files, crosses modules, needs discovery | Present a plan of briefs (vertical slices), offer an optional `organic-scout` discovery pass, approve brief by brief or fast-forward, then delegate |
 
 Classification never decides review depth — only how much planning precedes delegation.
 
@@ -55,7 +55,7 @@ only; nothing is retroactively resurrected.
 | Gear | Behavior |
 |------|----------|
 | `normal` (default) | Ceremony per task size, exactly as above |
-| `fast-forward` | One plan confirmation, then every phase chains to completion — review plane stays fully intact, pausable at any group boundary |
+| `fast-forward` | One confirmation of the whole `## Plan`, then every brief chains to completion — review plane stays fully intact, pausable at any brief boundary |
 | `unattended` | Fast-forward, plus never self-approves — pauses with the pending question recorded for the next session |
 
 Set via the Brief File's `mode:` field; any non-`normal` gear — at task start or mid-task — requires explicit user instruction.

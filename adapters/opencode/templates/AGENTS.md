@@ -91,12 +91,12 @@ Evaluate these four signals:
 
 **Medium** (multi-file change, new component, 50-300 lines):
 - STOP. Say this to the user:
-  > **Medium** -- [brief reason]. Plan: [2-3 bullets]. Proceed?
+  > **Medium** -- [brief reason]. Plan: N briefs — [one line per brief: behavior · contract left · decisions]. Approve brief 1? (or `fast-forward` to approve the whole plan)
 - Wait for confirmation before any implementation.
 
 **Large** (multi-module, >300 lines, uncertain scope, new domain):
 - STOP. Say this to the user:
-  > **Large** -- [brief reason]. Plan: [2-3 bullets]. Optional discovery pass first (`organic-scout`) to cut scope uncertainty before the brief is written? Proceed?
+  > **Large** -- [brief reason]. Plan: N briefs — [one line per brief: behavior · contract left · decisions]. Optional discovery pass first (`organic-scout`) to cut scope uncertainty before the brief is written? Approve brief 1? (or `fast-forward` to approve the whole plan)
 - Wait for confirmation. Offer the discovery pass only when the "needs discovery" signal actually fired.
 
 ### Gate does NOT apply to
@@ -113,7 +113,7 @@ For **Small** implementation tasks:
    and review the returned bounded envelope per **Organic Delegation Route → What comes back**.
 
 For **Medium and Large** tasks — this is the route firing for every non-trivial implementation request, regardless of size:
-1. Get user confirmation on the plan (and, for Large, on the optional discovery pass).
+1. Get user approval of the plan's first brief (normal gear) or of the whole plan (fast-forward) — and, for Large, of the optional discovery pass.
 2. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected;
    on return, verify the proposal against the **Scope Verification Checklist** in
    `~/.config/opencode/skills/_shared/orchestrator-protocol.md` and adopt it into the Task
@@ -127,6 +127,9 @@ For **Medium and Large** tasks — this is the route firing for every non-trivia
 4. If the reply is neither approval nor a recognized override token, re-prompt — do not
    default to inline.
 5. Review the returned envelope per **Evidence-Tier Review** below.
+6. After the brief's commit, checkpoint: mark its `## Phases` box; in normal gear present the
+   next `## Plan` entry for approval, in fast-forward continue with it; the task is done when
+   the last plan entry is committed.
 
 ## Evidence-Tier Review (post-candidate)
 
@@ -162,11 +165,13 @@ protocol's **Citation audit** and **Receipt** sections.
 ### Execution gears
 
 Three gears govern per-phase ceremony (`mode:` in the Brief File): `normal` (default — exactly
-the ceremony above) / `fast-forward` (one plan confirmation, then every phase chains to
-completion with the review plane fully intact) / `unattended` (fast-forward plus a
+the ceremony above) / `fast-forward` (one confirmation of the whole `## Plan`, then every brief
+chains to completion with the review plane fully intact) / `unattended` (fast-forward plus a
 stop-on-question policy — pauses with `pending_question:` instead of self-approving).
 Non-normal gears enter on explicit user request or a one-time confirmation of a well-structured ticket (mid-task switches: explicit user instruction only); full semantics in the protocol's
-**Execution gears** section.
+**Execution gears** section. The Brief File's `## Plan` section is the plan of briefs
+(definition only, never status); `## Phases` is the task's single status list, one checkbox per
+plan entry.
 
 ## Sub-Agent Delegation
 

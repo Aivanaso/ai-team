@@ -6,7 +6,7 @@
 
 The most common failure mode in delegated runs is **assuming generic framework behavior applies verbatim to this project**. The 4 bugs in the ECO-944 retrospective all shared this pattern: the run relied on "standard framework behavior" instead of validating the specific project configuration.
 
-This protocol defines six hard rules that every sub-agent MUST follow when writing plans, code, or review reports.
+This protocol defines seven hard rules that every sub-agent MUST follow when writing plans, code, or review reports.
 
 ## Rule 1 — Framework / Library Behavior Claims
 
