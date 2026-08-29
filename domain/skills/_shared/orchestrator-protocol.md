@@ -594,7 +594,12 @@ rule that forces a full pass:
 already covered AND adds no new surface — no new files, no new Specialist Activation Matrix
 class (e.g. remediation touching an auth path for the first time re-runs full tier
 classification instead). When eligible, delegate `organic-reviewer` in DELTA MODE: inject
-`prior_report` and `delta_scope` (Critical Context Forwarding below defines both rows).
+`prior_report` and `delta_scope` (Critical Context Forwarding below defines both rows) **on top of
+the ORIGINAL review delegation prompt VERBATIM — `## Task Brief` block included** — a delta pass is a
+re-delegation like any other (Re-engage prompt block below) and never recovers `acceptance_checks`
+from the prior report on disk; a delta prompt without the brief yields `context_resolution: fallback`
+(deuda-2a and deuda-2b retros: three delta passes in a row). State the delta's changed set from
+`git status --porcelain` (tracked AND untracked), never from an assumed `git diff HEAD` listing.
 `delta_scope` has one shape everywhere it appears: `{ findings_to_verify: [ids], changed_files:
 [paths], prior_verdict_history: [...] }`. **Chain custody: the orchestrator is the chain's
 custodian.** It reads the prior receipt's `verdict_history` (or synthesizes the single-entry
@@ -844,6 +849,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `group_id` | brief-slug label | work-unit-commits, organic-reviewer, organic-security | always when invoking these |
 | `group_files` | the union of the brief's `expected_files` paths and the implementer envelope's `artifacts` paths (canonical definition: `common-rules.md` → "Logical group") | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits — makes the receipt gate fireable and restores scoped staging |
 | `decisions_taken` | the implementer envelope's `decisions_taken` (verbatim) | organic-reviewer | mandatory whenever the list is non-empty at tier ≥ 1 (full pass and delta pass alike) |
+| `check_results` | the implementer envelope's `check_results` (verbatim, the same run whose `artifacts` define `group_files`) | organic-reviewer | mandatory at tier ≥ 1 whenever an implementer envelope exists for the candidate (full pass and delta pass alike) — without it the reviewer's "re-run contradicts claimed `check_results` = CRITICAL" Hard Rule can never fire (deuda-2a retro) |
 | `prior_report` | the prior pass's on-disk review report path (that pass's own `report_destination`) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
 | `delta_scope` | orchestrator-composed from the remediation diff and the prior receipt; single shape defined ONCE in Evidence-Tier Review → Delta re-validation (chain custody included) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
 | `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security, organic-retro (retro mode — path convention `.ai-team/retros/`) | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit. For `organic-reviewer`/`organic-security` (code-audit mode) this path names the `.md` narrative report; the lens writes a `.json` sidecar of the same name alongside it (Review Receipt, `result-envelope.md`) — the Citation audit above validates the `.json` twin, never the `.md` file itself. |
