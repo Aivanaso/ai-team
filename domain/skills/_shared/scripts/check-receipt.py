@@ -11,7 +11,14 @@ target.
 
 Modes:
   receipt <file.json> [project_root]   validate a Review Receipt JSON sidecar
-  ledger  <file.json>                  validate a Brief File ledger+close sidecar
+  ledger  <file.json> [project_root]   validate a Brief File ledger+close sidecar
+
+ledger mode's project_root defaults to "." (repo root, matching receipt mode's own
+default) and is used only to resolve close.inline_closures[] entries, when present
+(see below) -- a legacy ledger sidecar with no inline_closures field validates
+identically whether or not project_root is passed, PROVIDED the root resolves to a real
+directory other than '/': the degenerate-root rule applies in ledger mode exactly as in
+receipt mode, inline_closures present or not.
 
 A receipt sidecar is either a FULL reviewer receipt (the default) or a
 declared SECURITY FRAGMENT (top-level "kind": "security-fragment"). Absence of
@@ -45,7 +52,28 @@ numbers, arrays) is a VIOLATION -- an unrecognized kind is never silently
 treated as a full receipt.
 
 project_root: must not resolve to the filesystem root -- containment against
-"/" is a tautology, so a degenerate project_root is itself a VIOLATION.
+"/" is a tautology, so a degenerate project_root is itself a VIOLATION. This
+rule applies identically in ledger mode, against ledger mode's own
+project_root argument.
+
+close.inline_closures: OPTIONAL on a ledger sidecar's close object -- absent
+OR explicit null means no inline closures happened (every legacy sidecar
+validates exactly as before this field existed). When present (and
+non-null) it must be a list of { receipt, finding_ids } objects: receipt is
+a non-empty, repo-relative path ENFORCED to end in ".json" that must exist
+and be CONTAINED under project_root (the same _check_containment used for
+receipt-mode file citations); finding_ids is a non-empty list of non-empty
+strings, each compared -- after Unicode NFC normalization, mirroring
+_check_duplicate_ids's own rationale -- against the cited receipt's own
+findings_addressed[].finding_id values, themselves NFC-normalized the same
+way. A finding_ids entry that fails the non-empty-string check (including a
+non-hashable JSON array/object) is its own VIOLATION and is excluded from
+the coverage comparison -- never a crash, never escalated to exit 2. Any
+other failure here (missing/unreadable/unparsable/non-object cited receipt,
+wrong extension) is likewise a VIOLATION (exit 1), never the exit-2
+catch-all. A degenerate project_root (see above) short-circuits this whole
+check before any cited receipt is opened -- the degenerate-root VIOLATION
+is recorded and no further filesystem access is attempted in ledger mode.
 """
 
 import argparse
@@ -450,8 +478,115 @@ def validate_receipt(data, project_root):
     return violations, infos
 
 
-def validate_ledger(data):
+def _check_inline_closures(close, project_root, violations):
+    """Validate close.inline_closures[] -- OPTIONAL: absent OR explicit null
+    means no inline closures, and every legacy ledger sidecar (no such field,
+    or an explicit null) validates exactly as it did before this field
+    existed. When present, each entry cites a receipt sidecar (a repo-relative
+    ".json" path that must exist, be CONTAINED under project_root) whose own
+    findings_addressed[].finding_id values (NFC-normalized) must cover this
+    entry's finding_ids (also NFC-normalized). A finding_ids entry that is not
+    a non-empty string (including a non-hashable JSON array/object) is its own
+    VIOLATION and is simply excluded from the coverage comparison -- never a
+    crash. Any failure is a VIOLATION -- never escalated to exit 2, even when
+    the cited receipt cannot be read or parsed."""
+    entries = close.get("inline_closures")
+    if entries is None:
+        return
+    if not isinstance(entries, list):
+        violations.append("close.inline_closures must be a list when present")
+        return
+
+    for i, entry in enumerate(entries):
+        where = "close.inline_closures[%d]" % i
+        if not isinstance(entry, dict):
+            violations.append("%s must be an object" % where)
+            continue
+
+        receipt = entry.get("receipt")
+        if not isinstance(receipt, str) or not receipt.strip():
+            violations.append("%s.receipt must be a non-empty string" % where)
+            receipt = None
+        elif not receipt.endswith(".json"):
+            violations.append(
+                "%s.receipt must be a repo-relative '.json' path (got %r)" % (where, receipt)
+            )
+            receipt = None
+
+        finding_ids = entry.get("finding_ids")
+        if not isinstance(finding_ids, list) or len(finding_ids) == 0:
+            violations.append("%s.finding_ids must be a non-empty list" % where)
+            finding_ids = []
+        else:
+            for j, fid in enumerate(finding_ids):
+                if not isinstance(fid, str) or not fid.strip():
+                    violations.append(
+                        "%s.finding_ids[%d] must be a non-empty string" % (where, j)
+                    )
+
+        if receipt is None:
+            continue
+
+        ok, reason = _check_containment(project_root, receipt)
+        if not ok:
+            violations.append("%s.receipt %r: %s" % (where, receipt, reason))
+            continue
+
+        real_receipt = os.path.realpath(os.path.join(project_root, receipt))
+        try:
+            with open(real_receipt, "rb") as handle:
+                raw = handle.read()
+            receipt_data = json.loads(raw.decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001 -- fail closed as VIOLATION, never exit 2
+            violations.append(
+                "%s.receipt %r: could not be read/parsed as JSON (%s: %s)"
+                % (where, receipt, type(exc).__name__, exc)
+            )
+            continue
+
+        if not isinstance(receipt_data, dict):
+            violations.append(
+                "%s.receipt %r: top-level JSON value must be an object" % (where, receipt)
+            )
+            continue
+
+        addressed = receipt_data.get("findings_addressed")
+        covered_ids = set()
+        if isinstance(addressed, list):
+            for fa in addressed:
+                if isinstance(fa, dict):
+                    fid = fa.get("finding_id")
+                    if isinstance(fid, str) and fid:
+                        covered_ids.add(unicodedata.normalize("NFC", fid))
+
+        # Membership test restricted to entries already validated as non-empty
+        # strings above -- a non-string/unhashable finding_ids element (e.g. a
+        # nested JSON array or object) already produced its own VIOLATION and
+        # is simply excluded here, never handed to `in` on a set (which would
+        # raise TypeError: unhashable type and abort the whole run at exit 2).
+        string_ids = [fid for fid in finding_ids if isinstance(fid, str) and fid.strip()]
+        if string_ids:
+            missing = [
+                fid for fid in string_ids
+                if unicodedata.normalize("NFC", fid) not in covered_ids
+            ]
+            if missing:
+                violations.append(
+                    "%s: finding_ids %r not covered by %r's findings_addressed"
+                    % (where, missing, receipt)
+                )
+
+
+def validate_ledger(data, project_root="."):
     violations = []
+
+    real_root = os.path.realpath(project_root)
+    degenerate_root = real_root == os.path.abspath(os.sep) or not os.path.isdir(real_root)
+    if degenerate_root:
+        violations.append(
+            "project_root %r resolves to %r -- must be an existing directory other than the "
+            "filesystem root (containment against the root is a tautology)" % (project_root, real_root)
+        )
 
     ledger = data.get("ledger")
     if not isinstance(ledger, list):
@@ -542,6 +677,12 @@ def validate_ledger(data):
                 % (WORK_UNIT_COMMITS_AGENT,)
             )
 
+        # A degenerate project_root already failed closed above; short-circuit
+        # every check that would touch the filesystem rather than opening a
+        # cited receipt against an unbounded root (SEC F-5).
+        if not degenerate_root:
+            _check_inline_closures(close, project_root, violations)
+
     return violations, []
 
 
@@ -577,9 +718,12 @@ def _read_and_parse(path):
 def main():
     parser = argparse.ArgumentParser(
         prog="check-receipt.py",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
-            "Structural validator for the Review Receipt and Brief File ledger JSON "
-            "sidecars. Modes: receipt <file.json> [project_root] | ledger <file.json>."
+            "Structural validator for the Review Receipt and Brief File ledger JSON sidecars.\n"
+            "Modes:\n"
+            "  receipt <file.json> [project_root]\n"
+            "  ledger <file.json> [project_root]"
         ),
     )
     subparsers = parser.add_subparsers(dest="mode", required=True)
@@ -595,6 +739,12 @@ def main():
 
     ledger_parser = subparsers.add_parser("ledger", help="validate a Brief File ledger sidecar")
     ledger_parser.add_argument("file", help="path to the ledger .json sidecar")
+    ledger_parser.add_argument(
+        "project_root",
+        nargs="?",
+        default=".",
+        help="repo root close.inline_closures[].receipt entries resolve against (default: .)",
+    )
 
     args = parser.parse_args()
 
@@ -611,7 +761,7 @@ def main():
         if args.mode == "receipt":
             violations, infos = validate_receipt(data, args.project_root)
         else:
-            violations, infos = validate_ledger(data)
+            violations, infos = validate_ledger(data, args.project_root)
     except Exception as exc:  # noqa: BLE001 -- fail-closed: never a traceback
         sys.stderr.write("ERROR %s: %s: %s\n" % (args.file, type(exc).__name__, exc))
         sys.exit(2)

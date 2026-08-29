@@ -357,8 +357,8 @@ logged as a one-line audit event rather than a scope amendment (**Execution gear
 ## Close
 (written when status flips to done — the two canonical, machine-readable totals below may
 appear anywhere in this section, not by bullet position; every other line is free-form prose;
-sidecar <brief>.json carries the same two totals plus `commits`/`re_briefs` for the structural
-check below — kept in sync with this section, never diverging from it)
+sidecar <brief>.json carries the same two totals plus `commits`/`re_briefs`/`inline_closures` for
+the structural check below — kept in sync with this section, never diverging from it)
 - delegations: <int>          # MUST equal the Cost Ledger's row count
 - subagent_tokens: <int>       # MUST equal the sum of the Cost Ledger's tokens column; plain integer, no thousands separator
 (then free prose: re-brief count with causes; receipt reference(s); commit hashes)
@@ -370,16 +370,18 @@ Created at the task's first delegation; every delegation (including re-briefs) a
 maintains a JSON sidecar next to the Brief File — `.ai-team/briefs/YYYY-MM-DD-<slug>.json`,
 same slug, updated at every Cost Ledger row append and at the `## Close` write — schema:
 `{ "ledger": [ {"n", "agent", "model", "tokens", "tool_uses", "duration_s", "outcome"} ],
-"close": {"delegations", "subagent_tokens", "commits", "re_briefs"} }` (field names mirror the
-`## Cost Ledger` table and `## Close` prose exactly; the `.md` file remains the human-readable
-narrative, the `.json` sidecar is what the gate below reads). Before flipping `status` to
-`done`, run:
+"close": {"delegations", "subagent_tokens", "commits", "re_briefs", "inline_closures"} }` (field
+names mirror the `## Cost Ledger` table and `## Close` prose exactly — `inline_closures` is
+OPTIONAL, present only when this objective recorded an inline closure (Evidence-Tier Review →
+Delta re-validation → "Inline closure"); the `.md` file remains the human-readable narrative,
+the `.json` sidecar is what the gate below reads). Before flipping `status` to `done`, run:
 
 ```
-python3 skills/_shared/scripts/check-receipt.py ledger {brief-file-path with .md replaced by .json}
+python3 skills/_shared/scripts/check-receipt.py ledger {brief-file-path with .md replaced by .json} [project_root]
 ```
 
-Exit 0 → `delegations`, `subagent_tokens`, and the `work-unit-commits` row are all confirmed
+Exit 0 → `delegations`, `subagent_tokens`, the `work-unit-commits` row, and every
+`close.inline_closures` entry (receipt on disk under the root, ids covered) are all confirmed
 consistent; flip to `done`. Exit 1 → fix the sidecar (or the `## Close` prose it mirrors) per
 the printed `VIOLATION` lines before flipping. Exit 2 → the sidecar could not be validated at all: missing on
 disk (never written), unreadable, not valid UTF-8, a top-level JSON value that is not an
@@ -660,7 +662,13 @@ addendum entry without gate evidence or without its `files` list is invalid. Two
 `findings_addressed` addendum together cover the post-edit tree, closing the coverage gap
 between the reviewed tree and the committed tree. `findings_addressed` NEVER alters `verdict`:
 an inline closure is never a substitute for a delta pass, and a `review-blocked` receipt clears
-only via a delta/full pass or a recorded override.
+only via a delta/full pass or a recorded override. The orchestrator additionally appends one
+`{ receipt, finding_ids }` entry to the current objective's Brief File ledger sidecar's
+`close.inline_closures[]` — `receipt` the repo-relative path to the receipt `.json` sidecar just
+amended, `finding_ids` the closed findings' ids — so the Brief File structural check (above) and
+any later retro can recover the inline-closure count mechanically, from the sidecar, rather than
+by re-parsing free-form Amendments prose (schema: `result-envelope.md` → "Brief File Ledger JSON
+sidecar").
 
 ### Citation audit (tier ≥ 1, mechanical, BLOCKING)
 

@@ -53,6 +53,16 @@ written yet).
   (a fresh `organic-implementer` row following a `review-blocked`/`needs_input`/`blocked`
   row), grouped by cause (review-blocked finding, needs_input, blocked/scope-large, infra-death, amendment
   request).
+- **Inline-closure count**: when the Brief File's `.json` sidecar exists, source this figure
+  from `close.inline_closures` (its entry count — `_shared/result-envelope.md` → "Brief File
+  Ledger JSON sidecar"), the same machine-validated field the Metrics table above draws from.
+  Fall back to counting inline-closure mentions in the `.md` Brief File's `## Amendments` prose
+  ONLY when no sidecar exists (legacy Brief File, written before this field existed) —
+  `## Close` never prescribed recording inline closures, and neither did any protocol
+  section — before the sidecar field existed, the orchestrator's free-form `## Amendments`
+  narrative was the only durable trace of one. A count derived from prose is therefore NOT
+  a ledger figure: render it as "inline closures: not recorded in the ledger sidecar (prose
+  mentions in Amendments: N)", never as a bare number in the Metrics table.
 - **Totals**: sum only the ledger's own token/duration/agent-count columns.
 
 ## Watch-items for the next task

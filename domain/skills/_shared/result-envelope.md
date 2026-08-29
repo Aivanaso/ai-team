@@ -296,7 +296,10 @@ only, exactly like the Brief File itself.
     "delegations": 1,
     "subagent_tokens": 50000,
     "commits": ["<commit hash>", "..."],
-    "re_briefs": 0
+    "re_briefs": 0,
+    "inline_closures": [
+      { "receipt": "<repo-relative path to a receipt .json sidecar>", "finding_ids": ["F-1", "..."] }
+    ]
   }
 }
 ```
@@ -305,10 +308,10 @@ only, exactly like the Brief File itself.
 section — absent while the task is `active`/`paused`) — and the gate below has exactly one
 prescribed invocation, immediately before that flip, so `close` is REQUIRED at the moment the
 gate runs: `ledger` mode never accepts a missing `close` as "task still in progress, nothing to
-check yet". Validated by `python3 skills/_shared/scripts/check-receipt.py ledger <sidecar>`
-(`orchestrator-protocol.md` → Task Brief → "Brief File structural check"). Every check the
-validator performs, synced to the code (this doc follows the code, never the reverse — a future
-change to `validate_ledger` updates this list in the same commit):
+check yet". Validated by `python3 skills/_shared/scripts/check-receipt.py ledger <sidecar>
+[project_root]` (`orchestrator-protocol.md` → Task Brief → "Brief File structural check"). Every
+check the validator performs, synced to the code (this doc follows the code, never the reverse —
+a future change to `validate_ledger` updates this list in the same commit):
 
 - `ledger` must be a list; every row must be an object.
 - Each row's `n`, `tokens`, `tool_uses`, `duration_s` must be a plain integer — `true`/`false`
@@ -325,6 +328,21 @@ change to `validate_ledger` updates this list in the same commit):
   identity check, never a substring/contains test, so a spoofed or typo'd agent name (e.g.
   `"work-unit-commits-not-really"`) cannot satisfy the invariant that a real commit-creating
   delegation actually ran.
+- `close.inline_closures` is OPTIONAL — absent OR explicit `null` means no inline closures
+  happened; every ledger sidecar written before this field existed validates exactly as it always
+  did. When present (and non-null), it must be a list of `{ receipt, finding_ids }` objects:
+  `receipt` is a non-empty, repo-relative path ENFORCED to end in `.json` that must exist and be
+  CONTAINED under the validator's `project_root` argument (`ledger` mode accepts an optional
+  `[project_root]` positional, defaulting to `.`, resolved with the same degenerate-root rule as
+  receipt mode — a degenerate root short-circuits this entire check, before any cited receipt is
+  opened); `finding_ids` is a non-empty list of non-empty strings, each compared — after Unicode
+  NFC normalization, mirroring the duplicate-id check's own rationale — against that receipt's own
+  `findings_addressed[].finding_id` values, themselves NFC-normalized the same way (the
+  orchestrator's Inline closure procedure — `orchestrator-protocol.md` → Evidence-Tier Review →
+  Delta re-validation — appends one such entry per inline closure it records). A `finding_ids`
+  entry that is not a non-empty string (including a non-hashable JSON array/object) is its own
+  VIOLATION and is simply excluded from the coverage comparison — never a crash, never escalated
+  to exit 2.
 
 ## Rules
 
