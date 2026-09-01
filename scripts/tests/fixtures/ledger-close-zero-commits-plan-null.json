@@ -7,10 +7,8 @@
   "close": {
     "delegations": 3,
     "subagent_tokens": 85000,
-    "commits": ["a1b2c3d"],
-    "re_briefs": 0,
-    "inline_closures": [
-      { "receipt": "scripts/tests/fixtures/inline-closure-receipt-good.txt", "finding_ids": ["F-1"] }
-    ]
-  }
+    "commits": [],
+    "re_briefs": 0
+  },
+  "plan": null
 }

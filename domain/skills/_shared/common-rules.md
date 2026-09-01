@@ -24,17 +24,17 @@ Read application code, never modify it. Source files are read only to verify des
 
     - Writes application source files (exception to read-only principle — this skill's primary responsibility).
 
-This is the only exception. Every other skill on this route (`organic-reviewer`, `organic-security`, `organic-scout`, `work-unit-commits`, `organic-retro`) remains fully bound by the read-only principle — `work-unit-commits` writes to the working tree only via `git add`/`git commit` (Principle 2's exception), never by editing file contents.
+This is the only exception. Every other skill on this route (`organic-reviewer`, `organic-security`, `organic-scout`, `organic-retro`) remains fully bound by the read-only principle.
 
 ## Principle 2 — Write-scope (REQ-CR-003)
 
-Write only application files declared within a Task Brief's `allowed_edit_roots` (organic-implementer), via commit creation (work-unit-commits), or — for `organic-retro` in retro mode only — the retro file at its injected `report_destination`. No other skill on this route writes to any path. Shared protocols, SKILL.md files, project config files, and CI/CD pipelines are ALL read-only for every delegated skill; they are modified only by editing this framework directly. The scope-amendment channel's protected-path denylist (`_shared/result-envelope.md` → "Intermediate envelope — paused") extends this same read-only boundary to a worker's amendment proposals specifically.
+Write only application files declared within a Task Brief's `allowed_edit_roots` (organic-implementer), or — for `organic-retro` in retro mode only — the retro file at its injected `report_destination`. No delegated skill on this route creates commits — commit creation is an orchestrator-inline action, never delegated (`orchestrator-protocol.md` → "Commit creation"). No other skill on this route writes to any path. Shared protocols, SKILL.md files, project config files, and CI/CD pipelines are ALL read-only for every delegated skill; they are modified only by editing this framework directly. The scope-amendment channel's protected-path denylist (`_shared/result-envelope.md` → "Intermediate envelope — paused") extends this same read-only boundary to a worker's amendment proposals specifically.
 
 **Enforcement for organic-implementer:** its application-code write surface is bounded by the Task Brief's `allowed_edit_roots` element, using the within-roots (segment-prefix) definition in the orchestrator's Roots Computation rule rather than a rule of its own. Before writing any application-source file, it checks the target path against those roots. A write whose target path falls outside all roots is a blocking deviation — organic-implementer performs no such write and returns per its own Decision Gates (`scope_report.kind: out-of-roots`).
 
-### Exception: work-unit-commits
+### Exception: orchestrator commit creation
 
-`work-unit-commits` writes to the working tree via `git add` + `git commit` in auto mode. This is a deliberate exception — work-unit-commits is the exclusive owner of commit creation on this route; every other skill uses only read-only git commands.
+The orchestrator itself writes to the working tree via `git add` + `git commit` — a deliberate exception (Principle 4's named seniority exceptions), gated fail-closed for tier ≥ 1 by a `check-receipt.py receipt` re-run immediately before the commit (`orchestrator-protocol.md` → "Commit creation"). Every delegated skill on this route still uses only read-only git commands.
 
 ## Principle 3 — Envelope-always (REQ-CR-004)
 
@@ -46,11 +46,10 @@ Each role on the route has a single authority and a single product. Each role op
 
 | Role | Authority | Product | Boundary |
 |------|-----------|---------|----------|
-| **Coordinating skill** (the orchestrator, in `_shared/orchestrator-protocol.md`) | Coordinate delegation, classify scope, decide the evidence tier and route review | Delegation prompts; Evidence-Tier Review classification; the review receipt's `overrides` field; the Brief File under `.ai-team/briefs/` (the route's audit trail) | Delegates all code execution, application-artifact writing, and test runs to skills — two named exceptions: the trivial-edit floor (`orchestrator-protocol.md` → Delegation Philosophy) and inline closure of a review-clear receipt's mechanical findings, verification-gate re-run only (`orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation); sole author of the Brief File; is the exclusive author of a user-accepted override. |
+| **Coordinating skill** (the orchestrator, in `_shared/orchestrator-protocol.md`) | Coordinate delegation, classify scope, decide the evidence tier and route review, create the commit | Delegation prompts; Evidence-Tier Review classification; the review receipt's `overrides` field; the Brief File under `.ai-team/briefs/` (the route's audit trail); commits in the working tree | Delegates all code execution, application-artifact writing, and test runs to skills — three named exceptions: the trivial-edit floor (`orchestrator-protocol.md` → Delegation Philosophy), inline closure of a review-clear receipt's mechanical findings, verification-gate re-run only (`orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation), and commit creation, gated fail-closed for tier ≥ 1 by its own `check-receipt.py` re-run (`orchestrator-protocol.md` → "Commit creation"); sole author of the Brief File; is the exclusive author of a user-accepted override. |
 | **Discovery skill** (`organic-scout`) | Optional pre-brief exploration to cut scope uncertainty; bootstrap `.ai-team/config.yaml` | Findings summary; `scope_proposal` (when requested); `config.yaml` | Read-only on application code; never writes application files. |
-| **Implementing skill** (`organic-implementer`) | Implement one Task Brief in one repo exactly; verify against the brief's declared acceptance checks; OR pause with a scope-amendment request, OR block, per its own Decision Gates | Application source files bounded by the brief's `allowed_edit_roots`; bounded result envelope | Authors no audit-trail entry itself (the audit trail is the orchestrator's Brief File under `.ai-team/briefs/` — see `orchestrator-protocol.md` → "Task Brief" → "Brief File (durable copy)"; organic-implementer neither reads nor writes it); creates no commits (work-unit-commits owns commit creation); uses no git commands beyond read-only inspection needed to run acceptance checks. |
+| **Implementing skill** (`organic-implementer`) | Implement one Task Brief in one repo exactly; verify against the brief's declared acceptance checks; OR pause with a scope-amendment request, OR block, per its own Decision Gates | Application source files bounded by the brief's `allowed_edit_roots`; bounded result envelope | Authors no audit-trail entry itself (the audit trail is the orchestrator's Brief File under `.ai-team/briefs/` — see `orchestrator-protocol.md` → "Task Brief" → "Brief File (durable copy)"; organic-implementer neither reads nor writes it); creates no commits (the orchestrator creates the commit inline — `orchestrator-protocol.md` → "Commit creation"); uses no git commands beyond read-only inspection needed to run acceptance checks. |
 | **Auditing skills** (`organic-reviewer`, `organic-security`) | Diagnose correctness/security defects in the candidate's `group_files`; `organic-reviewer` alone emits the blocking verdict (`review-clear` / `review-blocked`) | Review Receipt (schema: `_shared/result-envelope.md` → Review Receipt); the on-disk report at the orchestrator-injected `report_destination` — optional from this skill's own write step, but ALWAYS injected and ALWAYS written for a review-plane pass from the orchestrator's side (`orchestrator-protocol.md` → Critical Context Forwarding) | Read-only on application code; MUST NOT run state-changing git commands; MUST NOT populate the receipt's `overrides` field — only the orchestrator records a user-accepted override. |
-| **Mechanical skill** (`work-unit-commits`) | Stage the declared `group_files` and create one commit per group (auto/manual); enforce the receipt gate for tier ≥ 1 candidates | Commits in the working tree | The exclusive owner of commit creation; creates no audit-trail entry itself (the Brief File is the route's audit trail, orchestrator-authored only — see `_shared/persistence-contract.md`); refuses to commit a tier ≥ 1 candidate whose Review Receipt is absent. |
 | **Retro skill** (`organic-retro`) | Post-task retrospective + convention-capture proposals, composed from durable evidence only | Retro file at the injected `report_destination` (mode: `retro`); `conventions_proposed` in the envelope (either mode) | Read-only everywhere, including Brief Files (named READ exception, mode `retro` only — the sole delegated skill authorized to read one, per `_shared/persistence-contract.md` → "Brief File ownership"); writes ONLY its own retro file; never writes `CLAUDE.md`, `AGENTS.md`, or any config file; never invoked mid-task — delegated only after a Brief File closes (`orchestrator-protocol.md` → "Retro trigger") or on an explicit provisional request. |
 
 ### Why this exists
@@ -58,16 +57,17 @@ Each role on the route has a single authority and a single product. Each role op
 The most common failure mode is the implementer laundering its own gaps through a free-form
 evidence field. The fix is structural: deny the implementer the write surface an auditor or a
 commit-gate needs, and give the orchestrator sole authority over overrides. The audit role
-belongs to `organic-reviewer`/`organic-security`, the commit gate belongs to
-`work-unit-commits`, and the override record belongs exclusively to the orchestrator (Evidence
+belongs to `organic-reviewer`/`organic-security`; the commit gate and the override record both
+belong exclusively to the orchestrator (Evidence
 Protocol Rule 6).
 
 ### Enforcement
 
 - `organic-implementer`'s Output Contract carries no field that could double as an audit-trail
   write path — `scope_report` is a bounded block-and-escalate report, not a decision log.
-- `work-unit-commits` refuses to commit a tier ≥ 1 candidate without its injected Review
-  Receipt (Decision Gates).
+- The orchestrator refuses to commit a tier ≥ 1 candidate without its Review Receipt and a
+  clean `check-receipt.py receipt` re-run immediately before the commit (`orchestrator-protocol.md`
+  → "Commit creation").
 - `organic-reviewer` and `organic-security` return `overrides: []` on every run — the
   orchestrator is the only party that populates that field.
 - The reference bullet in every affected SKILL.md's Hard Rules section names this principle
@@ -95,12 +95,12 @@ A **logical group** on this route is one Task Brief delegated to `organic-implem
 
 ### group_id
 
-The brief-slug label the orchestrator assigns when composing the Task Brief — stable across every re-delegation counted against the shared re-brief budget (DD-14, `orchestrator-protocol.md`). Injected into `organic-reviewer`, `organic-security`, and `work-unit-commits`.
+The brief-slug label the orchestrator assigns when composing the Task Brief — stable across every re-delegation counted against the shared re-brief budget (DD-14, `orchestrator-protocol.md`). Injected into `organic-reviewer` and `organic-security`; the orchestrator reuses the same label, unchanged, for its own commit creation (`orchestrator-protocol.md` → "Commit creation").
 
 ### group_files — canonical definition
 
-`group_files` is the declared file set for one group: the **union** of the brief's `expected_files` paths and the returned implementer envelope's `artifacts` paths. The union closes the gap between what the brief predicted and what the worker actually produced — a worker may touch a surface `expected_files` did not name in full, or a partial run may return fewer `artifacts` than `expected_files` listed. Skills that consume the file set (`organic-reviewer`, `organic-security`, `work-unit-commits`) read the injected `group_files` value directly; none of them re-derives it from a plan artifact. The brief's `expected_files` half of this union may originate from the scout's checklist-verified `scope_proposal` or from the orchestrator composing it directly (`orchestrator-protocol.md` → Task Brief → Scope Verification Checklist) — either way the union is computed the same way.
+`group_files` is the declared file set for one group: the **union** of the brief's `expected_files` paths and the returned implementer envelope's `artifacts` paths. The union closes the gap between what the brief predicted and what the worker actually produced — a worker may touch a surface `expected_files` did not name in full, or a partial run may return fewer `artifacts` than `expected_files` listed. Skills that consume the file set (`organic-reviewer`, `organic-security`) read the injected `group_files` value directly; none of them re-derives it from a plan artifact. The orchestrator itself reuses the same computed set, unchanged, to scope its own commit staging (`orchestrator-protocol.md` → "Commit creation"). The brief's `expected_files` half of this union may originate from the scout's checklist-verified `scope_proposal` or from the orchestrator composing it directly (`orchestrator-protocol.md` → Task Brief → Scope Verification Checklist) — either way the union is computed the same way.
 
 ### Source of truth
 
-The orchestrator computes `group_files` once per candidate, after the implementer's envelope returns, and injects it verbatim into every downstream delegation for that candidate (Critical Context Forwarding, `orchestrator-protocol.md`). `work-unit-commits` treats an absent `group_files` injection as a fallback condition (Decision Gates in its own SKILL.md), never as an empty set. This holds regardless of `expected_files`' provenance — scout-proposed or orchestrator-composed — the orchestrator remains the sole party that fixes the list into the brief and computes `group_files`.
+The orchestrator computes `group_files` once per candidate, after the implementer's envelope returns, and injects it verbatim into every downstream delegation for that candidate (Critical Context Forwarding, `orchestrator-protocol.md`). This holds regardless of `expected_files`' provenance — scout-proposed or orchestrator-composed — the orchestrator remains the sole party that fixes the list into the brief, computes `group_files`, and reuses it unchanged for its own commit staging.

@@ -26,7 +26,7 @@ Delegated workers track no phase state and archive nothing — there is no state
 Everything else a skill produces is either:
 
 - an application source file, written by `organic-implementer`, bounded by the Task Brief's `allowed_edit_roots`; or
-- a git commit, created by `work-unit-commits`, the exclusive owner of commit creation; or
+- a git commit, created by the orchestrator inline, the exclusive owner of commit creation (`orchestrator-protocol.md` → "Commit creation"); or
 - a review/discovery report, written by `organic-reviewer`, `organic-security`, or `organic-scout` (discover mode) at an orchestrator-injected `report_destination` — no fixed path. Optional from the skill's side (written only when the destination is injected) but mandatory from the orchestrator's side for every review-plane (`organic-reviewer`, `organic-security`) and scope-authority (`organic-scout` discover mode feeding a Task Brief) delegation (`orchestrator-protocol.md` → Critical Context Forwarding) — "optional" survives only for a genuinely context-light output, e.g. a plain `organic-scout` bootstrap pass that feeds no brief, where the result envelope remains the sole record; or
 - a retro file, written by `organic-retro` (mode: `retro` only) at the orchestrator-injected `report_destination` (`.ai-team/retros/...`) — mandatory whenever the orchestrator's Retro trigger delegates it (`orchestrator-protocol.md` → "Retro trigger"); `organic-retro` in `conventions` mode writes nothing, returning `conventions_proposed` in the envelope only.
 
@@ -47,4 +47,4 @@ Everything else a skill produces is either:
 | Rule | Description |
 |------|-------------|
 | **Config first** | Read `.ai-team/config.yaml` (if present) before orienting on the target repo — project conventions and declared commands live there. |
-| **No assumptions** | Never assume a declared file exists — verify. `organic-implementer` verifies via its own Decision Gates; `work-unit-commits` verifies via its `group_files` staging discovery (stage only what `git status --porcelain` confirms is actually dirty). |
+| **No assumptions** | Never assume a declared file exists — verify. `organic-implementer` verifies via its own Decision Gates; the orchestrator verifies via its own `group_files` staging discovery at commit creation (stage only the intersection of `git status --porcelain`'s dirty paths and `group_files` — `orchestrator-protocol.md` → "Commit creation"). |

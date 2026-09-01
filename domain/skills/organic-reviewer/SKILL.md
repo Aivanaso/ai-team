@@ -1,6 +1,6 @@
 ---
 name: organic-reviewer
-description: "Trigger: orchestrator invokes after a tier>=1 candidate, before work-unit-commits. Correctness + verification gate."
+description: "Trigger: orchestrator invokes after a tier>=1 candidate, before its own commit creation. Correctness + verification gate."
 disable-model-invocation: true
 user-invocable: false
 ---
@@ -8,8 +8,9 @@ user-invocable: false
 ## Activation Contract
 
 Run when the orchestrator invokes the reviewer after `organic-implementer` returns `status: ok`
-(or a `warning` the user accepted) for a tier ≥ 1 candidate, and before `work-unit-commits`
-creates the commit. Produce a result envelope carrying the Review Receipt (schema:
+(or a `warning` the user accepted) for a tier ≥ 1 candidate, and before the orchestrator's own
+inline commit creation (`_shared/orchestrator-protocol.md` → "Commit creation"). Produce a
+result envelope carrying the Review Receipt (schema:
 `_shared/result-envelope.md` → Review Receipt). Reviews the exact diff a worker produced,
 never a plan. Read application code to find correctness defects and re-run verification
 evidence; never modify application code.

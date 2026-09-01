@@ -10,8 +10,8 @@
 # test_commands, review_gates, model_overrides, rules, retro) are optional and
 # safe-absent: added by hand, or accepted via the orchestrator's Config
 # Refresh Check. This file is the flat schema reference layered on top:
-# keys the orchestrator and work-unit-commits read but organic-scout
-# does not itself write.
+# keys the orchestrator reads (including at its own inline commit-creation
+# step) but organic-scout does not itself write.
 #
 # Model routing defaults and rationale are NOT duplicated here — read
 # domain/skills/_shared/orchestrator-protocol.md -> "Model Routing" (a
@@ -26,10 +26,11 @@
 #   conventions and declared commands.
 
 # commit_strategy: auto | manual
-#   Written by organic-scout on first bootstrap (default: auto). Read by
-#   work-unit-commits (Decision Gates — default: auto if absent, WARNING
-#   emitted) and by the orchestrator when composing the work-unit-commits
-#   invocation (orchestrator-protocol.md -> "work-unit-commits Invocation").
+#   Written by organic-scout on first bootstrap (default: auto). Read by the
+#   orchestrator at its own inline commit-creation step (default: auto if
+#   absent): auto commits at the objective's close without pausing; manual
+#   presents the staged file set and waits for user confirmation
+#   (orchestrator-protocol.md -> "Commit creation").
 
 # model_overrides:
 #   {worker-name}: {model-alias}
@@ -39,8 +40,7 @@
 #   Project-level override of the Model Routing table's per-worker
 #   defaults. Read by the orchestrator (orchestrator-protocol.md ->
 #   "Model Routing" -> "Project Override"). Worker names: organic-implementer
-#   | organic-reviewer | organic-security | organic-scout | work-unit-commits
-#   | organic-retro.
+#   | organic-reviewer | organic-security | organic-scout | organic-retro.
 
 # strict_tdd: true | false
 #   Read by the orchestrator before delegating organic-implementer

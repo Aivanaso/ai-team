@@ -43,7 +43,9 @@ conventions:
   - "{constraint}"
   # Common examples (replace with detected): "max line length 120", "no default exports", "snake_case file names", "PSR-4 autoloading", "Conventional Commits", "strict mode enabled".
 
-commit_strategy: auto  # commit strategy for work-unit-commits skill: auto | manual
+commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits at each objective's
+                       # close without pausing; manual = presents the staged file set and waits for
+                       # user confirmation before committing (orchestrator-protocol.md -> "Commit creation")
 
 # strict_tdd: true
 #   Optional, safe-absent default: false. The orchestrator appends the
@@ -133,7 +135,7 @@ architecture:
 #   Routing"). Project-level override of the default model per delegated worker.
 #   organic-reviewer: sonnet   # e.g. downgrade from the opus default
 #   Worker names: organic-implementer | organic-reviewer | organic-security |
-#   organic-scout | work-unit-commits | organic-retro.
+#   organic-scout | organic-retro.
 
 # rules:
 #   Optional, safe-absent. Free-text custom rules for AI agents, added by hand

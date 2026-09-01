@@ -40,9 +40,11 @@ review tier and names the reason:
 | **1** | Standard code change | `organic-reviewer` (correctness + verification) |
 | **2** | Auth/authz, crypto, secrets, payments, PII, migrations, untrusted-input parsing, permission checks, public contracts | `organic-reviewer` + `organic-security` |
 
-A tier ≥ 1 candidate produces a **Review Receipt**; `work-unit-commits` refuses to commit
+A tier ≥ 1 candidate produces a **Review Receipt**; the orchestrator refuses to commit
 tier ≥ 1 work without one. The user can accept-and-proceed over a finding instead of
-re-engaging the worker (recorded in the receipt's `overrides` field).
+re-engaging the worker (recorded in the receipt's `overrides` field). Commit creation itself is
+an orchestrator-inline action, never delegated — one atomic commit per objective, gated
+fail-closed for tier ≥ 1 by a `check-receipt.py` re-run immediately before the commit.
 
 ### Review kill switch
 
@@ -77,7 +79,6 @@ ai-team/
 │       ├── organic-reviewer/         # correctness + verification review gate
 │       ├── organic-security/         # threat-model / code-audit security lens
 │       ├── organic-scout/            # bootstrap config.yaml / pre-brief discovery
-│       ├── work-unit-commits/        # atomic commits per logical group
 │       └── organic-retro/            # post-task retrospective + convention-capture proposals
 ├── adapters/
 │   ├── claude-code/                  # Claude Code adapter
@@ -172,6 +173,9 @@ copy)"). A project accumulates these filesystem artifacts:
 - `.ai-team/briefs/` — one durable Brief File per task, orchestrator-authored only: audit
   trail, cost ledger, and pause/resume state. Session Init → "Brief Resume Check" offers to
   resume any `active`/`paused` brief at the start of the next session.
+- `.ai-team/tech-debt.md` — queued/deferred findings ledger, orchestrator-authored only: a
+  pre-existing or out-of-group CRITICAL/MAJOR finding routed here instead of in-task
+  remediation (format: `domain/skills/_shared/orchestrator-protocol.md`).
 - `.ai-team/retros/` — per-task retrospectives, written by `organic-retro` (mode: `retro`) at
   an orchestrator-injected `report_destination` when a task's Brief File closes (format:
   `domain/skills/organic-retro/references/retro-format.md`). Delegated per the `retro:`
@@ -193,8 +197,11 @@ per worker and the project-level `model_overrides` override mechanism.
 | `organic-reviewer` | Correctness + verification review gate (tier ≥ 1) |
 | `organic-security` | Threat-model and code-audit security lens (tier 2, or standalone) |
 | `organic-scout` | Bootstrap `config.yaml`, or run pre-brief discovery |
-| `work-unit-commits` | Atomic commit per logical group; enforces the receipt gate |
 | `organic-retro` | Post-task retrospective + convention-capture proposals, from durable evidence |
+
+Commit creation is not a delegated skill — the orchestrator creates one atomic commit per
+objective inline, gated fail-closed for tier ≥ 1 by its own receipt-gate re-run (see
+"Evidence-tiered review" above).
 
 ## License
 

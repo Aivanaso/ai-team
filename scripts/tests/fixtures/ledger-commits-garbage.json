@@ -20,7 +20,7 @@
     },
     {
       "n": 3,
-      "agent": "work-unit-commits",
+      "agent": "commit-step",
       "model": "sonnet",
       "tokens": 5000,
       "tool_uses": 3,

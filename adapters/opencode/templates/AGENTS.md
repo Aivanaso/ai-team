@@ -36,7 +36,10 @@ requires one of:
   takeover and finish inline;
 - the **trivial-edit floor**: a trivial mechanical edit (typo, accent, rename, one-line
   doc/config tweak — zero analysis, zero logic) where composing the Task Brief would cost
-  more than the edit itself. Do those inline without ceremony.
+  more than the edit itself. Do those inline without ceremony;
+- **commit creation**, which the orchestrator itself performs inline once per objective,
+  gated fail-closed for tier ≥ 1 (`~/.config/opencode/skills/_shared/orchestrator-protocol.md`
+  → "Commit creation").
 
 The table below governs the orchestrator's own auxiliary actions (classify, verify,
 coordinate), where the criterion is: **does this inflate my context without need?**
@@ -47,6 +50,7 @@ coordinate), where the criterion is: **does this inflate my context without need
 | Read to explore/understand (4+ files) | -- | Yes |
 | Read as preparation for writing | -- | Yes, together with the write |
 | Bash for state (git, gh) | Yes | -- |
+| Commit creation (`git add` + `git commit`, gated fail-closed for tier ≥ 1 — see "Commit creation" in `~/.config/opencode/skills/_shared/orchestrator-protocol.md`) | Yes | -- |
 | Bash for execution (test, build, install) | -- | Yes |
 | Write application code (any size, even one file) | -- | Yes |
 | Write with analysis (multiple files, new logic) | -- | Yes |
@@ -164,7 +168,8 @@ A brief-time Specialist Activation Matrix preview shown to the user before deleg
 nothing — only this post-candidate classification is authoritative, and a mismatch between the
 two is normal. Remediation may chain through delta re-validation instead of a full re-review — only when it touches solely receipt-covered files and adds no new surface, and at most 2 consecutive delta passes per objective (orchestrator-counted; a full pass resets the count);
 the resulting receipt's `verdict_history` chains prior passes and its FINAL entry is the gate
-`work-unit-commits` reads.
+input for the orchestrator's own inline commit-creation step (protocol's **Commit creation**
+section).
 
 The Review Receipt lives on disk as a JSON sidecar next to the lens's `.md` report — the same
 path, `.md` replaced by `.json`. That sidecar, never the `.md` narrative, is what the BLOCKING
@@ -196,7 +201,7 @@ plan entry.
 
 ## Sub-Agent Delegation
 
-Use `task({agent: "organic-{worker}", prompt: "..."})` or `task({agent: "work-unit-commits", prompt: "..."})` — every delegation is synchronous, named-type: it reads its skill file, does its work, and returns one envelope, then terminates. The scope-amendment channel (`status: paused` + one orchestrator continuation, per **Synchronous delegation — no live-agent continuation**) is the sole exception.
+Use `task({agent: "organic-{worker}", prompt: "..."})` — every delegation is synchronous, named-type: it reads its skill file, does its work, and returns one envelope, then terminates. Commit creation is never delegated this way — it is an orchestrator-inline action (protocol's **Commit creation** section). The scope-amendment channel (`status: paused` + one orchestrator continuation, per **Synchronous delegation — no live-agent continuation**) is the sole exception.
 
 Each sub-agent call MUST include:
 1. The skill path (reference `~/.config/opencode/skills/{name}/SKILL.md`)

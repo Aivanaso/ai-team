@@ -117,18 +117,19 @@
 # at all -- no new citation exception is needed, since every rule the `plan`
 # field adds is a pure shape/arithmetic check over already-parsed JSON (no
 # filesystem access). Each negative fixture is derived from ledger-good.json's
-# ledger/close shape (a few extended to carry a second work-unit-commits row
-# and a second commit, so `plan`'s two-entry fixtures have enough rows/commits
-# to satisfy the at-Close count rules on their own) and isolates to exactly
-# one rule: ledger-plan-not-list (plan not a list), ledger-plan-entry-not-object
+# ledger/close shape (a few extended to carry a second commit-step row and a
+# second commit, so `plan`'s two-entry fixtures have enough commits to
+# satisfy the at-Close count rule on their own) and isolates to exactly one
+# rule: ledger-plan-not-list (plan not a list), ledger-plan-entry-not-object
 # (an entry that is not an object), ledger-plan-n-gap (n skips a value),
 # ledger-plan-n-not-int (n is the float 1.0 -- the one non-int shape the n-sequence rule alone cannot catch, so the strict-int guard is the sole rule that rejects it), ledger-plan-title-empty,
 # ledger-plan-done-not-bool, ledger-plan-not-done-at-close (an entry not done
-# when close is present), ledger-plan-fewer-commit-rows (fewer
-# work-unit-commits ledger rows than plan entries) and ledger-plan-fewer-commits
-# (fewer close.commits entries than plan entries). ledger-plan-good and
-# ledger-plan-null are the two positives -- plan absent/null validates exactly
-# as a legacy sidecar always did (D-D).
+# when close is present) and ledger-plan-fewer-commits (fewer close.commits
+# entries than plan entries -- the sole at-Close count rule; the orchestrator
+# creates at least one commit per done plan entry, orchestrator-protocol.md
+# -> "Commit creation"). ledger-plan-good and ledger-plan-null are the two
+# positives -- plan absent/null validates as before, EXCEPT the unconditional
+# close.commits >= 1 floor, which applies plan or no plan (D-D).
 #
 # Runs known-NEGATIVE fixtures FIRST (must exit 1) and known-EXIT-2 fixtures
 # next (must exit 2 -- usage/parse failures that prevent validation from
@@ -215,7 +216,6 @@ assert_exit "receipt-file-not-on-disk" 1 "$VALIDATOR" receipt "$FIXTURES/receipt
 assert_exit "receipt-not-json" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-not-json.json" "$REPO_ROOT"
 assert_exit "ledger-bad-sum" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-bad-sum.json"
 assert_exit "ledger-tokens-string" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-tokens-string.json"
-assert_exit "ledger-missing-commits-row" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-missing-commits-row.json"
 
 # --- New negatives: containment (SEC-F-1/F-2), empty-but-passing
 #     (REV-F-1/F-2/F-13/F-14, SEC-F-5), type strictness (REV-F-5/F-6/F-7),
@@ -235,7 +235,6 @@ assert_exit "ledger-no-close" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-no-close.j
 assert_exit "ledger-close-bool" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-bool.json"
 assert_exit "ledger-negative-tokens" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-negative-tokens.json"
 assert_exit "ledger-duplicate-n" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-duplicate-n.json"
-assert_exit "ledger-fake-commits-agent" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-fake-commits-agent.json"
 
 # --- Pass-2 negatives: kind enum, fragment/correctness exclusivity, verification
 #     shape + non-empty (zero-work class), absolute path INSIDE the root (isolates
@@ -425,7 +424,7 @@ ledger = {
     "ledger": [
         {"n": 1, "agent": "organic-implementer", "model": "sonnet", "tokens": 50000, "tool_uses": 12, "duration_s": 300, "outcome": "ok"},
         {"n": 2, "agent": "organic-reviewer", "model": "opus", "tokens": 30000, "tool_uses": 8, "duration_s": 200, "outcome": "review-clear"},
-        {"n": 3, "agent": "work-unit-commits", "model": "sonnet", "tokens": 5000, "tool_uses": 3, "duration_s": 60, "outcome": "ok"},
+        {"n": 3, "agent": "commit-step", "model": "sonnet", "tokens": 5000, "tool_uses": 3, "duration_s": 60, "outcome": "ok"},
     ],
     "close": {
         "delegations": 3,
@@ -493,8 +492,20 @@ assert_violation_count "ledger-plan-n-not-int" 1 1 "$VALIDATOR" ledger "$FIXTURE
 assert_violation_count "ledger-plan-title-empty" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-title-empty.json" "$REPO_ROOT"
 assert_violation_count "ledger-plan-done-not-bool" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-done-not-bool.json" "$REPO_ROOT"
 assert_violation_count "ledger-plan-not-done-at-close" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-not-done-at-close.json" "$REPO_ROOT"
-assert_violation_count "ledger-plan-fewer-commit-rows" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-fewer-commit-rows.json" "$REPO_ROOT"
 assert_violation_count "ledger-plan-fewer-commits" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-fewer-commits.json" "$REPO_ROOT"
+
+# --- close.commits unconditional >= 1 floor (RG-1, tier-2 security F-1,
+#     re-brief 2/2): the plan-based rule above (close.commits >= len(plan))
+#     only fires when plan is a populated list, so it alone never catches a
+#     Close recorded with zero commits when plan is absent, null, or an empty
+#     list. Each fixture isolates to exactly the one new floor violation
+#     (calibration isolation, same assert_violation_count pattern as the
+#     ledger-plan-* block above) across the three plan shapes the finding
+#     named: absent, explicit null, and an empty list. ---
+
+assert_violation_count "ledger-close-zero-commits-no-plan" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-zero-commits-no-plan.json" "$REPO_ROOT"
+assert_violation_count "ledger-close-zero-commits-plan-null" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-zero-commits-plan-null.json" "$REPO_ROOT"
+assert_violation_count "ledger-close-zero-commits-plan-empty" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-zero-commits-plan-empty.json" "$REPO_ROOT"
 
 # --- Known-positive fixtures LAST: each must exit 0. ---
 
@@ -526,9 +537,10 @@ assert_exit "ledger-inline-closures-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledge
 
 assert_exit "ledger-inline-closures-mixed-nfd-nfc" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-mixed-nfd-nfc.json" "$REPO_ROOT"
 
-# --- ledger `plan[]` positives: plan absent OR explicit null validates
-#     exactly as a legacy sidecar always did (D-D); ledger-plan-good.json is a
-#     fully populated, all-done plan consistent with its ledger/close rows. ---
+# --- ledger `plan[]` positives: plan absent OR explicit null validates as
+#     before, EXCEPT the unconditional close.commits >= 1 floor (plan or no
+#     plan); ledger-plan-good.json is a fully populated, all-done plan
+#     consistent with its ledger/close rows. ---
 
 assert_exit "ledger-plan-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-good.json" "$REPO_ROOT"
 assert_exit "ledger-plan-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-null.json" "$REPO_ROOT"

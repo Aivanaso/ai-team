@@ -23,7 +23,7 @@ verification:
 overrides: []
 verdict: review-clear
 next_recommended:
-  - "work-unit-commits"
+  - "orchestrator: commit creation"
 risks: []
 model_used: "opus"
 context_resolution: self-loaded
@@ -50,7 +50,7 @@ verification:
 overrides: []
 verdict: review-clear
 next_recommended:
-  - "work-unit-commits"
+  - "orchestrator: commit creation"
 risks: []
 model_used: "opus"
 context_resolution: self-loaded
@@ -132,7 +132,7 @@ not_reverified:
   - "concurrency lens over src/session.ts — already clean in the prior full pass, outside this delta's changed files"
 verdict: review-clear
 next_recommended:
-  - "work-unit-commits"
+  - "orchestrator: commit creation"
 risks: []
 model_used: "opus"
 context_resolution: self-loaded

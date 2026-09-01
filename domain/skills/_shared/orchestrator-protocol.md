@@ -41,7 +41,8 @@ The table below governs the orchestrator's own auxiliary actions (classify, veri
 | Write planning notes shown to the user (plan-mode summaries) | Yes | -- |
 | Write application code (any size, even one file) | -- | Yes |
 | Write with analysis (multiple files, new logic) | -- | Yes |
-| Bash for state (git status/log/diff, gh) — never commit creation, which `work-unit-commits` owns exclusively | Yes | -- |
+| Bash for state (git status/log/diff, gh) | Yes | -- |
+| Commit creation (`git add` + `git commit`, gated fail-closed for tier ≥ 1 — see **Commit creation** below) | Yes | -- |
 | Bash for execution (test, build, install) | -- | Yes |
 
 Anti-patterns -- reading 4+ files or writing/testing multi-file changes inline, or reading files as prep and then editing inline instead of delegating the whole thing together -- ALWAYS inflate context without need.
@@ -252,7 +253,7 @@ bash skills/_shared/scripts/refresh-skill-registry.sh --project-root {project_ro
 
 (The installer rewrites `skills/_shared/` to the adapter's absolute install path.)
 
-- The script scans project skill roots first (`skills/`, `.claude/skills/`, `.opencode/skills/`, `.agents/skills/` — project wins name collisions), then user roots (`~/.claude/skills/`, `~/.config/opencode/skills/`, `~/.agents/skills/`), and writes `.ai-team/skill-registry.md`: an INDEX of stack/convention skills (name, full trigger description, scope, exact path). Pipeline skills (`organic-implementer`, `organic-reviewer`, `organic-scout`, `organic-security`, `organic-retro`, `work-unit-commits`, `_shared`) stay out — route workers are delegated by name, never matched by stack.
+- The script scans project skill roots first (`skills/`, `.claude/skills/`, `.opencode/skills/`, `.agents/skills/` — project wins name collisions), then user roots (`~/.claude/skills/`, `~/.config/opencode/skills/`, `~/.agents/skills/`), and writes `.ai-team/skill-registry.md`: an INDEX of stack/convention skills (name, full trigger description, scope, exact path). Pipeline skills (`organic-implementer`, `organic-reviewer`, `organic-scout`, `organic-security`, `organic-retro`, `_shared`) stay out — route workers are delegated by name, never matched by stack.
 - Freshness needs zero bookkeeping: a fingerprint cache (`.ai-team/.skill-registry.cache`, mtime+size of every SKILL.md found) makes the repeat run a millisecond "cache-hit" no-op, so adding/editing/removing any skill is picked up on the next session automatically.
 - Script missing at the install dir → proceed without a registry, tell the user once ("skill registry unavailable — run `scripts/install.sh`"), and delegate without skills blocks (sub-agents report `skill_resolution: none`).
 
@@ -267,7 +268,7 @@ The canonical, author-side contract the orchestrator composes and inlines into t
 | objective | One sentence: the observable outcome the worker must produce. | `objective` |
 | target repo | Absolute path to the single repository the worker writes in. All other brief paths are relative to it. | `target_repo` |
 | allowed edit roots | Repo-relative directories the worker may write inside. Validated with the within-roots (segment-prefix) definition in **Roots Computation** below. | `allowed_edit_roots` |
-| expected files | The files the brief expects to exist or change afterwards, each with its action. Contributes to `group_files` when a lens or `work-unit-commits` is activated — see **Logical group — canonical definition** in `common-rules.md`. | `expected_files` |
+| expected files | The files the brief expects to exist or change afterwards, each with its action. Contributes to `group_files` when a lens is activated, or when the orchestrator scopes its own commit staging (**Commit creation** below) — see **Logical group — canonical definition** in `common-rules.md`. | `expected_files` |
 | acceptance checks | Runnable commands the worker executes and the orchestrator can re-run, each with its expected outcome. An adjective ("works correctly") is not a check. When the objective's fix touches state one run leaves for the next (a branch, worktree, lock, or file shared between executions), the checks include a **second-run** check from the first brief — set up the state the fix leaves behind, then exercise the next run's entry path against it (error-reporting retro F1: three MAJOR regressions, all in the un-checked second-run path). | `acceptance_checks` |
 | out-of-scope | Explicit non-goals — what the worker must not do even if it looks adjacent. | `out_of_scope` |
 | constraints | Design decisions already taken that the worker honors and never re-decides — error semantics, validations NOT to add, defaults, timeouts/retries, where a behavior is documented. Each entry is verifiable by the reviewer without judgment. NEVER an implementation design no review pass has yet tested (a filter shape, an algorithm, a data structure the orchestrator merely prefers) — a constraint fixes what is already decided; a solution the review plane may still refute stays out of `constraints`, or the re-brief cannot adopt the lens's recommendation (G4 retro: constraint 2 blocked the same recommendation across two passes). An empty list is legal and means "none declared". | `constraints` |
@@ -357,7 +358,7 @@ When a lens is activated, inject `group_files` (the union of the brief's `expect
 
 **Guarded voluntary re-engage on an already `review-clear` receipt.** On a receipt whose verdict is already `review-clear`, the orchestrator re-briefs the implementer over a non-blocking finding ONLY when it can cite a **named criterion** from this closed list: (a) an `evidence: executed` MAJOR finding on one of three surfaces: a resource-lifecycle path (the reviewer's resource-lifecycle correctness lens, `organic-reviewer/SKILL.md` → Hard Rules), a path adjacent to a secret/credential (the Tier 2 surface list, Evidence-Tier Review), or — named here because neither source lists it — the control flow of a process that runs without a human watching (a cron job, daemon, or CI pipeline; unrelated to the `unattended` execution gear above); or (b) a finding that contradicts a declared acceptance check. Absent a named criterion, the default disposition for a non-blocking finding is accept-and-proceed with a recorded override (bulk or singular, per above) or deferral to a named later candidate (logged as a `.ai-team/tech-debt.md` entry — see **Pre-existing and out-of-group findings** below; an exposure figure attached, for a MAJOR whose `trigger` names a stored-data precondition, per **Exposure measurement for a stored-data precondition** below) — the criterion cited, or its absence, is recorded in the Brief File's Amendments section. A `review-blocked` receipt is unaffected by this guard — its three options above remain as written.
 
-**Pre-existing and out-of-group findings.** A CRITICAL or MAJOR finding routes to the tech-debt disposition instead of the four-way triage above ONLY when its defect mechanism is pre-existing (present on `base_ref`, untouched by the candidate diff) or its site lies outside `group_files`; a defect the candidate itself introduces never takes this disposition — it keeps the four-disposition triage in **Verdict handling** above; when that triage's outcome is deferral to a named later candidate, the deferral is still logged as a `.ai-team/tech-debt.md` entry (the citation in **Verdict handling** above, and the matching citations in **Guarded voluntary re-engage** and **Recommendation ingestion** rule 3), in the same entry format below. This disposition gate — pre-existing or out-of-group — scopes only which findings route here, and only at CRITICAL/MAJOR; the ledger itself records any deferred finding at whatever severity it was actually emitted, including a MINOR arriving via **Verdict handling**'s own per-finding triage, **Guarded voluntary re-engage**, or **Recommendation ingestion** rule 3. The finding is still reported to the user at its full severity, per **Reporting to the user**, BEFORE it is queued — queueing bounds the REACTION, never the emission, and never the decision to report it. Queueing a finding here never substitutes for its receipt-side disposition where one is owed: for a blocking CRITICAL, queueing never substitutes for its own singular `overrides` entry (`result-envelope.md` → Review Receipt → Rules; `work-unit-commits/SKILL.md` → Decision Gates), still required before the commit gate clears; below CRITICAL, the tech-debt entry IS the deferral's record — no receipt-side `overrides` entry is owed for it. The tech-debt entry is the durable memory of the deferral; for a CRITICAL, the override is what clears the gate. The orchestrator then appends one entry to `.ai-team/tech-debt.md` (tree placement and ownership: `_shared/persistence-contract.md`) instead of remediating the finding inside the current task. Entry format, one block or table row per finding: date, origin (the review receipt path + finding id, or `orchestrator observation` / `user report`), `file:line`, severity, a one-line mechanism, an exposure figure when measured, and status `open` | `fixed (commit hash)`. Entries are append-only, with one named exception: the `status` field, which a later fix flips in place — the one permitted in-place edit; no other field of an existing entry is ever rewritten, and a fix is never recorded as a duplicate row. In-task remediation of a queued finding requires explicit user approval recorded in the Brief File's `## Amendments`; absent that approval the fix is deferred and the task proceeds. That approval entry is an audit event, not a scope amendment, and is labeled as such in that entry — mirroring the mode-change precedent above (**Execution gears**) — so it never counts against the objective's 2-per-objective amendment cap (**Amendment ingestion**). **Boundary: an incidence/exposure measurement** (production-data counts, age in production, observed-failure counts) **may size the remediation and its scheduling, never the severity, never the decision to emit or report the finding** — sizing is a scheduling input, not a filter on what gets reported.
+**Pre-existing and out-of-group findings.** A CRITICAL or MAJOR finding routes to the tech-debt disposition instead of the four-way triage above ONLY when its defect mechanism is pre-existing (present on `base_ref`, untouched by the candidate diff) or its site lies outside `group_files`; a defect the candidate itself introduces never takes this disposition — it keeps the four-disposition triage in **Verdict handling** above; when that triage's outcome is deferral to a named later candidate, the deferral is still logged as a `.ai-team/tech-debt.md` entry (the citation in **Verdict handling** above, and the matching citations in **Guarded voluntary re-engage** and **Recommendation ingestion** rule 3), in the same entry format below. This disposition gate — pre-existing or out-of-group — scopes only which findings route here, and only at CRITICAL/MAJOR; the ledger itself records any deferred finding at whatever severity it was actually emitted, including a MINOR arriving via **Verdict handling**'s own per-finding triage, **Guarded voluntary re-engage**, or **Recommendation ingestion** rule 3. The finding is still reported to the user at its full severity, per **Reporting to the user**, BEFORE it is queued — queueing bounds the REACTION, never the emission, and never the decision to report it. Queueing a finding here never substitutes for its receipt-side disposition where one is owed: for a blocking CRITICAL, queueing never substitutes for its own singular `overrides` entry (`result-envelope.md` → Review Receipt → Rules; this file → **Commit creation**), still required before the commit gate clears; below CRITICAL, the tech-debt entry IS the deferral's record — no receipt-side `overrides` entry is owed for it. The tech-debt entry is the durable memory of the deferral; for a CRITICAL, the override is what clears the gate. The orchestrator then appends one entry to `.ai-team/tech-debt.md` (tree placement and ownership: `_shared/persistence-contract.md`) instead of remediating the finding inside the current task. Entry format, one block or table row per finding: date, origin (the review receipt path + finding id, or `orchestrator observation` / `user report`), `file:line`, severity, a one-line mechanism, an exposure figure when measured, and status `open` | `fixed (commit hash)`. Entries are append-only, with one named exception: the `status` field, which a later fix flips in place — the one permitted in-place edit; no other field of an existing entry is ever rewritten, and a fix is never recorded as a duplicate row. In-task remediation of a queued finding requires explicit user approval recorded in the Brief File's `## Amendments`; absent that approval the fix is deferred and the task proceeds. That approval entry is an audit event, not a scope amendment, and is labeled as such in that entry — mirroring the mode-change precedent above (**Execution gears**) — so it never counts against the objective's 2-per-objective amendment cap (**Amendment ingestion**). **Boundary: an incidence/exposure measurement** (production-data counts, age in production, observed-failure counts) **may size the remediation and its scheduling, never the severity, never the decision to emit or report the finding** — sizing is a scheduling input, not a filter on what gets reported.
 
 **Exposure measurement for a stored-data precondition.** Eligibility is one set, stated once: a CRITICAL or MAJOR finding being deferred or queued to a `.ai-team/tech-debt.md` entry — whichever of the three paths routed it there, the tech-debt disposition (**Pre-existing and out-of-group findings** above), **Verdict handling**'s own per-finding deferral, or **Guarded voluntary re-engage**'s deferral above — whose `trigger` names a stored-data precondition: a row count, a record's age, a state that exists only in production data. For that finding, the orchestrator measures the precondition's real-data exposure AFTER the finding is emitted and BEFORE it is presented to the user (**Reporting to the user** above). This measurement is the orchestrator's, not a lens's: it happens after the lens has already returned, at triage time, against production-shaped data a lens delegation cannot be assumed to reach. The measured figures land in the review receipt's `exposure[]` addendum (`result-envelope.md` → Review Receipt) and in the matching `.ai-team/tech-debt.md` entry's exposure field above. Sizing follows the **Boundary** sentence above without restating it here. Absent a stored-data precondition in the `trigger`, or when no measurement was taken, the finding carries no `exposure[]` entry — the addendum is optional, never owed for every queued finding.
 
@@ -374,7 +375,7 @@ The orchestrator's durable, on-disk copy of one task — audit trail, cost ledge
 task: "<title>"
 created_at: "<ISO-8601 UTC>"
 status: active | paused | done
-mode: normal            # normal | fast-forward | unattended — see "Execution gears" above (distinct from the `mode` flag injected into work-unit-commits, which carries commit_strategy auto|manual, and from organic-retro's `mode: retro | conventions`)
+mode: normal            # normal | fast-forward | unattended — see "Execution gears" above (distinct from the orchestrator's own `commit_strategy` flag, auto|manual, read at Commit creation, and from organic-retro's `mode: retro | conventions`)
 pending_question: null  # unattended only — set when paused on a stop-on-question event; cleared on resume
 base_ref: "<branch or commit the work builds on>"
 created_by: { tool: "<harness>", model: "<orchestrator model>" }
@@ -400,9 +401,11 @@ checks items as they complete — this is the pause/resume state; `## Plan` neve
 marks)
 ## Cost Ledger
 | # | agent | model | tokens | tool_uses | duration | outcome |
-(one row per delegation, appended at envelope ingestion; for an `organic-reviewer` delegation
-`outcome` names the pass type and verdict, e.g. `delta — review-clear` — the durable source the
-consecutive-delta cap counts from, Evidence-Tier Review → Delta re-validation)
+(one row per DELEGATION only, appended at envelope ingestion; for an `organic-reviewer`
+delegation `outcome` names the pass type and verdict, e.g. `delta — review-clear` — the durable
+source the consecutive-delta cap counts from, Evidence-Tier Review → Delta re-validation. The
+orchestrator's own commit creation — **Commit creation** below — is not a delegation and gains no
+ledger row; its evidence is `close.commits` plus the Phases checkbox it closes.)
 ## Amendments
 (records Scope Verification Checklist events — a brief-feeding discovery that returned no
 `scope_proposal`, or an item the orchestrator closed with its own evidence — and, when a
@@ -449,10 +452,10 @@ flipping `status` to `done`, run:
 python3 skills/_shared/scripts/check-receipt.py ledger {brief-file-path with .md replaced by .json} [project_root]
 ```
 
-Exit 0 → `delegations`, `subagent_tokens`, the `work-unit-commits` row, every
+Exit 0 → `delegations`, `subagent_tokens`, every
 `close.inline_closures` entry (receipt on disk under the root, ids covered), and, when `plan` is
-present, its shape and its at-Close rules (every entry done; ≥ N work-unit-commits rows; ≥ N
-commits) are all confirmed consistent; flip to `done`. Exit 1 → fix the sidecar (or the
+present, its shape and its at-Close rule (every entry done; `close.commits` count ≥ the plan's
+done-entry count) are all confirmed consistent; flip to `done`. Exit 1 → fix the sidecar (or the
 `## Close`/`## Plan` prose it mirrors) per the printed `VIOLATION` lines before flipping. Exit 2 → the sidecar could not be validated at all: missing on
 disk (never written), unreadable, not valid UTF-8, a top-level JSON value that is not an
 object, or any other failure that stops validation before a shape check runs — read the single
@@ -492,7 +495,7 @@ The only execution route: the orchestrator composes a Task Brief (above) and del
 #### What comes back
 
 One bounded result envelope per return — never a prose summary (a delegation that pauses returns
-its `paused` envelope first, then one terminal envelope). `organic-implementer` creates no commits: the orchestrator invokes `work-unit-commits` (the route's exclusive owner of commit creation, see Receipt and **work-unit-commits Invocation** below) with the injected context assembled per Critical Context Forwarding — a tier 0 candidate (or "review off") commits under ordinary policy, a tier ≥ 1 candidate requires the Review Receipt. When a skills block was forwarded, the envelope also reports `skill_resolution`. At every envelope ingestion the orchestrator appends one row to the Brief File's Cost Ledger and updates its Phases checkboxes (see **Task Brief** → "Brief File (durable copy)").
+its `paused` envelope first, then one terminal envelope). `organic-implementer` creates no commits: the orchestrator itself creates the commit inline (see Receipt and **Commit creation** below) — a tier 0 candidate (or "review off") commits under ordinary policy, a tier ≥ 1 candidate requires the Review Receipt and the fail-closed gate re-run. When a skills block was forwarded, the envelope also reports `skill_resolution`. At every envelope ingestion the orchestrator appends one row to the Brief File's Cost Ledger and updates its Phases checkboxes (see **Task Brief** → "Brief File (durable copy)").
 
 Route the return by its `status`:
 
@@ -513,7 +516,7 @@ Route the return by its `status`:
 On `status: paused` with `amendment_request.kind: scope-amendment` (schema:
 `result-envelope.md` → "Intermediate envelope — paused"): first, fold the envelope's `artifacts`
 into `group_files` immediately, before answering — an abandoned or later-denied pause still
-leaves its pre-pause writes visible to any lens or `work-unit-commits` invocation for this
+leaves its pre-pause writes visible to any lens delegation or the orchestrator's own commit staging for this
 candidate. (Disambiguation: the Brief File's frontmatter `status: paused`, task-level — interrupted,
 session ended mid-task, or an `unattended` stop-on-question — and the envelope's `status: paused`, delegation-level — this worker
 is waiting on one continuation message — are distinct states; the Brief File's `status` does not
@@ -687,7 +690,7 @@ and it verifies its own eligibility against the actual diff before trusting the 
 (`organic-reviewer/SKILL.md` → Execution Steps); a diff wider than the injected scope forces
 `verdict: review-blocked` rather than a silently widened review. The resulting receipt CHAINS:
 it carries `verdict_history` referencing the prior receipt(s) (`result-envelope.md` → Review
-Receipt); the chain's FINAL verdict is the gate input for `work-unit-commits`.
+Receipt); the chain's FINAL verdict is the gate input for the orchestrator's own commit gate (**Commit creation** below).
 
 **Delta budget.** When a re-brief closes ≥1 finding on an error-handling, signal/trap,
 timeout/retry, or idempotency path, the `## Re-engage Reason` block states the expected
@@ -764,22 +767,44 @@ python3 skills/_shared/scripts/check-receipt.py receipt {report_destination with
 
 ## Receipt
 
-Every delegated implementation returns a result envelope (bounded, per `organic-implementer`'s Output Contract). A tier ≥ 1 candidate additionally produces a review receipt — `tier`, `tier_reason`, per-lens results, verification evidence, citations, and any user-accepted overrides (full field shape lives in `result-envelope.md` → Review Receipt). `work-unit-commits` refuses to commit tier ≥ 1 work without its receipt.
+Every delegated implementation returns a result envelope (bounded, per `organic-implementer`'s Output Contract). A tier ≥ 1 candidate additionally produces a review receipt — `tier`, `tier_reason`, per-lens results, verification evidence, citations, and any user-accepted overrides (full field shape lives in `result-envelope.md` → Review Receipt). The orchestrator refuses to commit tier ≥ 1 work without its receipt (**Commit creation** below).
 
-## work-unit-commits Invocation
+## Commit creation
 
-After a candidate is ready — `organic-implementer` returns `status: ok` (or `warning` accepted by the user) — AND, when the diff is tier ≥ 1, `organic-reviewer` returns `review-clear` (or the user overrides a `review-blocked` verdict per Evidence-Tier Review) — invoke `work-unit-commits`:
+Commit creation is an orchestrator-inline action, never delegated — one of the named seniority
+exceptions alongside the trivial-edit floor and inline closure (Delegation Philosophy above;
+`common-rules.md` → Principle 4). It runs once per objective, after a candidate is ready:
+`organic-implementer` returns `status: ok` (or `warning` accepted by the user) AND the
+candidate's own acceptance checks pass AND, when the diff is tier ≥ 1, the chain's FINAL verdict
+is `review-clear` (or the user overrides a `review-blocked` verdict per Evidence-Tier Review) —
+never before every one of these resolves.
 
-```
-Inject: group_id={brief-slug}, mode={config.commit_strategy default auto if absent}, project_root={target_repo},
-        group_files={union of expected_files and the implementer envelope's artifacts}, tier={N}, tier_reason={one line}
-        [tier >= 1 only] Review Receipt: {organic-reviewer's returned receipt, verbatim}
-```
-
-- Invoke only after the candidate's own acceptance checks pass and, for tier ≥ 1, the review receipt exists; never before either resolves.
-- Read `commit_strategy` from `.ai-team/config.yaml`; default `auto` if the field is absent.
-- `group_files` and `tier`/`tier_reason` are always injected (Critical Context Forwarding above); the Review Receipt is injected verbatim only when `tier >= 1` — this is what makes the receipt gate fireable and restores scoped staging to exactly the declared file set.
-- Model: sonnet.
+1. **Fail-closed gate (tier ≥ 1 only, immediately before `git commit`).** Re-run the Citation
+   audit's script gate on the receipt sidecar:
+   ```
+   python3 skills/_shared/scripts/check-receipt.py receipt {receipt-sidecar-path} {project_root}
+   ```
+   Exit 0 is required. A missing, unreadable, or violating sidecar BLOCKS the commit — the gate
+   is this script run, never the orchestrator's memory of an earlier pass. In the same step,
+   verify the singular-override requirement for a blocking CRITICAL (`result-envelope.md` →
+   Review Receipt → Rules): a `review-blocked` verdict commits only when `overrides` carries one
+   `finding_id` entry naming EVERY blocking CRITICAL, recorded by the orchestrator itself
+   (`common-rules.md` → Principle 4 — the orchestrator is the exclusive author of a
+   user-accepted override).
+2. **Stage exactly the candidate's own files.** The intersection of `git status --porcelain`'s
+   dirty paths and `group_files` (canonical definition: `common-rules.md` → "Logical group") —
+   never a bare `git add -A`; a dirty path outside `group_files` is left untouched (another
+   candidate's or the user's own in-flight work).
+3. **One atomic commit per objective.** A Conventional Commits message (`feat:`, `fix:`,
+   `refactor:`, `docs:`, `test:`, `chore:`); never `Co-Authored-By` or any AI-attribution line;
+   never `git push` without an explicit user request.
+4. **`commit_strategy`** (`.ai-team/config.yaml`, default `auto` when absent): `auto` — the
+   orchestrator commits at the objective's close without pausing; `manual` — it presents the
+   staged file set to the user and waits for confirmation before running `git commit`.
+5. Tier 0 (or "review off") candidates commit under ordinary repository policy — no receipt, no
+   gate re-run — still one atomic commit, still never pushed without request.
+6. Record the resulting commit hash in the Brief File's `## Close` → `commits` list. Commit
+   creation is not a delegation and gains no `## Cost Ledger` row (`## Cost Ledger` above).
 
 ## Deviation Report Ingestion
 
@@ -818,7 +843,6 @@ Model routing only applies to **delegated sub-agents**. Inline work runs at what
 | organic-reviewer | opus | Full correctness reasoning over a diff is substantive cross-cutting work |
 | organic-security | sonnet | Pattern matching over the diff for security-sensitive surfaces |
 | organic-scout | sonnet | Optional discovery pass; codebase exploration, structured output |
-| work-unit-commits | sonnet | — |
 | organic-retro | sonnet | Retrospective + convention-capture from durable evidence |
 | default | sonnet | Fallback for any delegation with no row above |
 
@@ -828,7 +852,7 @@ Check `.ai-team/config.yaml` for `model_overrides` -- project-level overrides ta
 
 ## Sub-Agent Delegation
 
-Use `subagent_type` matching the skill name (`organic-implementer`, `organic-reviewer`, `organic-security`, `organic-scout`, `work-unit-commits`, `organic-retro`). Each maps to an agent file at `{install_dir}/agents/{name}.md` (Claude Code: `~/.claude/agents/`) or an agent entry in `opencode.json` (OpenCode). The agent file provides identity and tool restrictions; the SKILL.md provides instructions.
+Use `subagent_type` matching the skill name (`organic-implementer`, `organic-reviewer`, `organic-security`, `organic-scout`, `organic-retro`). Each maps to an agent file at `{install_dir}/agents/{name}.md` (Claude Code: `~/.claude/agents/`) or an agent entry in `opencode.json` (OpenCode). The agent file provides identity and tool restrictions; the SKILL.md provides instructions.
 
 **Delegation pattern (applies to every worker):**
 1. Pass the path to `skills/{name}/SKILL.md` in the delegation prompt. The sub-agent reads it as its first action (the orchestrator passes paths, not content).
@@ -836,7 +860,7 @@ Use `subagent_type` matching the skill name (`organic-implementer`, `organic-rev
 3. Inject the `## Injected Context` YAML block directly into the prompt — session state the sub-agent cannot derive from disk.
 4. Include `references_dir` in the paths block when the skill has one.
 5. Append the STRICT TDD MODE directive only when three conditions hold together: `.ai-team/config.yaml` sets `strict_tdd: true`; `test_commands.unit` is declared; and the objective changes behavior in a testable artifact — code the declared runner can exercise, never prose, docs, non-runtime config, templates, or skill/agent definitions. When all three hold, append: "STRICT TDD MODE IS ACTIVE. Test runner: `{config.yaml → test_commands.unit}`. Follow red → green → triangulate → refactor. Record every cycle in `tdd_cycles` (Output Contract)." When `strict_tdd: true` but `test_commands.unit` is absent: send no directive, tell the user in one line, and record the gap in the Brief File's Amendments — never invent a runner command.
-6. **Pre-send checklist for a lens or `work-unit-commits` delegation** (`organic-reviewer`, `organic-security`, `work-unit-commits`): before sending, mechanically tick each field the Critical Context Forwarding table below already declares mandatory for that worker — `group_files`; `report_destination` (lenses); `tier` and `tier_reason`; `prior_report` plus `delta_scope.prior_verdict_history` (delta passes only); `decisions_taken` (when the implementer envelope reported ≥1 entry); `strict_tdd` plus `tdd_cycles` / `tdd_not_applicable` (when the STRICT TDD MODE directive was sent to the implementer); the Review Receipt verbatim (`work-unit-commits` only). A missing item is fixed BEFORE sending — never discovered later by the worker's own `blocked` return on a missing-context gate.
+6. **Pre-send checklist for a lens delegation** (`organic-reviewer`, `organic-security`): before sending, mechanically tick each field the Critical Context Forwarding table below already declares mandatory for that worker — `group_files`; `report_destination`; `tier` and `tier_reason`; `prior_report` plus `delta_scope.prior_verdict_history` (delta passes only); `decisions_taken` (when the implementer envelope reported ≥1 entry); `strict_tdd` plus `tdd_cycles` / `tdd_not_applicable` (when the STRICT TDD MODE directive was sent to the implementer). A missing item is fixed BEFORE sending — never discovered later by the worker's own `blocked` return on a missing-context gate.
 
 **Why disk-read over inline:** inlining a SKILL.md plus its shared protocols consumes context budget needed for source files and leaves protocols stale by the time the agent needs them (lost-in-the-middle effect after many tool calls). JIT loading keeps each protocol fresh at the step that needs it. Pattern validated by gentle-ai (`skill-resolver.md`).
 
@@ -892,7 +916,7 @@ lose that recoverability.
 **Handling a small addendum after a *terminal* candidate returns:** the orchestrator does not
 edit application code inline — re-engage the worker fresh with the delta inlined (a `## Re-engage
 Reason` block, see Re-engage Routing above). Inline code edits bypass Evidence-Tier Review and
-work-unit-commits' exclusive git ownership. **The one named exception** is inline closure under
+the orchestrator's own fail-closed commit gate (**Commit creation** above). **The one named exception** is inline closure under
 Evidence-Tier Review → Delta re-validation above — a review-clear receipt's purely mechanical
 findings, gated by the three conditions stated there, never a review-blocked verdict and never a
 design decision. Batch, don't drip: collect every gap found in one pass into a single re-engage
@@ -919,9 +943,8 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `strict_tdd` | `.ai-team/config.yaml` → `strict_tdd: true` | organic-implementer (as the directive, when the Sub-Agent Delegation step 5 conditions hold) and organic-reviewer (when the directive was sent) | when the STRICT TDD MODE directive was sent (the step 5 conditions hold) — never on `strict_tdd: true` alone |
 | `tdd_cycles` | the implementer envelope's `tdd_cycles`, `tdd_cycles_omitted`, and `tdd_not_applicable` (verbatim) | organic-reviewer | mandatory whenever the STRICT TDD MODE directive was sent, tier ≥ 1 (full pass and delta pass alike) |
 | `scope_proposal` | orchestrator's decision at delegation time | organic-scout | always when the discovery pass will feed a Task Brief (an on-demand inspection that feeds no brief may omit it) |
-| `mode` | `.ai-team/config.yaml.commit_strategy` (default auto) | work-unit-commits | always when invoking work-unit-commits |
-| `group_id` | brief-slug label | work-unit-commits, organic-reviewer, organic-security | always when invoking these |
-| `group_files` | the union of the brief's `expected_files` paths and the implementer envelope's `artifacts` paths (canonical definition: `common-rules.md` → "Logical group") | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits — makes the receipt gate fireable and restores scoped staging |
+| `group_id` | brief-slug label | organic-reviewer, organic-security | always when invoking these |
+| `group_files` | the union of the brief's `expected_files` paths and the implementer envelope's `artifacts` paths (canonical definition: `common-rules.md` → "Logical group") | organic-reviewer, organic-security | always when invoking a lens — makes the receipt gate fireable; the orchestrator reuses this same set, unchanged, to scope its own commit staging (**Commit creation** above) |
 | `decisions_taken` | the implementer envelope's `decisions_taken` (verbatim) | organic-reviewer | mandatory whenever the list is non-empty at tier ≥ 1 (full pass and delta pass alike) |
 | `check_results` | the implementer envelope's `check_results` (verbatim, the same run whose `artifacts` define `group_files`) | organic-reviewer | mandatory at tier ≥ 1 whenever an implementer envelope exists for the candidate (full pass and delta pass alike) — without it the reviewer's "re-run contradicts claimed `check_results` = CRITICAL" Hard Rule can never fire (deuda-2a retro) |
 | `prior_report` | the prior pass's on-disk review report path (that pass's own `report_destination`) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
@@ -930,8 +953,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `brief_file` | the closed task's Brief File path under `.ai-team/briefs/` | organic-retro (retro mode) | always in retro mode — the skill's primary evidence source (sole authorized Brief File READ) |
 | `review_reports` | the task's on-disk review-report paths, read from the Brief File's receipt records | organic-retro (retro mode) | always in retro mode (may be an empty list; unreadable entries are noted in the skill's `risks`) |
 | `source_material` | the correction/friction context conventions are drawn from | organic-retro (conventions mode) | always in conventions mode — absent → the skill returns `needs_input` |
-| `tier` / `tier_reason` | Evidence-Tier Review classifier | organic-reviewer, organic-security, work-unit-commits | always when invoking a lens or work-unit-commits |
-| Review Receipt | `organic-reviewer`'s returned receipt (schema: `result-envelope.md` → Review Receipt) | work-unit-commits | verbatim, when `tier >= 1` — the receipt gate `work-unit-commits` enforces reads this injection
+| `tier` / `tier_reason` | Evidence-Tier Review classifier | organic-reviewer, organic-security | always when invoking a lens — the orchestrator retains the same values, unchanged, for its own commit gate (**Commit creation** above) |
 
 Inject all fields from the table above as a `## Injected Context (from orchestrator)` block at the top of the delegation prompt. The sub-agent treats this block as the source of truth for paths and flags — it does NOT re-derive them from disk.
 

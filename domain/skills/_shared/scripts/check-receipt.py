@@ -96,13 +96,15 @@ same NFC normalization and non-empty-string filter) against the SAME
 known_findings map F-7 uses above. An id absent from both lenses is
 "overrides[i].finding_id %r not found in lenses.*.findings[].id" (or the
 finding_ids[j] analogue for the bulk form). Severity is deliberately NOT
-examined here -- an override naming a CRITICAL finding is governed by
-work-unit-commits' Decision Gates (work-unit-commits/SKILL.md, the
-"verdict: review-blocked AND overrides lacks a singular finding_id entry
-naming EVERY blocking CRITICAL" row), not this validator. An entry whose id is
-non-string, or whose finding_ids is not a list, has no shape violation
-defined for that malformation today (unchanged, out of scope for this lot) --
-it is simply excluded from this cross-check, never crashes it.
+examined here -- an override naming a CRITICAL finding is governed by the
+orchestrator's own commit gate (orchestrator-protocol.md -> "Commit
+creation", step 1: a review-blocked verdict commits only when overrides
+carries one finding_id entry naming EVERY blocking CRITICAL, per
+result-envelope.md -> "Review Receipt" -> the overrides bulk-form paragraph),
+not this validator. An entry whose id is non-string, or whose finding_ids is
+not a list, has no shape violation defined for that malformation today
+(unchanged, out of scope for this lot) -- it is simply excluded from this
+cross-check, never crashes it.
 
 close.inline_closures: OPTIONAL on a ledger sidecar's close object -- absent
 OR explicit null means no inline closures happened (every legacy sidecar
@@ -123,9 +125,21 @@ catch-all. A degenerate project_root (see above) short-circuits this whole
 check before any cited receipt is opened -- the degenerate-root VIOLATION
 is recorded and no further filesystem access is attempted in ledger mode.
 
+close.commits: REQUIRED, unconditionally, whenever close is present as an
+object -- must be a list, every entry a non-empty string, AND the list
+itself must have at least 1 entry: a close recorded with zero commits is its
+own VIOLATION ("close.commits must have at least 1 entry..."), regardless of
+whether plan (below) is present, explicit null, or an empty list. This is
+the sidecar-side mirror of orchestrator-protocol.md -> "Commit creation"
+(one atomic commit created inline by the orchestrator, once per objective) --
+a Close is never valid with zero commits recorded, plan tracked or not. When
+plan IS a populated list, the length rule below (close.commits >= len(plan))
+is a STRICTER floor stacked on top of this one, never a replacement for it.
+
 plan: OPTIONAL on a ledger sidecar -- absent OR explicit null means "not
 recorded" (every ledger sidecar written before this field existed, or any
-Small task that never composed one, validates exactly as it always did).
+Small task that never composed one, validates as before EXCEPT the
+unconditional close.commits >= 1 floor, which applies plan or no plan).
 When present it must be a list of { n, title, done } objects: n is a strict
 integer forming the sequence 1..N in order (entry i has n == i+1 -- a gap, a
 repeat, a wrong start, or an out-of-order value is ONE violation naming the
@@ -133,16 +147,19 @@ entry); title is a non-empty string; done is a strict boolean
 (isinstance(v, bool) -- "yes"/1/0 are violations, never coerced). This is a
 pure mirror of the Brief File's `## Plan` (the list) and `## Phases` (the
 done flags) -- the .md sections stay authoritative, this field is only what
-a script can check without parsing prose. THREE further invariants apply
-only when close is present as an object (the gate's one prescribed
-invocation, immediately before the status:done flip): every entry's done
-must be true (each false entry is its own violation naming plan[i]); the
-count of ledger rows whose agent is EXACTLY WORK_UNIT_COMMITS_AGENT must be
->= len(plan); and, when close.commits is a list, its length must be >=
-len(plan) too (one brief, one commit). Before close (absent or not an
-object) none of these three run. NO FILESYSTEM ACCESS: every plan check is a
-pure shape/arithmetic check over already-parsed JSON, run unconditionally --
-regardless of degenerate_root.
+a script can check without parsing prose. TWO further invariants apply only
+when close is present as an object (the gate's one prescribed invocation,
+immediately before the status:done flip): every entry's done must be true
+(each false entry is its own violation naming plan[i]); and, when
+close.commits is a list, its length must be >= len(plan) (the orchestrator
+creates at least one commit per done plan entry -- orchestrator-protocol.md
+-> "Commit creation") -- STACKED on top of the unconditional close.commits
+>= 1 rule above, never a replacement for it. Before close (absent or not an
+object) neither of these two run. A ledger whose rows still carry a legacy
+agent value from a retired commit-creation worker remains VALID -- ledger
+rows are agnostic data this validator never inspects by agent name. NO
+FILESYSTEM ACCESS: every plan check is a pure shape/arithmetic check over
+already-parsed JSON, run unconditionally -- regardless of degenerate_root.
 """
 
 import argparse
@@ -156,8 +173,6 @@ CONFIDENCES = ("high", "medium", "low")
 EVIDENCE_KINDS = ("executed", "read")
 VERDICTS = ("review-clear", "review-blocked")
 KINDS = ("security-fragment",)
-
-WORK_UNIT_COMMITS_AGENT = "work-unit-commits"
 
 
 def _is_strict_int(value):
@@ -347,8 +362,8 @@ def _check_overrides(data, violations, known_findings):
     (validate_receipt) -- backs the SEC F-4 cross-check below for BOTH the
     singular finding_id and the bulk finding_ids[] override forms. Severity
     is deliberately not examined here: an override naming a CRITICAL finding
-    is governed by work-unit-commits' Decision Gates (work-unit-commits/SKILL.md),
-    not this validator."""
+    is governed by the orchestrator's own commit gate (orchestrator-protocol.md
+    -> "Commit creation"), not this validator."""
     overrides = data.get("overrides")
     if overrides is None:
         return
@@ -744,22 +759,16 @@ def _check_inline_closures(close, project_root, violations):
                 )
 
 
-def _check_plan(data, ledger_rows, close, violations):
+def _check_plan(data, close, violations):
     """Validate the OPTIONAL top-level `plan` field -- see the module
     docstring's `plan` paragraph for the full contract. NO FILESYSTEM ACCESS:
     every rule below is a pure shape/arithmetic check over already-parsed
     JSON values, run unconditionally regardless of degenerate_root.
 
-    ledger_rows: the same `ledger` list validate_ledger already parsed (may
-    contain malformed rows -- those already produced their own violations
-    elsewhere; this function simply ignores any row that is not a dict when
-    counting work-unit-commits rows, never crashes on it).
-
     close: data.get("close") as validate_ledger already computed it -- may be
     None, a non-dict, or a dict. The at-Close invariants (every entry done;
-    enough work-unit-commits rows; enough close.commits entries) run ONLY
-    when close is a dict; before close (absent or not an object) none of them
-    run, per D-C above.
+    enough close.commits entries) run ONLY when close is a dict; before close
+    (absent or not an object) neither of them run, per D-C above.
     """
     plan = data.get("plan")
     if plan is None:
@@ -799,17 +808,6 @@ def _check_plan(data, ledger_rows, close, violations):
             )
 
     if close_is_dict:
-        wuc_rows = sum(
-            1
-            for row in ledger_rows
-            if isinstance(row, dict) and row.get("agent") == WORK_UNIT_COMMITS_AGENT
-        )
-        if wuc_rows < len(plan):
-            violations.append(
-                "plan has %d entries but only %d work-unit-commits ledger row(s) (one brief, "
-                "one commit)" % (len(plan), wuc_rows)
-            )
-
         commits = close.get("commits")
         if isinstance(commits, list) and len(commits) < len(plan):
             violations.append(
@@ -835,7 +833,6 @@ def validate_ledger(data, project_root="."):
         ledger = []
 
     token_sum = 0
-    has_work_unit_commits = False
     seen_n = set()
     for i, row in enumerate(ledger):
         where = "ledger[%d]" % i
@@ -866,10 +863,6 @@ def validate_ledger(data, project_root="."):
         tokens = row.get("tokens")
         if _is_strict_int(tokens):
             token_sum += tokens
-
-        agent = row.get("agent")
-        if agent == WORK_UNIT_COMMITS_AGENT:
-            has_work_unit_commits = True
 
     close = data.get("close")
     if close is None:
@@ -907,16 +900,22 @@ def validate_ledger(data, project_root="."):
             for i, sha in enumerate(commits):
                 if not isinstance(sha, str) or not sha.strip():
                     violations.append("close.commits[%d] must be a non-empty string" % i)
+            # Unconditional invariant: close is present, so at least one
+            # commit must be recorded -- independent of whether plan (below)
+            # is present, null, or an empty list. The plan-based rule in
+            # _check_plan (commits >= len(plan)) is a stricter floor that
+            # stacks on top of this one when plan is a populated list; this
+            # is the floor that still applies when plan cannot supply one.
+            if len(commits) < 1:
+                violations.append(
+                    "close.commits must have at least 1 entry -- close is present, so "
+                    "at least one commit must be recorded (orchestrator-protocol.md -> "
+                    "\"Commit creation\")"
+                )
 
         re_briefs = close.get("re_briefs")
         if not _is_strict_int(re_briefs) or re_briefs < 0:
             violations.append("close.re_briefs must be a non-negative integer (got %r)" % (re_briefs,))
-
-        if not has_work_unit_commits:
-            violations.append(
-                "close is present but no ledger row's agent is exactly %r"
-                % (WORK_UNIT_COMMITS_AGENT,)
-            )
 
         # A degenerate project_root already failed closed above; short-circuit
         # every check that would touch the filesystem rather than opening a
@@ -927,7 +926,7 @@ def validate_ledger(data, project_root="."):
     # _check_plan runs unconditionally, regardless of degenerate_root -- every
     # plan rule is a pure shape/arithmetic check over already-parsed JSON, no
     # filesystem access at all (D-B).
-    _check_plan(data, ledger, close, violations)
+    _check_plan(data, close, violations)
 
     return violations, []
 

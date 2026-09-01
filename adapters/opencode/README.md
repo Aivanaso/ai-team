@@ -26,7 +26,7 @@ Installs the ai-team organic evidence-tiered delegation framework into OpenCode 
 |----------|----------|
 | Orchestrator instructions | `~/.config/opencode/AGENTS.md` |
 | Agent definitions | `~/.config/opencode/opencode.json` (merged) |
-| Skills | `~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits,organic-retro}/` |
+| Skills | `~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,organic-retro}/` |
 | Shared protocols | `~/.config/opencode/skills/_shared/` |
 
 ## Usage
@@ -55,7 +55,7 @@ Remove manually:
 rm -f ~/.config/opencode/AGENTS.md
 rm -rf ~/.config/opencode/skills/organic-implementer ~/.config/opencode/skills/organic-reviewer \
        ~/.config/opencode/skills/organic-scout ~/.config/opencode/skills/organic-security \
-       ~/.config/opencode/skills/work-unit-commits ~/.config/opencode/skills/organic-retro \
+       ~/.config/opencode/skills/organic-retro \
        ~/.config/opencode/skills/_shared
 rm -f ~/.config/opencode/.ai-team-manifest
 # Edit ~/.config/opencode/opencode.json to remove this framework's agent entries

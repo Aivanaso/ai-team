@@ -103,7 +103,7 @@ Omit this section entirely when no friction yielded a reusable-convention candid
 
 **Date**: 2026-08-19
 **Route**: normal
-**Result**: done — commit a1b2c3d (Cost Ledger row 4, work-unit-commits)
+**Result**: done — commit a1b2c3d (orchestrator commit creation — not a delegation, no Cost Ledger row)
 
 ## What worked
 
@@ -131,9 +131,10 @@ into that pass's own token count, not a separate delegation.
 | 1 | organic-implementer | sonnet | 95,000 | 30 | 5m10s | blocked — scope-large |
 | 2 | organic-implementer (re-brief) | sonnet | 110,000 | 38 | 6m40s | ok — 4 files, 2/2 checks |
 | 3 | organic-reviewer (tier 1) | opus | 88,000 | 22 | 7m05s | review-clear — 0 findings |
-| 4 | work-unit-commits | sonnet | 30,000 | 12 | 1m20s | ok — commit a1b2c3d |
 
-Re-brief count: 1 (cause: scope-large, F1 not implicated).
+Re-brief count: 1 (cause: scope-large, F1 not implicated). Commit a1b2c3d was created inline by
+the orchestrator (not a delegation — no Cost Ledger row, `orchestrator-protocol.md` → "Commit
+creation").
 
 ## Watch-items for the next task
 

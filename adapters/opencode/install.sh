@@ -193,10 +193,40 @@ if [[ -f "$TARGET_JSON" ]]; then
   # (opus/sonnet/haiku), so .model and .agent[*].model from the existing config
   # take precedence over the overlay — a re-install must never downgrade the
   # operator's provider mapping back to placeholders.
+  #
+  # Stale-agent pruning (mirrors step 0's manifest-based pruning, same "no
+  # literal retired-name list" discipline): a plain deep-merge (`*`) UNIONS
+  # object keys, so an existing `.agent` entry this framework installed on a
+  # prior run survives forever once its own skill is retired — the overlay
+  # has no key left to override it with. Every framework-installed agent's
+  # `prompt` field references its own skill file
+  # (`.../skills/<name>/SKILL.md`, see the overlay template); an entry whose
+  # prompt carries that pattern is dropped when <name> is not one of the
+  # skill directories THIS run just installed (CURRENT_MANAGED_SET, computed
+  # in step 0) — an entry whose prompt carries no such pattern (a genuine
+  # operator-defined custom agent, including "orchestrator" itself, whose
+  # prompt is a `{file:...}` reference) is never touched, preserving the
+  # guarantee in the comment above.
+  VALID_SKILL_NAMES_JSON=$(
+    printf '%s\n' "${CURRENT_MANAGED_SET[@]}" | sed 's|^skills/||' | jq -R . | jq -s .
+  )
   TMP_JSON=$(mktemp)
-  jq -s '
+  jq -s --argjson valid_skills "$VALID_SKILL_NAMES_JSON" '
     .[0] as $existing | .[1] as $overlay |
-    ($existing * $overlay)
+    ($existing
+      | .agent |= ((. // {}) | with_entries(
+          select(
+            (.value.prompt // "") as $p |
+            if ($p | test("skills/[A-Za-z0-9_-]+/SKILL\\.md")) then
+              (($p | capture("skills/(?<name>[A-Za-z0-9_-]+)/SKILL\\.md")).name) as $name
+              | ($valid_skills | index($name)) != null
+            else
+              true
+            end
+          )
+        ))
+    ) as $existing_pruned |
+    ($existing_pruned * $overlay)
     | .model = ($existing.model // $overlay.model)
     | (if .model == null then del(.model) else . end)
     | .agent = (.agent | with_entries(
@@ -216,7 +246,7 @@ fi
 echo ""
 info "Installation complete! (OpenCode adapter)"
 echo ""
-echo "  Skills:       ~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,work-unit-commits,organic-retro}/"
+echo "  Skills:       ~/.config/opencode/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,organic-retro}/"
 echo "  Protocols:    ~/.config/opencode/skills/_shared/"
 echo "  Orchestrator: ~/.config/opencode/AGENTS.md"
 echo "  Config:       ~/.config/opencode/opencode.json"
