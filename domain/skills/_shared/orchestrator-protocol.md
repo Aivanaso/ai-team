@@ -843,9 +843,9 @@ Model routing only applies to **delegated sub-agents**. Inline work runs at what
 
 | Worker | Model | Reason |
 |--------|-------|--------|
-| organic-implementer | opus | Implementation is the substantive work: it carries the TDD cycles, keeps the tree green while changing it, and honors every constraint at once (user decision 2026-09-03) |
+| organic-implementer | opus | Implementation is the substantive work: it carries the TDD cycles, keeps the tree green while changing it, and honors every constraint at once. EXPERIMENT (2026-09-03, with the reviewer row): measured over the next 3-4 real tasks on re-brief count, worker-side defects and executed findings per review pass — the Cost Ledger records model and outcome per row, the retro compares; reverted if the evidence does not follow |
 | organic-reviewer | sonnet | Verification that the candidate does what the brief says — executed probes (mutation, re-run checks) are a discipline, not a reasoning load; sonnet already ran clean delta passes (ECO-856 row 9) |
-| organic-security | opus | Security reasoning composes findings across the diff (organic-v2 phase 3: two CRITICALs that only mattered together) — the lens where intelligence, not pattern matching, decides |
+| organic-security | sonnet | Every finding this lens has landed so far — the `Origen = Venta` guard (ECO-856), path containment (G4b), the composed CRITICALs of organic-v2 phase 3 — came from sonnet; the record does not ask for more |
 | organic-scout | sonnet | Mandatory pre-brief discovery pass (Medium/Large; Small without a read-record); codebase exploration, structured output |
 | organic-retro | sonnet | Retrospective + convention-capture from durable evidence |
 | default | sonnet | Fallback for any delegation with no row above |
