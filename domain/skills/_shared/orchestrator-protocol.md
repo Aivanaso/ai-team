@@ -368,9 +368,9 @@ One brief = one repo = one worker. For a change spanning more than one repositor
 
 #### Brief File (durable copy)
 
-The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the SESSION project root (the repo the orchestrator session opened in), never one per target repo. A cross-repo task (**Multi-repo lane rule** above) still keeps exactly one Brief File there: each per-repo Task Brief block already records its own `target_repo`, and gains its own `base_ref` line whenever it differs from the frontmatter's (frontmatter `base_ref` names the primary/first repo's). The Cost Ledger and Close totals also live in a JSON sidecar at `.ai-team/briefs/YYYY-MM-DD-<slug>.json` — same slug — kept in sync by the orchestrator at every ledger append, at every `## Plan` approval or `## Phases` checkbox change, and at the Close write; the `.md` file stays the human-readable narrative, the `.json` sidecar is what the structural check below reads. Brief Resume Check (Session Init) scans only the session project root. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
+The orchestrator's durable, on-disk copy of one task — audit trail, cost ledger, and pause/resume state — at `.ai-team/briefs/YYYY-MM-DD-<slug>.md` in the SESSION project root (the repo the orchestrator session opened in), never one per target repo. A cross-repo task (**Multi-repo lane rule** above) still keeps exactly one Brief File there: each per-repo Task Brief block already records its own `target_repo`, and gains its own `base_ref` line whenever it differs from the frontmatter's (frontmatter `base_ref` names the primary/first repo's). The Cost Ledger and Close totals also live in the file's own `## Ledger` section — the single fenced ```json block it ends with — written by the orchestrator at every ledger append, at every `## Plan` approval or `## Phases` checkbox change, and at the `## Close` write; the sections above it stay the human-readable narrative, and that block is what the structural check below reads. Brief Resume Check (Session Init) scans only the session project root. Author: the orchestrator only; no delegated skill reads or writes it, and a worker's contract still arrives inline in the delegation prompt (unchanged).
 
-```markdown
+````markdown
 ---
 task: "<title>"
 created_at: "<ISO-8601 UTC>"
@@ -405,7 +405,9 @@ marks)
 delegation `outcome` names the pass type and verdict, e.g. `delta — review-clear` — the durable
 source the consecutive-delta cap counts from, Evidence-Tier Review → Delta re-validation. The
 orchestrator's own commit creation — **Commit creation** below — is not a delegation and gains no
-ledger row; its evidence is `close.commits` plus the Phases checkbox it closes.)
+ledger row; its evidence is `close.commits` plus the Phases checkbox it closes. This table is
+the human-readable narrative; the `## Ledger` block's `ledger[]` is its machine mirror, appended
+in the same write.)
 ## Amendments
 (records Scope Verification Checklist events — a brief-feeding discovery that returned no
 `scope_proposal`, or an item the orchestrator closed with its own evidence — and, when a
@@ -427,49 +429,69 @@ below) — see "Amendment ingestion" below; plus, separately, any mid-task gear 
 logged as a one-line audit event rather than a scope amendment (**Execution gears** above).
 "none" until the first entry of any of these kinds.)
 ## Close
-(written when status flips to done — the two canonical, machine-readable totals below may
-appear anywhere in this section, not by bullet position; every other line is free-form prose;
-sidecar <brief>.json carries the same two totals plus `commits`/`re_briefs`/`inline_closures` for
-the structural check below — kept in sync with this section, never diverging from it)
-- delegations: <int>          # MUST equal the Cost Ledger's row count
-- subagent_tokens: <int>       # MUST equal the sum of the Cost Ledger's tokens column; plain integer, no thousands separator
-(then free prose: re-brief count with causes; receipt reference(s); commit hashes)
+(written when status flips to done — free-form prose only: re-brief count with causes; receipt
+reference(s); commit hashes. The task's machine-readable totals live ONLY in the `## Ledger`
+block below — `delegations` and `subagent_tokens` there, plus `commits`/`re_briefs`/
+`inline_closures` — so this section never restates a total and can never diverge from one.)
+## Ledger
+(the machine-readable mirror of this file, and its LAST section: one fenced ```json block
+holding `{ ledger: [...], close: {...}, plan: [...] }` — field list, optional fields and
+validation rules: `result-envelope.md` → "Brief File Ledger block". Written in the same edit as
+every `## Cost Ledger` row append, every `## Plan` approval or `## Phases` checkbox change, and
+the `## Close` write; `close` appears only at that last one, and `close.inline_closures[]` only
+when an inline closure was recorded (Evidence-Tier Review → Delta re-validation → "Inline
+closure"). Nothing follows its closing fence but blank lines, and this is the Brief File's ONLY
+fenced ```json block — a `## Task Brief` block is fenced yaml, and a JSON excerpt quoted under
+`## Amendments` is fenced text or indented, never json — because the structural check below
+reads the file's single ```json block and fails closed on a second one.)
+```json
+{
+  "ledger": [
+    { "n": 1, "agent": "<skill>", "model": "<model>", "tokens": 0, "tool_uses": 0, "duration_s": 0, "outcome": "<outcome>" }
+  ],
+  "close": { "delegations": 1, "subagent_tokens": 0, "commits": ["<hash>"], "re_briefs": 0 },
+  "plan": [ { "n": 1, "title": "<one line>", "done": true } ]
+}
 ```
+````
 
 Created when the plan is composed — at the Medium/Large gate, before any implementation delegation; for a Small task, when its brief is composed — before the delegation, so the read-record the Small exception depends on exists when the exception is evaluated; every delegation (including re-briefs) appends its YAML block verbatim, a re-brief additionally noting the re-engage reason. **Cost Ledger source of truth**: the harness-reported usage attached to each Agent-tool result (tokens, tool uses, duration) — a sub-agent cannot measure its own consumption; never ask a worker to self-report tokens in its envelope (a self-reported number is fabrication, same principle as Evidence Protocol Rule 6). Status: `active` → `paused` (interruption, session end mid-task, or an `unattended`-gear pending question) → `active` (resume) → `done` (Close section written). Pausing costs nothing — the checkbox state and ledger already on disk ARE the resume state.
 
 **Brief File structural check (orchestrator, before the status:done flip):** the orchestrator
-maintains a JSON sidecar next to the Brief File — `.ai-team/briefs/YYYY-MM-DD-<slug>.json`,
-same slug, updated at every Cost Ledger row append, at every `## Plan` approval or `## Phases`
+keeps the Brief File's `## Ledger` block current — the single fenced ```json block the file ends
+with, rewritten at every Cost Ledger row append, at every `## Plan` approval or `## Phases`
 checkbox change, and at the `## Close` write — schema:
 `{ "ledger": [ {"n", "agent", "model", "tokens", "tool_uses", "duration_s", "outcome"} ],
 "close": {"delegations", "subagent_tokens", "commits", "re_briefs", "inline_closures"},
-"plan": [ {"n", "title", "done"} ] }` (field names mirror the `## Cost Ledger` table and
-`## Close` prose exactly — `inline_closures` is OPTIONAL, present only when this objective
+"plan": [ {"n", "title", "done"} ] }` (`ledger[]` field names mirror the `## Cost Ledger` table's columns exactly; `close` carries the
+totals the `## Close` prose no longer states — `inline_closures` is OPTIONAL, present only when this objective
 recorded an inline closure (Evidence-Tier Review → Delta re-validation → "Inline closure");
 `plan` is OPTIONAL too — a top-level sibling of `ledger`/`close`, the machine-checkable mirror
-of `## Plan` + `## Phases`, absent or `null` for a task that never recorded one; the `.md` file
-remains the human-readable narrative, the `.json` sidecar is what the gate below reads). Before
-flipping `status` to `done`, run:
+of `## Plan` + `## Phases`, absent or `null` for a task that never recorded one; the sections
+above the block remain the human-readable narrative, and the block itself is what the gate
+below reads). Before flipping `status` to `done`, run it on the Brief File itself:
 
 ```
-python3 skills/_shared/scripts/check-receipt.py ledger {brief-file-path with .md replaced by .json} [project_root]
+python3 skills/_shared/scripts/check-receipt.py ledger {brief-file-path} [project_root]
 ```
 
 Exit 0 → `delegations`, `subagent_tokens`, every
 `close.inline_closures` entry (receipt on disk under the root, ids covered), and, when `plan` is
 present, its shape and its at-Close rule (every entry done; `close.commits` count ≥ the plan's
-done-entry count) are all confirmed consistent; flip to `done`. Exit 1 → fix the sidecar (or the
-`## Close`/`## Plan` prose it mirrors) per the printed `VIOLATION` lines before flipping. Exit 2 → the sidecar could not be validated at all: missing on
-disk (never written), unreadable, not valid UTF-8, a top-level JSON value that is not an
+done-entry count) are all confirmed consistent; flip to `done`. Exit 1 → fix the block (or the
+`## Cost Ledger`/`## Plan` entries it mirrors) per the printed `VIOLATION` lines before flipping; this
+exit also covers the container itself — no fenced ```json block in the Brief File (write one
+from the `## Cost Ledger`'s own rows), two or more blocks, an opening fence never closed, or
+text inside the block that is not valid JSON. Exit 2 → the Brief File could not be validated at
+all: missing on disk, unreadable, not valid UTF-8, a top-level JSON value that is not an
 object, or any other failure that stops validation before a shape check runs — read the single
-`ERROR` line, fix the sidecar (writing it from the Cost Ledger's own rows when it is missing),
-and re-run; never flip `status: done` on a missing or unrunnable gate.
+`ERROR` line, fix the file, and re-run; never flip `status: done` on a missing or unrunnable
+gate.
 
 ### Retro trigger
 
 When a task's Brief File flips to `status: done`, the orchestrator writes the `## Close`
-footer (above) first, then consults `.ai-team/config.yaml` → `retro` (canonical key and full
+section (above) first, then consults `.ai-team/config.yaml` → `retro` (canonical key and full
 semantics: `organic-scout/references/config-template.md`):
 
 | Value | Action |
@@ -748,12 +770,12 @@ addendum entry without gate evidence or without its `files` list is invalid. Two
 between the reviewed tree and the committed tree. `findings_addressed` NEVER alters `verdict`:
 an inline closure is never a substitute for a delta pass, and a `review-blocked` receipt clears
 only via a delta/full pass or a recorded override. The orchestrator additionally appends one
-`{ receipt, finding_ids }` entry to the current objective's Brief File ledger sidecar's
-`close.inline_closures[]` — `receipt` the repo-relative path to the report whose receipt block
-was just amended, `finding_ids` the closed findings' ids — so the Brief File structural check (above) and
-any later retro can recover the inline-closure count mechanically, from the sidecar, rather than
-by re-parsing free-form Amendments prose (schema: `result-envelope.md` → "Brief File Ledger JSON
-sidecar").
+`{ receipt, finding_ids }` entry to the current objective's Brief File `## Ledger` block, under
+`close.inline_closures[]` — `receipt` the repo-relative path to the review report `.md` whose
+final receipt block was just amended, `finding_ids` the closed findings' ids — so the Brief File
+structural check (above) and any later retro can recover the inline-closure count mechanically,
+from that block, rather than by re-parsing free-form Amendments prose (schema:
+`result-envelope.md` → "Brief File Ledger block").
 
 ### Citation audit (tier ≥ 1, mechanical, BLOCKING)
 

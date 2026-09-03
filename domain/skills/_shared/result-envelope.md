@@ -294,14 +294,18 @@ exposure:                  # optional — orchestrator-authored addendum measuri
 - A `verification[]` entry carrying `gate:` is an objective `review_gates` outcome from `.ai-team/config.yaml` — exit code only, always `confidence: high` (objective exit-code evidence, not a judgment call). A failing gate additionally lands as a `lenses.correctness.findings[]` entry: `file`/`line` cite the gate's declaring entry in `.ai-team/config.yaml` (always a resolvable citation), and `claim` names gate name + command + exit code. A failing blocking gate is CRITICAL and forces `verdict: review-blocked`; a failing non-blocking gate is MAJOR and does not block.
 - Tier 0 candidates produce no receipt — the result envelope alone is the record.
 
-## Brief File Ledger JSON sidecar
+## Brief File Ledger block
 
-The orchestrator maintains this sidecar next to a Brief File — `.ai-team/briefs/YYYY-MM-DD-
-<slug>.json`, same slug as the `.md` Brief File — mirroring the `## Cost Ledger` table and
-`## Close` section byte-for-byte in field meaning (`orchestrator-protocol.md` → Task Brief →
-"Brief File (durable copy)"), kept in sync at every ledger append, at every `## Plan` approval
-or `## Phases` checkbox change, and at the `## Close` write. No delegated skill writes this
-file; it is orchestrator-authored only, exactly like the Brief File itself.
+The orchestrator keeps this object inside the Brief File itself — a `## Ledger` heading followed
+by a single fenced ```json block, the last content of `.ai-team/briefs/YYYY-MM-DD-<slug>.md` —
+mirroring the `## Cost Ledger` table row by row in `ledger[]` and carrying in `close` the totals
+the `## Close` prose no longer states
+(`orchestrator-protocol.md` → Task Brief → "Brief File (durable copy)"), rewritten at every
+ledger append, at every `## Plan` approval or `## Phases` checkbox change, and at the `## Close`
+write. No delegated skill writes this file; it is orchestrator-authored only, exactly like the
+Brief File itself. It is the Brief File's ONLY fenced ```json block — a `## Task Brief` block is
+fenced yaml, a quoted excerpt is fenced text or indented — because the gate below reads the
+file's single block and fails closed on a second one.
 
 ```json
 {
@@ -314,7 +318,7 @@ file; it is orchestrator-authored only, exactly like the Brief File itself.
     "commits": ["<commit hash>", "..."],
     "re_briefs": 0,
     "inline_closures": [
-      { "receipt": "<repo-relative path to a receipt .json sidecar>", "finding_ids": ["F-1", "..."] }
+      { "receipt": "<repo-relative path to a review report .md>", "finding_ids": ["F-1", "..."] }
     ]
   },
   "plan": [
@@ -334,8 +338,8 @@ applies plan or no plan (D-D).
 section — absent while the task is `active`/`paused`) — and the gate below has exactly one
 prescribed invocation, immediately before that flip, so `close` is REQUIRED at the moment the
 gate runs: `ledger` mode never accepts a missing `close` as "task still in progress, nothing to
-check yet". Validated by `python3 skills/_shared/scripts/check-receipt.py ledger <sidecar>
-[project_root]` (`orchestrator-protocol.md` → Task Brief → "Brief File structural check"). Every
+check yet". Validated by `python3 skills/_shared/scripts/check-receipt.py ledger
+<brief-file>.md [project_root]` (`orchestrator-protocol.md` → Task Brief → "Brief File structural check"). Every
 check the validator performs, synced to the code (this doc follows the code, never the reverse —
 a future change to `validate_ledger` updates this list in the same commit):
 
@@ -362,9 +366,11 @@ a future change to `validate_ledger` updates this list in the same commit):
   (`orchestrator-protocol.md` → "Commit creation"; commit creation is not a delegation and gains
   no ledger row, `## Cost Ledger` in the same file).
 - `close.inline_closures` is OPTIONAL — absent OR explicit `null` means no inline closures
-  happened; every ledger sidecar written before this field existed validates exactly as it always
+  happened; every ledger object written before this field existed validates exactly as it always
   did. When present (and non-null), it must be a list of `{ receipt, finding_ids }` objects:
-  `receipt` is a non-empty, repo-relative path ENFORCED to end in `.json` that must exist and be
+  `receipt` is a non-empty, repo-relative path ENFORCED to end in `.md` (a review report, read as
+  the Markdown container whose own single fenced block carries its receipt) or in `.json` (the
+  legacy bare-JSON form) that must exist and be
   CONTAINED under the validator's `project_root` argument (`ledger` mode accepts an optional
   `[project_root]` positional, defaulting to `.`, resolved with the same degenerate-root rule as
   receipt mode — a degenerate root short-circuits this entire check, before any cited receipt is
@@ -376,7 +382,7 @@ a future change to `validate_ledger` updates this list in the same commit):
   entry that is not a non-empty string (including a non-hashable JSON array/object) is its own
   VIOLATION and is simply excluded from the coverage comparison — never a crash, never escalated
   to exit 2.
-- `plan` is OPTIONAL — absent OR explicit `null` means not recorded; every ledger sidecar
+- `plan` is OPTIONAL — absent OR explicit `null` means not recorded; every ledger object
   written before this field existed validates as before EXCEPT the unconditional
   `close.commits` >= 1 floor, which applies plan or no plan (this doc follows the
   code, never the reverse — a future change to `_check_plan` updates this list in the same

@@ -367,7 +367,7 @@ assert_exit "ledger-inline-closures-receipt-not-json" 1 "$VALIDATOR" ledger "$FI
 assert_exit "ledger-inline-closures-receipt-not-json-ext" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-receipt-not-json-ext.json" "$REPO_ROOT"
 
 # --- ledger mode's own degenerate-root guard, isolated: ledger-good.json (no
-#     inline_closures at all) is otherwise a fully valid ledger sidecar, so
+#     inline_closures at all) is otherwise a fully valid ledger object, so
 #     the ONLY violation a "/" project_root can produce here is the
 #     degenerate-root rule itself (mirrors receipt-degenerate-root above,
 #     generated inline there because it needs a throwaway file under "/";

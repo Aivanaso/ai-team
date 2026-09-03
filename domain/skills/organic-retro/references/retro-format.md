@@ -44,29 +44,33 @@ written yet).
 
 - Reproduce the Brief File's `## Cost Ledger` table **verbatim** — same columns (`#, agent,
   model, tokens, tool_uses, duration, outcome`). Never recompute or estimate a figure the
-  ledger did not already record. When the Brief File's `.json` sidecar exists (`brief_file`
-  with `.md` replaced by `.json`), source these figures from its `ledger`/`close` fields
-  instead — the machine-validated copy (`_shared/result-envelope.md` → "Brief File Ledger JSON
-  sidecar") — and render them into this same table shape; a Brief File with no sidecar (legacy)
-  falls back to reading the `.md` table directly, unchanged from before.
+  ledger did not already record. When the Brief File carries a `## Ledger` block, source these
+  figures from its `ledger`/`close` fields instead — the machine-validated copy
+  (`_shared/result-envelope.md` → "Brief File Ledger block") — and render them into this same
+  table shape; a Brief File written before that block existed may hold the same object in a
+  separate same-slug `.json` file next to it, read the same way; with neither, fall back to
+  reading the `.md` table directly, unchanged from before.
 - **Re-brief count**: count `outcome` cells that are a re-delegation for the same objective
   (a fresh `organic-implementer` row following a `review-blocked`/`needs_input`/`blocked`
   row), grouped by cause (review-blocked finding, needs_input, blocked/scope-large, infra-death, amendment
   request).
-- **Inline-closure count**: when the Brief File's `.json` sidecar exists, source this figure
-  from `close.inline_closures` (its entry count — `_shared/result-envelope.md` → "Brief File
-  Ledger JSON sidecar"), the same machine-validated field the Metrics table above draws from.
-  When no sidecar exists (legacy Brief File, written before this field existed), render the
-  figure as "inline closures: not recorded in the ledger sidecar" and nothing else — never
-  estimate it by counting mentions in the `.md` Brief File's `## Amendments` prose.
+- **Inline-closure count**: source this figure from `close.inline_closures` (its entry count —
+  `_shared/result-envelope.md` → "Brief File Ledger block") in the Brief File's `## Ledger`
+  block, or in the separate same-slug `.json` file when the Brief File predates that block — the
+  same machine-validated field the Metrics table above draws from. When neither records it (a
+  Brief File written before this field existed), render the figure as "inline closures: not
+  recorded in the ledger" and nothing else — never estimate it by counting mentions in the
+  `.md` Brief File's `## Amendments` prose.
   `## Close` never prescribed recording inline closures, and neither did any protocol
   section, so a legacy Brief File's `## Amendments` narrative is prose, not a ledger figure —
   `organic-retro/SKILL.md`'s own rule against estimating applies here exactly as everywhere
   else in this file.
-- **Plan size and completion**: when the sidecar carries `plan` (`_shared/result-envelope.md` →
-  Brief File Ledger JSON sidecar), render "plan: N briefs, M done" from its entries; when the
-  sidecar exists but has no `plan`, or no sidecar exists, render "plan: not recorded in the
-  ledger sidecar" and nothing else — never estimate it from the `.md` `## Plan` prose.
+- **Plan size and completion**: when the ledger object carries `plan`
+  (`_shared/result-envelope.md` → Brief File Ledger block) — in the `## Ledger` block, or in the
+  separate same-slug `.json` file for a Brief File that predates it — render "plan: N briefs, M
+  done" from its entries; when that object has no `plan`, or no such object exists, render
+  "plan: not recorded in the ledger" and nothing else — never estimate it from the `.md`
+  `## Plan` prose.
 - **Totals**: sum only the ledger's own token/duration/agent-count columns.
 
 ## Watch-items for the next task
