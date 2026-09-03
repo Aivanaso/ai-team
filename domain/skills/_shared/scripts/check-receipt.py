@@ -1,17 +1,39 @@
 #!/usr/bin/env python3
-"""check-receipt.py -- mechanical structural validator for Review Receipt and
-Brief File Cost Ledger JSON sidecars (orchestrator-protocol.md "Citation audit"
-and "Brief File structural check").
+"""check-receipt.py -- mechanical structural validator for the Review Receipt
+and Brief File Cost Ledger objects (orchestrator-protocol.md "Citation audit"
+and "Brief File structural check"), wherever they are stored.
 
 This tool checks STRUCTURE only: it never re-runs any acceptance/build/gate
-command, never reads the paired .md report, and never opens a cited file
-beyond a plain containment + existence check under project_root. Validating
-structure, not content, is the whole point -- prose was never a safe parse
-target.
+command, never reads the report prose around the object, and never opens a
+cited file beyond a plain containment + existence check under project_root.
+Validating structure, not content, is the whole point -- prose was never a
+safe parse target.
 
 Modes:
-  receipt <file.json> [project_root]   validate a Review Receipt JSON sidecar
-  ledger  <file.json> [project_root]   validate a Brief File ledger+close sidecar
+  receipt <file.md> [project_root]     validate a Review Receipt (Markdown container)
+  ledger  <file.md> [project_root]     validate a Brief File ledger+close (Markdown container)
+  receipt <file.json> [project_root]   legacy: the same object as a bare JSON file
+  ledger  <file.json> [project_root]   legacy: the same object as a bare JSON file
+
+Container (.md, the primary form): the validated object is the content of the
+SINGLE fenced ```json block in the file; the prose around it is never parsed.
+An opening fence is a whole line matching `^ {0,3}```json[ \\t]*$` -- case
+sensitive, so ```JSON and ```jsonc open nothing -- and the block ends at the
+next whole line matching `^ {0,3}```[ \\t]*$`; the substring ```json inside a
+sentence is never a fence. Exactly one such block must exist: zero blocks, two
+or more blocks, or an opening fence that is never closed is a VIOLATION at
+exit 1 -- never "first wins", never "last wins". WHICH heading precedes the
+block, and where in the file it sits, are the writers' convention and are
+never checked here. Malformed JSON inside the found block is the same exit-1
+VIOLATION class as a malformed legacy .json file; exit 2 stays reserved for
+what prevented validation from running at all (see Exit codes below).
+
+Container selection is by path suffix and nothing else: a path ending in
+".md" is a Markdown container, anything else is read as bare JSON exactly as
+before (the legacy branch, byte-for-byte unchanged). Both JSON loaders --
+the CLI argument and the receipt a ledger's close.inline_closures[] entry
+cites -- go through the same _load_json_document helper, so the two forms are
+accepted identically in both places.
 
 ledger mode's project_root defaults to "." (repo root, matching receipt mode's own
 default) and is used only to resolve close.inline_closures[] entries, when present
@@ -28,12 +50,16 @@ fragment REQUIRES lenses.security and forbids lenses.correctness.
 
 Exit codes:
   0  valid
-  1  the file parsed as JSON but is structurally invalid -- one or more
-     "VIOLATION <path>: <what>" lines are printed to stdout
+  1  the file is structurally invalid -- one or more "VIOLATION <path>: <what>"
+     lines are printed to stdout. Three sub-classes: the object parsed but
+     breaks a rule; the text that should be JSON is not valid JSON syntax; or
+     (.md only) the file does not carry exactly one fenced ```json block
   2  anything that prevented validation from running at all (missing/unreadable
      file, invalid UTF-8, pathological input, a top-level JSON value that is
      not an object, or any other unexpected error) -- exactly one
-     "ERROR <path>: <what>" line is printed to stderr, never a traceback
+     "ERROR <path>: <what>" line is printed to stderr, never a traceback.
+     The .md container never widens this class: a missing block or a malformed
+     block is exit 1, exactly as a malformed .json file always was
 
 Stdout channels: "VIOLATION <path>: <what>" (exit 1) and, on exit 0 only,
 zero or more "INFO <path>: <what>" lines -- advisory notes (e.g. CRITICAL
@@ -110,9 +136,13 @@ close.inline_closures: OPTIONAL on a ledger sidecar's close object -- absent
 OR explicit null means no inline closures happened (every legacy sidecar
 validates exactly as before this field existed). When present (and
 non-null) it must be a list of { receipt, finding_ids } objects: receipt is
-a non-empty, repo-relative path ENFORCED to end in ".json" that must exist
-and be CONTAINED under project_root (the same _check_containment used for
-receipt-mode file citations); finding_ids is a non-empty list of non-empty
+a non-empty, repo-relative path ENFORCED to end in ".md" (a Markdown
+container) or ".json" (the legacy bare-JSON form) that must exist and be
+CONTAINED under project_root (the same _check_containment used for
+receipt-mode file citations); the container form is decided from that
+declared citation string, never from the path realpath() resolves it to, so
+the suffix the guard accepted is the one the loader honours. finding_ids is
+a non-empty list of non-empty
 strings, each compared -- after Unicode NFC normalization, mirroring
 _check_duplicate_ids's own rationale -- against the cited receipt's own
 findings_addressed[].finding_id values, themselves NFC-normalized the same
@@ -120,7 +150,8 @@ way. A finding_ids entry that fails the non-empty-string check (including a
 non-hashable JSON array/object) is its own VIOLATION and is excluded from
 the coverage comparison -- never a crash, never escalated to exit 2. Any
 other failure here (missing/unreadable/unparsable/non-object cited receipt,
-wrong extension) is likewise a VIOLATION (exit 1), never the exit-2
+wrong extension, and -- for a cited .md -- a missing, unclosed or duplicated
+fenced ```json block) is likewise a VIOLATION (exit 1), never the exit-2
 catch-all. A degenerate project_root (see above) short-circuits this whole
 check before any cited receipt is opened -- the degenerate-root VIOLATION
 is recorded and no further filesystem access is attempted in ledger mode.
@@ -165,6 +196,7 @@ already-parsed JSON, run unconditionally -- regardless of degenerate_root.
 import argparse
 import json
 import os
+import re
 import sys
 import unicodedata
 
@@ -174,10 +206,123 @@ EVIDENCE_KINDS = ("executed", "read")
 VERDICTS = ("review-clear", "review-blocked")
 KINDS = ("security-fragment",)
 
+# Markdown container fence grammar (module docstring, "Container"). Whole-line
+# matches only: the substring ```json inside a sentence never opens a block,
+# and the label is case sensitive, so ```JSON / ```jsonc open nothing.
+MARKDOWN_SUFFIX = ".md"
+FENCE_OPEN = re.compile(r"^ {0,3}```json[ \t]*$")
+FENCE_CLOSE = re.compile(r"^ {0,3}```[ \t]*$")
+
 
 def _is_strict_int(value):
     """True for a real int, excluding bool (bool is a subclass of int)."""
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _extract_fenced_json(text):
+    """Extract the single fenced ```json block from a Markdown container.
+
+    Returns ((payload, opening line number), None) with payload the block's
+    content verbatim, or (None, "<what>") when the file does not carry exactly
+    one closed block. The opening line number lets the caller report a JSON
+    syntax error against the file the reader is looking at.
+    Every failure here is an exit-1 VIOLATION for the caller, never exit 2:
+    a container whose block is missing, unclosed or duplicated is structurally
+    invalid, not unreadable.
+
+    Uniqueness is the rule, deliberately: with two blocks there is no safe
+    tie-break ("first wins" and "last wins" both validate a document nobody
+    wrote), so the ambiguity is reported instead of resolved.
+    """
+    blocks = []          # [(opening line number, [content lines])]
+    open_line = None     # line number of the currently open fence, or None
+    content = []
+    for number, line in enumerate(text.split("\n"), start=1):
+        if open_line is None:
+            # A bare ``` outside a block closes nothing -- it is prose.
+            if FENCE_OPEN.match(line):
+                open_line = number
+                content = []
+        elif FENCE_CLOSE.match(line):
+            blocks.append((open_line, content))
+            open_line = None
+        else:
+            # Inside a block every line is content verbatim, a further
+            # ```json line included -- fences do not nest.
+            content.append(line)
+
+    if open_line is not None:
+        return None, (
+            "the ```json fence opened at line %d is never closed -- a block ends at a "
+            "whole line of three backticks" % open_line
+        )
+    if not blocks:
+        return None, (
+            "no fenced ```json block found -- a Markdown container holds the object in "
+            "exactly one ```json block (the fence label is case sensitive and must be a "
+            "whole line)"
+        )
+    if len(blocks) > 1:
+        return None, (
+            "expected exactly one fenced ```json block, found %d (fences opened at lines "
+            "%s) -- an ambiguous container is never resolved by position"
+            % (len(blocks), ", ".join(str(opened) for opened, _ in blocks))
+        )
+    open_line, content = blocks[0]
+    return ("\n".join(content), open_line), None
+
+
+def _load_json_document(path, container_path=None):
+    """Read `path` and JSON-parse it, honouring its container form.
+
+    container_path: the path whose suffix decides the container, when it is
+    not `path` itself -- the ledger's cited-receipt loader passes the DECLARED
+    repo-relative citation while opening the realpath, so a symlink can never
+    silently switch a declared .md into the legacy branch.
+
+    Returns (value, None) -- `value` being any JSON value, the top-level-type
+    policy belonging to each caller -- or (None, (kind, message)):
+
+    kind == "block-error": (.md only) the file does not carry exactly one
+                           fenced ```json block -- VIOLATION, exit 1.
+    kind == "json-error":  the text that should be JSON is not valid JSON
+                           syntax -- VIOLATION, exit 1.
+    kind == "error":       anything else that prevented parsing (missing file,
+                           unreadable, invalid UTF-8, pathologically nested
+                           input, any other unexpected failure).
+    """
+    name = path if container_path is None else container_path
+
+    try:
+        with open(path, "rb") as handle:
+            raw = handle.read()
+        text = raw.decode("utf-8")
+    except Exception as exc:  # noqa: BLE001 -- deliberate: fail-closed, never a traceback
+        return None, ("error", "%s: %s" % (type(exc).__name__, exc))
+
+    if name.endswith(MARKDOWN_SUFFIX):
+        block, problem = _extract_fenced_json(text)
+        if problem is not None:
+            return None, ("block-error", problem)
+        payload, fence_line = block
+    else:
+        payload, fence_line = text, None
+
+    try:
+        return json.loads(payload), None
+    except json.JSONDecodeError as exc:
+        if fence_line is None:
+            return None, ("json-error", "not valid JSON: %s" % exc)
+        # The parser counts from the first line INSIDE the block, not from the
+        # top of the container -- say so, rather than hand back a line number
+        # that points at prose.
+        return None, (
+            "json-error",
+            "not valid JSON in the fenced ```json block opened at line %d (positions below "
+            "count from the first line inside the block): %s" % (fence_line, exc),
+        )
+    except Exception as exc:  # noqa: BLE001 -- deliberate: fail-closed, never a traceback
+        return None, ("error", "%s: %s" % (type(exc).__name__, exc))
 
 
 def _check_containment(project_root, file_field):
@@ -659,8 +804,8 @@ def _check_inline_closures(close, project_root, violations):
     """Validate close.inline_closures[] -- OPTIONAL: absent OR explicit null
     means no inline closures, and every legacy ledger sidecar (no such field,
     or an explicit null) validates exactly as it did before this field
-    existed. When present, each entry cites a receipt sidecar (a repo-relative
-    ".json" path that must exist, be CONTAINED under project_root) whose own
+    existed. When present, each entry cites a receipt (a repo-relative ".md"
+    or ".json" path that must exist, be CONTAINED under project_root) whose own
     findings_addressed[].finding_id values (NFC-normalized) must cover this
     entry's finding_ids (also NFC-normalized). A finding_ids entry that is not
     a non-empty string (including a non-hashable JSON array/object) is its own
@@ -684,9 +829,10 @@ def _check_inline_closures(close, project_root, violations):
         if not isinstance(receipt, str) or not receipt.strip():
             violations.append("%s.receipt must be a non-empty string" % where)
             receipt = None
-        elif not receipt.endswith(".json"):
+        elif not (receipt.endswith(MARKDOWN_SUFFIX) or receipt.endswith(".json")):
             violations.append(
-                "%s.receipt must be a repo-relative '.json' path (got %r)" % (where, receipt)
+                "%s.receipt must be a repo-relative '.md' or '.json' path (got %r)"
+                % (where, receipt)
             )
             receipt = None
 
@@ -710,14 +856,20 @@ def _check_inline_closures(close, project_root, violations):
             continue
 
         real_receipt = os.path.realpath(os.path.join(project_root, receipt))
-        try:
-            with open(real_receipt, "rb") as handle:
-                raw = handle.read()
-            receipt_data = json.loads(raw.decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001 -- fail closed as VIOLATION, never exit 2
+        # Same loader as the CLI argument (_read_and_parse): a cited ".md" is
+        # a Markdown container whose single fenced ```json block carries the
+        # receipt, anything else is read as bare JSON. The container form is
+        # decided from the DECLARED citation (the string the extension guard
+        # above accepted), never from the realpath a symlink may resolve to.
+        # Every failure stays a VIOLATION here -- an unreadable, unparsable or
+        # blockless cited receipt never escalates this run to exit 2.
+        receipt_data, load_error = _load_json_document(
+            real_receipt, container_path=receipt
+        )
+        if load_error is not None:
             violations.append(
-                "%s.receipt %r: could not be read/parsed as JSON (%s: %s)"
-                % (where, receipt, type(exc).__name__, exc)
+                "%s.receipt %r: could not be read/parsed as JSON (%s)"
+                % (where, receipt, load_error[1])
             )
             continue
 
@@ -932,27 +1084,26 @@ def validate_ledger(data, project_root="."):
 
 
 def _read_and_parse(path):
-    """Read + JSON-parse `path`. Returns (data, None) on success, or
+    """Load the CLI argument through _load_json_document (Markdown container
+    or legacy bare JSON, by suffix) and apply receipt/ledger mode's own
+    top-level-type policy. Returns (data, None) on success, or
     (None, (kind, message)) on failure:
 
-    kind == "json-error": the file opened and decoded, but is not valid JSON
-                          syntax -- caller prints a VIOLATION line, exit 1.
-    kind == "error":      anything else that prevented validation -- caller
+    kind == "block-error": (.md only) the file does not carry exactly one
+                           fenced ```json block -- caller prints a VIOLATION
+                           line, exit 1.
+    kind == "json-error":  the text that should be JSON is not valid JSON
+                           syntax -- caller prints a VIOLATION line, exit 1.
+    kind == "error":       anything else that prevented validation -- caller
                           prints a single ERROR line to stderr, exit 2. Never
                           a raw traceback, regardless of the underlying cause
                           (missing file, unreadable, invalid UTF-8,
                           pathologically nested input, top-level not an
                           object, or any other unexpected failure).
     """
-    try:
-        with open(path, "rb") as handle:
-            raw = handle.read()
-        text = raw.decode("utf-8")
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        return None, ("json-error", "not valid JSON: %s" % exc)
-    except Exception as exc:  # noqa: BLE001 -- deliberate: fail-closed, never a traceback
-        return None, ("error", "%s: %s" % (type(exc).__name__, exc))
+    data, error = _load_json_document(path)
+    if error is not None:
+        return None, error
 
     if not isinstance(data, dict):
         return None, ("error", "top-level JSON value must be an object (got %s)" % type(data).__name__)
@@ -965,16 +1116,18 @@ def main():
         prog="check-receipt.py",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
-            "Structural validator for the Review Receipt and Brief File ledger JSON sidecars.\n"
+            "Structural validator for the Review Receipt and Brief File ledger objects.\n"
+            "A .md file carries the object in its single fenced ```json block; any other\n"
+            "suffix is read as bare JSON (the legacy form).\n"
             "Modes:\n"
-            "  receipt <file.json> [project_root]\n"
-            "  ledger <file.json> [project_root]"
+            "  receipt <file.md|file.json> [project_root]\n"
+            "  ledger <file.md|file.json> [project_root]"
         ),
     )
     subparsers = parser.add_subparsers(dest="mode", required=True)
 
-    receipt_parser = subparsers.add_parser("receipt", help="validate a Review Receipt sidecar")
-    receipt_parser.add_argument("file", help="path to the receipt .json sidecar")
+    receipt_parser = subparsers.add_parser("receipt", help="validate a Review Receipt")
+    receipt_parser.add_argument("file", help="path to the receipt .md (or legacy .json)")
     receipt_parser.add_argument(
         "project_root",
         nargs="?",
@@ -982,8 +1135,8 @@ def main():
         help="repo root findings' file citations resolve against (default: .)",
     )
 
-    ledger_parser = subparsers.add_parser("ledger", help="validate a Brief File ledger sidecar")
-    ledger_parser.add_argument("file", help="path to the ledger .json sidecar")
+    ledger_parser = subparsers.add_parser("ledger", help="validate a Brief File ledger")
+    ledger_parser.add_argument("file", help="path to the ledger .md (or legacy .json)")
     ledger_parser.add_argument(
         "project_root",
         nargs="?",
@@ -996,7 +1149,7 @@ def main():
     data, error = _read_and_parse(args.file)
     if error is not None:
         kind, message = error
-        if kind == "json-error":
+        if kind in ("json-error", "block-error"):
             print("VIOLATION %s: %s" % (args.file, message))
             sys.exit(1)
         sys.stderr.write("ERROR %s: %s\n" % (args.file, message))

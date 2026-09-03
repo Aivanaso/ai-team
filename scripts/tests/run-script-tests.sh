@@ -131,6 +131,40 @@
 # positives -- plan absent/null validates as before, EXCEPT the unconditional
 # close.commits >= 1 floor, which applies plan or no plan (D-D).
 #
+# TENTH exception (the Markdown container, receipt-md-*.md and
+# ledger-inline-closures-receipt-md-good.md): the .md fixtures are report/Brief
+# File shaped -- prose plus the object in one fenced ```json block -- so their
+# JSON bodies keep the ordinary citation policy above (receipt-md-block-good.md
+# and every other .md receipt cite README.md, a real tracked file). The
+# exception is the CONTAINER citation itself:
+# ledger-inline-closures-receipt-md-good.md cites the sibling fixture
+# receipt-md-block-good.md as its close.inline_closures[0].receipt -- the same
+# reasoning as the FOURTH exception (the cited path must resolve to a real,
+# parseable receipt whose findings_addressed covers the closed id; README.md
+# would fail for reasons unrelated to the rule under test), extended to the .md
+# form the widened extension guard now accepts. That positive is also the
+# assertion that pins the CITED-receipt loader's fence extraction itself: a
+# cited-receipt loader still running raw json.loads (the pre-container code)
+# turns it, and only it, red. Two further ledgers are GENERATED at test time
+# (never static fixtures) citing receipt-md-no-block.md and
+# receipt-md-two-blocks.md; those pin the FAILURE SHAPE of an unextractable
+# cited container -- exit 1 with exactly one VIOLATION, never the exit-2
+# catch-all -- and deliberately claim nothing about the extraction wiring,
+# since a raw json.loads would also fail them by one JSON syntax error. A
+# third generated case (receipt-md-unterminated-fence, written into
+# TMP_WORKDIR for the same reason the SEVENTH exception generates its
+# escapes: the fixture list is closed) covers the opened-but-never-closed
+# fence arm, which no static fixture exercises. Each negative
+# .md fixture isolates to exactly one rule (calibration isolation):
+# receipt-md-no-block.md carries no fence of any label; wrong-fence-label.md
+# carries only ```JSON / ```jsonc fences over valid bodies (label exactness,
+# case sensitivity); two-blocks.md carries two blocks that are each a valid
+# receipt on their own (uniqueness, never "first wins"/"last wins");
+# malformed-block.md carries exactly one block whose body has a trailing comma
+# (malformed block = the exit-1 class, not exit 2). receipt-md-prose-fence-
+# string.md is a positive: the literal text ```json appears mid-sentence in its
+# prose alongside one real block, pinning "a fence is a whole line".
+#
 # Runs known-NEGATIVE fixtures FIRST (must exit 1) and known-EXIT-2 fixtures
 # next (must exit 2 -- usage/parse failures that prevent validation from
 # running at all, never a shape violation), THEN known-POSITIVE fixtures LAST
@@ -452,6 +486,27 @@ SYMLINK_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-symlink.json"
 _build_inline_closure_ledger "escape-link.json" "$SYMLINK_LEDGER"
 assert_violation_count "ledger-inline-closures-receipt-symlink (generated)" 1 1 "$VALIDATOR" ledger "$SYMLINK_LEDGER" "$FAKE_ROOT"
 
+# --- Markdown container, CITED-receipt loader FAIL-CLOSED shape (TENTH
+#     exception above): each generated ledger cites a real, contained .md
+#     receipt that deliberately cannot be extracted (no block / two blocks),
+#     with a valid finding_ids list so the ONLY thing that can fail is the load
+#     (calibration isolation). What these two pin is the FAILURE SHAPE: an
+#     unextractable cited container stays exit 1 with exactly one VIOLATION and
+#     never escalates to the exit-2 catch-all. They do NOT discriminate whether
+#     the cited-receipt loader extracts fences at all -- a loader that ran raw
+#     json.loads over the markdown would still produce one violation here (a
+#     JSON syntax error) and keep both green. The assertion that DOES pin the
+#     wiring is the positive ledger-inline-closures-receipt-md-good below:
+#     under a raw-json.loads cited-receipt loader it is the one that turns red. ---
+
+MD_NO_BLOCK_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-md-no-block.json"
+_build_inline_closure_ledger "scripts/tests/fixtures/receipt-md-no-block.md" "$MD_NO_BLOCK_LEDGER"
+assert_violation_count "ledger-inline-closures-receipt-md-no-block (generated)" 1 1 "$VALIDATOR" ledger "$MD_NO_BLOCK_LEDGER" "$REPO_ROOT"
+
+MD_TWO_BLOCKS_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-md-two-blocks.json"
+_build_inline_closure_ledger "scripts/tests/fixtures/receipt-md-two-blocks.md" "$MD_TWO_BLOCKS_LEDGER"
+assert_violation_count "ledger-inline-closures-receipt-md-two-blocks (generated)" 1 1 "$VALIDATOR" ledger "$MD_TWO_BLOCKS_LEDGER" "$REPO_ROOT"
+
 # --- REV F-5 (re-brief): the os.path.isabs arm of findings[].file is a pure
 #     string check and must keep running under a degenerate root, unlike the
 #     filesystem-touching containment probe it used to live inside of --
@@ -507,6 +562,27 @@ assert_violation_count "ledger-close-zero-commits-no-plan" 1 1 "$VALIDATOR" ledg
 assert_violation_count "ledger-close-zero-commits-plan-null" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-zero-commits-plan-null.json" "$REPO_ROOT"
 assert_violation_count "ledger-close-zero-commits-plan-empty" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-zero-commits-plan-empty.json" "$REPO_ROOT"
 
+# --- Markdown container, CLI-argument loader (TENTH exception above): each
+#     negative isolates to exactly one container rule, so assert_violation_count
+#     pins the single VIOLATION line as well as the exit code. The malformed
+#     block asserts exit 1, NOT exit 2 -- a container whose block is bad is
+#     structurally invalid, the same class as a malformed legacy .json. ---
+
+assert_violation_count "receipt-md-no-block" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-md-no-block.md" "$REPO_ROOT"
+assert_violation_count "receipt-md-two-blocks" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-md-two-blocks.md" "$REPO_ROOT"
+assert_violation_count "receipt-md-malformed-block" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-md-malformed-block.md" "$REPO_ROOT"
+assert_violation_count "receipt-md-wrong-fence-label" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-md-wrong-fence-label.md" "$REPO_ROOT"
+
+# The fourth container arm -- a fence opened and never closed -- is GENERATED
+# here rather than committed as a fixture (TENTH exception above): it is a
+# two-line file whose whole point is the missing closing fence, and a static
+# fixture of a deliberately unterminated code fence is a trap for every tool
+# that renders this directory. Without this assertion the rule would ship
+# never having been observed red (Rule 7).
+UNTERMINATED_MD="$TMP_WORKDIR/receipt-md-unterminated-fence.md"
+printf '# Report\n\n## Receipt\n\n```json\n{"tier": 1}\n' > "$UNTERMINATED_MD"
+assert_violation_count "receipt-md-unterminated-fence (generated)" 1 1 "$VALIDATOR" receipt "$UNTERMINATED_MD" "$REPO_ROOT"
+
 # --- Known-positive fixtures LAST: each must exit 0. ---
 
 assert_exit "receipt-good" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-good.json" "$REPO_ROOT"
@@ -544,6 +620,18 @@ assert_exit "ledger-inline-closures-mixed-nfd-nfc" 0 "$VALIDATOR" ledger "$FIXTU
 
 assert_exit "ledger-plan-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-good.json" "$REPO_ROOT"
 assert_exit "ledger-plan-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-null.json" "$REPO_ROOT"
+
+# --- Markdown container positives (TENTH exception above): a report-shaped
+#     receipt whose single fenced ```json block is a full valid receipt; the
+#     same, with the literal text ```json also present mid-sentence in the
+#     prose (a fence is a whole line, never a substring); and a .md LEDGER
+#     citing a .md RECEIPT, which exercises the widened
+#     close.inline_closures[].receipt extension guard and the cited-receipt
+#     loader's own fence extraction in one run. ---
+
+assert_exit "receipt-md-block-good" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-md-block-good.md" "$REPO_ROOT"
+assert_exit "receipt-md-prose-fence-string" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-md-prose-fence-string.md" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-receipt-md-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-receipt-md-good.md" "$REPO_ROOT"
 
 echo ""
 if (( fail_count > 0 )); then

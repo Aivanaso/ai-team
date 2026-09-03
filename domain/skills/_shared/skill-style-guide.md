@@ -17,7 +17,7 @@ Every SKILL.md must contain exactly these six `##` sections, in this order:
 5. **Output Contract** — what the envelope looks like, required fields, mandatory grep-contracts. No envelope examples inline (those go to `references/envelope-examples.md`).
 6. **References** — list of `references/` files with a one-line "load when" annotation each. Empty section is fine if no references exist yet.
 
-The six sections above are the complete and fixed structure. Additional sections go in `references/` files; reordering breaks the section-order assumption every SKILL.md author and reviewer relies on when locating a rule by section name (the framework's JSON structural validator, `_shared/scripts/check-receipt.py`, parses the Review Receipt and ledger sidecars only — it has no dependency on SKILL.md section order).
+The six sections above are the complete and fixed structure. Additional sections go in `references/` files; reordering breaks the section-order assumption every SKILL.md author and reviewer relies on when locating a rule by section name (the framework's JSON structural validator, `_shared/scripts/check-receipt.py`, parses the Review Receipt and ledger objects only, wherever they are stored — it has no dependency on SKILL.md section order).
 
 ---
 
