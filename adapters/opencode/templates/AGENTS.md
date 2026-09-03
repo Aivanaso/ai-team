@@ -91,17 +91,17 @@ Evaluate these four signals:
 **Small** (question, typo, config, single-file fix):
 - No gate output, no plan approval. Questions and explanations: answer directly.
 - Trivial mechanical edit (typo-level, zero analysis): do it inline per the trivial-edit floor.
-- Any other implementation work: compose a minimal Task Brief and delegate to `organic-implementer` immediately.
+- Any other implementation work: compose a minimal Task Brief and delegate to `organic-implementer` immediately — once the Brief File's read-record covers every `expected_files` path, or after a narrow-topic `organic-scout` pass (`scope_proposal: true`) when it does not (protocol → **Task Brief** → "When no discovery pass ran").
 
 **Medium** (multi-file change, new component, 50-300 lines):
 - STOP. Say this to the user:
-  > **Medium** -- [brief reason]. Plan: N briefs — [one line per brief: behavior · contract left · decisions]. Approve brief 1? (or `fast-forward` to approve the whole plan)
-- Wait for confirmation before any implementation.
+  > **Medium** -- [brief reason]. Discovery pass first (`organic-scout`, `scope_proposal: true`) — the plan below is provisional until its proposal is adopted. Plan: N briefs — [one line per brief: behavior · contract left · decisions]. Proceed? The discovery pass runs first; the plan is approved after adoption — brief 1 then, or `fast-forward` (say it now to enter the gear; its one confirmation is taken on the definitive plan)
+- Wait for confirmation before any implementation. The discovery pass is announced, never offered; the plan is re-presented after adoption.
 
 **Large** (multi-module, >300 lines, uncertain scope, new domain):
 - STOP. Say this to the user:
-  > **Large** -- [brief reason]. Plan: N briefs — [one line per brief: behavior · contract left · decisions]. Optional discovery pass first (`organic-scout`) to cut scope uncertainty before the brief is written? Approve brief 1? (or `fast-forward` to approve the whole plan)
-- Wait for confirmation. Offer the discovery pass only when the "needs discovery" signal actually fired.
+  > **Large** -- [brief reason]. Discovery pass first (`organic-scout`, `scope_proposal: true`) — the plan below is provisional until its proposal is adopted. Plan: N briefs — [one line per brief: behavior · contract left · decisions]. Proceed? The discovery pass runs first; the plan is approved after adoption — brief 1 then, or `fast-forward` (say it now to enter the gear; its one confirmation is taken on the definitive plan)
+- Wait for confirmation. Discovery is mandatory whether or not the "needs discovery" signal fired — a large-but-clear scope still gets its files, checks and constraints from evidence the scout cites.
 
 ### Gate does NOT apply to
 
@@ -113,15 +113,15 @@ Evaluate these four signals:
 
 For **Small** implementation tasks:
 1. Trivial mechanical edit (typo-level, zero analysis) → inline per the trivial-edit floor, no delegation.
-2. Otherwise delegate directly — no plan gate: `task({agent: "organic-implementer", …})` —
+2. Otherwise delegate directly — no plan gate; precondition: the Brief File's read-record covers every `expected_files` path, else a narrow-topic `organic-scout` pass with `scope_proposal: true` first (protocol → **Task Brief** → "When no discovery pass ran"): `task({agent: "organic-implementer", …})` —
    and review the returned bounded envelope per **Organic Delegation Route → What comes back**.
 
 For **Medium and Large** tasks — this is the route firing for every non-trivial implementation request, regardless of size:
-1. Get user approval of the plan's first brief (normal gear) or of the whole plan (fast-forward) — and, for Large, of the optional discovery pass; when that pass is accepted, the plan approval (first brief or whole plan) moves to step 2, after adoption, and the gate approves only the discovery pass.
-2. If discovery was accepted, delegate `organic-scout` with `scope_proposal: true` injected;
+1. Announce the discovery pass and present the provisional plan; the gate approves the discovery pass and the plan's direction — the plan approval itself (first brief in normal gear, the whole plan in fast-forward) moves to step 2, after adoption.
+2. Delegate `organic-scout` with `scope_proposal: true` injected (every Medium/Large task; the Small case lives on the Small route above);
    on return, verify the proposal against the **Scope Verification Checklist** in
    `~/.config/opencode/skills/_shared/orchestrator-protocol.md` and adopt it into the Task
-   Brief's `expected_files`/`acceptance_checks` — verify, never recompose (recompose-with-checklist only when discovery returned no `scope_proposal` block — fallback branch, see the protocol). The scout's optional `constraints_candidates` block is verified and adopted into the Task Brief's `constraints` the same way — checked against its `file:line` evidence, then copied in verbatim, never invented from the orchestrator's own reading. For Large, the scout's `plan_proposal` is adopted into the Brief File's `## Plan` the same way — verified, never recomposed — and the plan is re-presented for approval — brief 1 in normal gear, the whole plan in fast-forward (its ONE confirmation) — before any implementation delegation.
+   Brief's `expected_files`/`acceptance_checks` — verify, never recompose (recompose-with-checklist only when discovery returned no `scope_proposal` block — fallback branch, see the protocol). The scout's optional `constraints_candidates` block is verified and adopted into the Task Brief's `constraints` the same way — checked against its `file:line` evidence, then copied in verbatim, never invented from the orchestrator's own reading. The scout's `plan_proposal` is adopted into the Brief File's `## Plan` the same way — verified, never recomposed — and the plan is re-presented for approval — brief 1 in normal gear, the whole plan in fast-forward (its ONE confirmation) — before any implementation delegation.
 3. **Delegate implementation — this is the default:** `task({agent: "organic-implementer", …})`
    with a Task Brief (canonical definition: **Task Brief** in
    `~/.config/opencode/skills/_shared/orchestrator-protocol.md`) — its seven elements include
@@ -191,7 +191,7 @@ protocol's **Citation audit** and **Receipt** sections.
 
 Three gears govern per-phase ceremony (`mode:` in the Brief File): `normal` (default — exactly
 the ceremony above) / `fast-forward` (one confirmation of the whole `## Plan` — the definitive one,
-after adoption when a discovery pass ran — then every brief chains to completion with the review
+after adoption of the scout's `plan_proposal` — then every brief chains to completion with the review
 plane fully intact) / `unattended` (fast-forward plus a
 stop-on-question policy — pauses with `pending_question:` instead of self-approving).
 Non-normal gears enter on explicit user request or a one-time confirmation of a well-structured ticket (mid-task switches: explicit user instruction only); full semantics in the protocol's

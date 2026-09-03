@@ -13,8 +13,8 @@ runs before commit.
 User ↔ Claude Code (orchestrator)                                User ↔ OpenCode (orchestrator agent)
 │                                                                │
 ├── Small: delegate (no gate)                                    ├── Small: delegate (no gate)
-├── Medium: plan of briefs + delegate                            ├── Medium: plan of briefs + delegate
-└── Large: plan of briefs + optional discovery pass              └── Large: plan of briefs + optional discovery pass
+├── Medium: discovery pass + plan of briefs + delegate           ├── Medium: discovery pass + plan of briefs + delegate
+└── Large: discovery pass + plan of briefs + delegate            └── Large: discovery pass + plan of briefs + delegate
                          ↓                                             ↓
                     domain/skills/    ←─── shared skills ───→    domain/skills/
 ```
@@ -23,9 +23,9 @@ User ↔ Claude Code (orchestrator)                                User ↔ Open
 
 | Size | Signals | Ceremony |
 |------|---------|----------|
-| **Small** | 1 file, <50 lines, fully clear scope | Delegate directly, no gate (trivial mechanical edits run inline) |
-| **Medium** | 2-5 files, 50-300 lines | Present a plan of briefs (vertical slices), approve brief by brief or fast-forward, then delegate |
-| **Large** | 6+ files, crosses modules, needs discovery | Present a plan of briefs (vertical slices), offer an optional `organic-scout` discovery pass, approve brief by brief or fast-forward, then delegate |
+| **Small** | 1 file, <50 lines, fully clear scope | Delegate directly, no gate (trivial mechanical edits run inline); a brief naming a file the Brief File's read-record does not cover gets a narrow discovery pass first |
+| **Medium** | 2-5 files, 50-300 lines | Announce the provisional plan, run the `organic-scout` discovery pass (`scope_proposal: true`), adopt its proposal into the plan of briefs (vertical slices), approve brief by brief or fast-forward, then delegate |
+| **Large** | 6+ files, crosses modules, needs discovery | Same as Medium — the discovery pass is mandatory, never offered; a large-but-clear scope still gets its files, checks and constraints from scout-cited evidence |
 
 Classification never decides review depth — only how much planning precedes delegation.
 
@@ -57,7 +57,7 @@ only; nothing is retroactively resurrected.
 | Gear | Behavior |
 |------|----------|
 | `normal` (default) | Ceremony per task size, exactly as above |
-| `fast-forward` | One confirmation of the whole `## Plan` (the definitive one, after adoption when a discovery pass ran), then every brief chains to completion; the review plane stays fully intact, pausable at any brief boundary |
+| `fast-forward` | One confirmation of the whole `## Plan` (the definitive one, after adoption of the scout's proposal), then every brief chains to completion; the review plane stays fully intact, pausable at any brief boundary |
 | `unattended` | Fast-forward, plus never self-approves — pauses with the pending question recorded for the next session |
 
 Set via the Brief File's `mode:` field; any non-`normal` gear — at task start or mid-task — requires explicit user instruction.

@@ -8,8 +8,9 @@ user-invocable: false
 ## Activation Contract
 
 Run when the orchestrator launches scout at the start of a new project (no `config.yaml`
-yet), before a Large or unclear-scope Task Brief when the user accepted the optional
-discovery offer, or on demand for open-ended project inspection. Two modes: **bootstrap**
+yet), before every Medium or Large Task Brief — and before a Small one naming a file the
+orchestrator's Brief File does not record as read this session — or on demand for
+open-ended project inspection. Two modes: **bootstrap**
 detects the project stack and generates `config.yaml`; **discover** investigates a topic or
 objective and returns a discovery report — key files, structure, existing patterns to
 follow, and risks, grounded in read evidence with `file:line` citations. Never write
