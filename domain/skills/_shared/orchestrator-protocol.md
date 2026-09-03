@@ -80,9 +80,9 @@ decision, an option, or a plan entry:
    field names) is translated, never pasted -- because the user judging a finding is not the
    worker that produced it.
 2. **Reference.** Each item names what originates it: the `## Plan` entry or Task Brief it
-   belongs to, the receipt sidecar and finding id (`file:line` when a line exists), or the
-   prior decision as recorded in the Brief File (its `## Amendments` entry or `## Plan`
-   entry) -- a bare id or severity with no path is never presented alone, because an
+   belongs to, the review report's receipt block and finding id (`file:line` when a line
+   exists), or the prior decision as recorded in the Brief File (its `## Amendments` entry or
+   `## Plan` entry) -- a bare id or severity with no path is never presented alone, because an
    unreferenced claim cannot be checked.
 3. **Decisions before approval.** Every design decision the orchestrator wants to turn into a
    `constraints` entry is explained one by one, in this register, BEFORE the approval is
@@ -738,8 +738,8 @@ all three hold, the orchestrator MAY close the findings inline. **Seniority carv
 re-runs ONLY the receipt's already-named verification gates itself to evidence the closure
 (`common-rules.md` → Principle 4 Boundary cell names this exception) — every other execution
 stays delegated. It records a `findings_addressed` addendum in the receipt whose lens emitted
-the finding — the correctness sidecar for a correctness finding, the `kind: security-fragment`
-sidecar for a security finding — never the other one; `finding_id` resolves against that same document's own `lenses.*.findings[].id`, never across sidecars. The eligibility precondition ("verdict already `review-clear`") is read from the correctness receipt's top-level `verdict` — the combined tier-2 verdict — for BOTH sidecars, since a fragment carries none of its own. One entry per
+the finding — the receipt block of the correctness report for a correctness finding, the receipt
+block of the `kind: security-fragment` security report for a security finding — never the other one; `finding_id` resolves against that same document's own `lenses.*.findings[].id`, never across reports. The eligibility precondition ("verdict already `review-clear`") is read from the correctness receipt's top-level `verdict` — the combined tier-2 verdict — for BOTH reports, since a fragment carries none of its own. One entry per
 finding closed — `finding_id`, the REQUIRED `files` list (repo-relative paths the closure
 touched, every one inside the receipt's `group_files`), `fix_evidence` (exact `path:line` or
 command-output digest), and `gate_results` (schema: `result-envelope.md` → Review Receipt) — an
@@ -749,23 +749,23 @@ between the reviewed tree and the committed tree. `findings_addressed` NEVER alt
 an inline closure is never a substitute for a delta pass, and a `review-blocked` receipt clears
 only via a delta/full pass or a recorded override. The orchestrator additionally appends one
 `{ receipt, finding_ids }` entry to the current objective's Brief File ledger sidecar's
-`close.inline_closures[]` — `receipt` the repo-relative path to the receipt `.json` sidecar just
-amended, `finding_ids` the closed findings' ids — so the Brief File structural check (above) and
+`close.inline_closures[]` — `receipt` the repo-relative path to the report whose receipt block
+was just amended, `finding_ids` the closed findings' ids — so the Brief File structural check (above) and
 any later retro can recover the inline-closure count mechanically, from the sidecar, rather than
 by re-parsing free-form Amendments prose (schema: `result-envelope.md` → "Brief File Ledger JSON
 sidecar").
 
 ### Citation audit (tier ≥ 1, mechanical, BLOCKING)
 
-Every claim in a review result must cite `file:line` evidence — a reviewer's own citation section is a declaration, not proof (Evidence Protocol Rule 6). The JSON sidecar exists on disk to run this check against because `report_destination` is ALWAYS injected for review-plane delegations for exactly this reason (Critical Context Forwarding below); an unset injection is the one failure mode that silently disables this BLOCKING gate. Run the mechanical check against the sidecar — never the paired `.md` report, which this gate never parses:
+Every claim in a review result must cite `file:line` evidence — a reviewer's own citation section is a declaration, not proof (Evidence Protocol Rule 6). The report exists on disk to run this check against because `report_destination` is ALWAYS injected for review-plane delegations for exactly this reason (Critical Context Forwarding below); an unset injection is the one failure mode that silently disables this BLOCKING gate. Run the mechanical check against that report — the validator reads the single fenced ```json block it ends with, never the prose around it:
 
 ```
-python3 skills/_shared/scripts/check-receipt.py receipt {report_destination with .md replaced by .json} .
+python3 skills/_shared/scripts/check-receipt.py receipt {report_destination} .
 ```
 
 - Exit 0 → accept the review verdict (any `INFO` lines are advisory — e.g. CRITICAL findings present only in `lenses.security`, which the orchestrator combines into the tier-2 verdict itself).
-- Exit 1 → re-engage `organic-reviewer` once with the printed `VIOLATION` lines inlined verbatim: "fix these shape violations or cite resolvable evidence." Still violating after the re-engage → escalate to the user; treat the affected claim as unverified for gating.
-- Exit 2 → the sidecar could not be validated at all — missing on disk, unreadable, not valid UTF-8, a top-level JSON value that is not an object, or any other failure that stops validation before a shape check can even run (the validator prints one `ERROR <path>: <what>` line to stderr, never a traceback). Not a shape defect to fix in place: `status: blocked`, `failure_class: review`, re-delegate the lens to produce a correct sidecar. Never fall back to reading the `.md` report by hand as the gate — a hand-read is not this mechanical check.
+- Exit 1 → a structural VIOLATION: the object breaks a shape rule, the text inside the block is not valid JSON, or the container itself is wrong (no fenced ```json block at all, N blocks found where exactly one is required, a fence that is never closed). Re-engage `organic-reviewer` once with the printed `VIOLATION` lines inlined verbatim: "fix these shape violations or cite resolvable evidence." Still violating after the re-engage → escalate to the user; treat the affected claim as unverified for gating.
+- Exit 2 → the report could not be validated at all — missing on disk, unreadable, not valid UTF-8, a top-level JSON value that is not an object, or any other failure that stops validation before a shape check can even run (the validator prints one `ERROR <path>: <what>` line to stderr, never a traceback). Not a shape defect to fix in place: `status: blocked`, `failure_class: review`, re-delegate the lens to produce a correct report. Never fall back to reading the report's prose by hand as the gate — a hand-read is not this mechanical check.
 
 **Orchestrator duty — the gate's own calibration.** `scripts/tests/run-script-tests.sh` (repo-local, dev-only, protected by the denylist) is the Evidence Protocol Rule 7 calibration suite for `check-receipt.py`: it runs the known-negative fixtures first and asserts the exit codes. Before any commit that touches `_shared/scripts/`, the orchestrator runs it and requires a full pass — a gate whose failure has never been observed is not a gate.
 
@@ -784,14 +784,17 @@ is `review-clear` (or the user overrides a `review-blocked` verdict per Evidence
 never before every one of these resolves.
 
 1. **Fail-closed gate (tier ≥ 1 only, immediately before `git commit`).** Re-run the Citation
-   audit's script gate on the receipt sidecar:
+   audit's script gate on the report carrying the receipt:
    ```
-   python3 skills/_shared/scripts/check-receipt.py receipt {receipt-sidecar-path} {project_root}
+   python3 skills/_shared/scripts/check-receipt.py receipt {report_destination} {project_root}
    ```
-   Exit 0 is required. A missing, unreadable, or violating sidecar BLOCKS the commit — the gate
-   is this script run, never the orchestrator's memory of an earlier pass. In the same step,
-   verify the singular-override requirement for a blocking CRITICAL (`result-envelope.md` →
-   Review Receipt → Rules): a `review-blocked` verdict commits only when `overrides` carries one
+   Exit 0 is required. A missing, unreadable, or violating report BLOCKS the commit — exit 1 is
+   a structural VIOLATION (a broken shape, invalid JSON inside the block, or a container that
+   carries no fenced block, more than one, or an unclosed fence), exit 2 means the report could
+   not be validated at all. The gate is this script run, never the orchestrator's memory of an
+   earlier pass. In the same step, verify the singular-override requirement for a blocking
+   CRITICAL (`result-envelope.md` → Review
+   Receipt → Rules): a `review-blocked` verdict commits only when `overrides` carries one
    `finding_id` entry naming EVERY blocking CRITICAL, recorded by the orchestrator itself
    (`common-rules.md` → Principle 4 — the orchestrator is the exclusive author of a
    user-accepted override).
@@ -953,7 +956,7 @@ Resolve these flags **once per session**, cache them, and inject them into every
 | `check_results` | the implementer envelope's `check_results` (verbatim, the same run whose `artifacts` define `group_files`) | organic-reviewer | mandatory at tier ≥ 1 whenever an implementer envelope exists for the candidate (full pass and delta pass alike) — without it the reviewer's "re-run contradicts claimed `check_results` = CRITICAL" Hard Rule can never fire (deuda-2a retro) |
 | `prior_report` | the prior pass's on-disk review report path (that pass's own `report_destination`) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
 | `delta_scope` | orchestrator-composed from the remediation diff and the prior receipt; single shape defined ONCE in Evidence-Tier Review → Delta re-validation (chain custody included) | organic-reviewer | mandatory whenever a delta pass is delegated (Evidence-Tier Review → Delta re-validation) |
-| `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security, organic-retro (retro mode — path convention `.ai-team/retros/`) | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit. For `organic-reviewer`/`organic-security` (code-audit mode) this path names the `.md` narrative report; the lens writes a `.json` sidecar of the same name alongside it (Review Receipt, `result-envelope.md`) — the Citation audit above validates the `.json` twin, never the `.md` file itself. |
+| `report_destination` | orchestrator at delegation time — path convention `.ai-team/reviews/` for `organic-reviewer`/`organic-security` lenses, `.ai-team/explorations/` for `organic-scout` discovery | organic-scout (discover mode), organic-reviewer, organic-security, organic-retro (retro mode — path convention `.ai-team/retros/`) | ALWAYS when the delegation's report is review-plane or scope-authority material — the on-disk report is the durable audit trail the Brief File and the Citation audit (above) depend on; an unset injection returns a lens envelope with `artifacts: []`, silently disabling the blocking Citation audit. For `organic-reviewer`/`organic-security` (code-audit mode) this path names the `.md` report whose final fenced ```json block IS the Review Receipt (`result-envelope.md`) — the Citation audit above validates that block, never the prose around it, and the lens writes no second file beside the report. |
 | `brief_file` | the closed task's Brief File path under `.ai-team/briefs/` | organic-retro (retro mode) | always in retro mode — the skill's primary evidence source (sole authorized Brief File READ) |
 | `review_reports` | the task's on-disk review-report paths, read from the Brief File's receipt records | organic-retro (retro mode) | always in retro mode (may be an empty list; unreadable entries are noted in the skill's `risks`) |
 | `source_material` | the correction/friction context conventions are drawn from | organic-retro (conventions mode) | always in conventions mode — absent → the skill returns `needs_input` |

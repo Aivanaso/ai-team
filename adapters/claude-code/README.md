@@ -14,7 +14,7 @@ Install the ai-team organic evidence-tiered delegation framework for use with Cl
 
 ## Prerequisites
 
-Claude Code must be installed and `~/.claude/` must exist. The installer aborts if that directory is missing. `python3` (standard library only, no third-party packages) must also be on `PATH` — it runs `check-receipt.py`, the blocking gate the review plane validates every Review Receipt and Brief File ledger sidecar against.
+Claude Code must be installed and `~/.claude/` must exist. The installer aborts if that directory is missing. `python3` (standard library only, no third-party packages) must also be on `PATH` — it runs `check-receipt.py`, the blocking gate the review plane validates every Review Receipt and Brief File ledger against.
 
 ## What the install does
 

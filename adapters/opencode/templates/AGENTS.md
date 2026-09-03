@@ -142,9 +142,9 @@ Every finding, design decision, option, and plan entry shown to the user follows
 1. **Language** -- the user's language (the language of the conversation), plain terms a
    competent engineer outside this project understands, at most one technical term per
    sentence, worker vocabulary translated never pasted.
-2. **Reference** -- name what originates it: the `## Plan` entry or Task Brief, the receipt
-   sidecar and finding id (`file:line` when a line exists), or the prior decision as recorded
-   in the Brief File -- never a bare id or severity alone.
+2. **Reference** -- name what originates it: the `## Plan` entry or Task Brief, the review
+   report's receipt block and finding id (`file:line` when a line exists), or the prior
+   decision as recorded in the Brief File -- never a bare id or severity alone.
 3. **Decisions before approval** -- explain each design decision one by one, in this
    register, before asking for the approval that turns it into a `constraints` entry.
 4. **Options** -- at most two or three, each with an estimated cost and ONE recommendation
@@ -171,16 +171,19 @@ the resulting receipt's `verdict_history` chains prior passes and its FINAL entr
 input for the orchestrator's own inline commit-creation step (protocol's **Commit creation**
 section).
 
-The Review Receipt lives on disk as a JSON sidecar next to the lens's `.md` report — the same
-path, `.md` replaced by `.json`. That sidecar, never the `.md` narrative, is what the BLOCKING
-Citation audit validates before a `review-clear`/`review-blocked` verdict is accepted:
+The Review Receipt lives inside the lens's own `.md` report: the report ends with a `## Receipt`
+heading and ONE fenced ```json block carrying the receipt object, and no second file is written
+beside it. That block, never the prose around it, is what the BLOCKING Citation audit validates
+before a `review-clear`/`review-blocked` verdict is accepted:
 
-    python3 ~/.config/opencode/skills/_shared/scripts/check-receipt.py receipt <sidecar> .
+    python3 ~/.config/opencode/skills/_shared/scripts/check-receipt.py receipt <report_destination> .
 
-Exit 0 accepts the verdict; exit 1 re-engages `organic-reviewer` once with the printed
-`VIOLATION` lines inlined; exit 2 means the sidecar itself could not be validated (missing,
-unreadable, not an object) and the lens is re-delegated to produce a correct one — never fall
-back to reading the `.md` report by hand as the gate. Before delegating review, read the
+Exit 0 accepts the verdict; exit 1 is a structural VIOLATION (broken shape, invalid JSON inside
+the block, or a container with no fenced block, more than one, or an unclosed fence) and
+re-engages `organic-reviewer` once with the printed `VIOLATION` lines inlined; exit 2 means the
+report could not be validated at all (missing, unreadable, not valid UTF-8, a top-level value
+that is not an object) and the lens is re-delegated to produce a correct one — never fall
+back to a hand-read of the report's prose as the gate. Before delegating review, read the
 implementer's `decisions_taken` (if any) and cross-check each entry against the brief's
 `constraints` — a contradiction is inlined into the reviewer prompt as a focus item. When the
 STRICT TDD MODE directive was sent, forward `strict_tdd` and the implementer's `tdd_cycles` (or

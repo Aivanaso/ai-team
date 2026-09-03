@@ -2,20 +2,23 @@
 
 Use this template to write the report at the injected `report_destination` — a FILE path
 ending in `.md` (e.g. `.ai-team/reviews/YYYY-MM-DD-<slug>-threat-model.md`), never a directory
-to write a fixed filename into. This mode writes no `.json` sidecar: `threat-model` findings
+to write a fixed filename into. This mode writes no receipt block: `threat-model` findings
 carry no `verdict`/`lenses.correctness` object and never feed the Review Receipt or the commit
 gate (SKILL.md, Hard Rules + Execution Steps, threat-model Step 6) — the report includes a
-one-line "no receipt sidecar in this mode" note instead.
+one-line "no receipt block in this mode" note instead and carries no fenced JSON block at all.
 
 ## Template
 
-```markdown
+The outer fence below is a quad backtick so the template's own ```yaml block cannot close it
+early — the same convention `organic-reviewer`'s report format uses.
+
+````markdown
 # Threat Model: {scope}
 
 **Date:** {ISO 8601}
 **Mode:** threat-model
 **Touchpoints triggered:** {comma-separated list, or "none"}
-**Receipt sidecar:** none — no receipt sidecar in this mode (threat-model findings never feed the Review Receipt)
+**Receipt:** none — no receipt block in this mode (threat-model findings never feed the Review Receipt)
 
 ## Summary
 
@@ -77,7 +80,7 @@ security_requirements:
     priority: MUST | SHOULD
     related_touchpoint: "{slug}"
 ```
-```
+````
 
 ## Per-Finding Structure
 

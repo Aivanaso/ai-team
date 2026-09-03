@@ -9,8 +9,9 @@
 
 **Behavior:** Return `status: ok`, `verdict: review-clear`, `lenses.correctness.findings: []`,
 `verification: []` WITH `verification_omitted_reason: "no candidate changes to review"` — the
-sidecar gate (`check-receipt.py`) rejects an empty `verification` that carries no reason.
-Note in executive summary: "no candidate changes to review — gate passes with no findings".
+receipt gate (`check-receipt.py`, run against the report itself) rejects an empty `verification`
+that carries no reason. Note in executive summary: "no candidate changes to review — gate passes
+with no findings".
 
 Rationale: an empty change set is a valid state (e.g., the Task Brief declared a file the
 implementer did not need to touch). The gate must not block on a clean slate.
@@ -65,7 +66,7 @@ network, sandboxed tool).
 **Behavior:** Omit that command from `verification` — never fabricate `pass` or `fail` for a
 command that did not run. If EVERY declared check is unrunnable and `verification` is left empty,
 set `verification_omitted_reason: "every declared check unrunnable in this environment"` — the
-sidecar gate rejects an unexplained empty list. Note the gap in `risks`: "verification check
+receipt gate rejects an unexplained empty list. Note the gap in `risks`: "verification check
 '{command}' could not be re-run in this environment" (for an unrunnable `review_gates` entry, name the gate:
 "review gate '{name}' ('{command}') could not be re-run in this environment"). This does not
 by itself block the verdict (the correctness lenses still resolve normally); it does mean the

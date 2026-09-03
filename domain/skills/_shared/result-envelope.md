@@ -193,19 +193,21 @@ ingestion (both in their own files) cross-reference this list rather than repeat
 
 Produced by `organic-reviewer` for every candidate Evidence-Tier Review classifies as tier ≥ 1 (schema: `orchestrator-protocol.md` → "Evidence-Tier Review"). Consumed by the orchestrator (commit gate, routing, Re-engage Routing on `failure_class`). An absent receipt for a tier ≥ 1 candidate is a hard block on commit — the orchestrator refuses without it (`orchestrator-protocol.md` → "Commit creation").
 
-**On-disk JSON sidecar.** The schema below is the receipt object as returned in the delegation
-envelope; the orchestrator re-reads it from its on-disk sidecar for the fail-closed gate
+**On-disk receipt block.** The schema below is the receipt object as returned in the delegation
+envelope; the orchestrator re-reads it from the on-disk report for the fail-closed gate
 immediately before the commit — the gate is this re-read, never the orchestrator's memory of an
 earlier pass (`orchestrator-protocol.md` → **Commit creation**, step 1). For the on-disk copy, the lens
-ALSO serializes this exact object — same field names, no additions, no renames — to a `.json`
-sidecar next to its `.md` narrative report: `report_destination` with the `.md` extension
-replaced by `.json` (e.g. `.ai-team/reviews/billing-export.md` →
-`.ai-team/reviews/billing-export.json`), written in the same write step as the `.md` file
-(`organic-reviewer/SKILL.md` Step 7, `organic-security/SKILL.md` code-audit Step 6). This
-sidecar — never the `.md` file — is what the BLOCKING Citation audit
+writes ONE file — its report at `report_destination` — whose last content is a `## Receipt`
+heading followed by a single fenced ```json block carrying this exact object, same field names,
+no additions, no renames (`organic-reviewer/SKILL.md` Step 7, `organic-security/SKILL.md`
+code-audit Step 6). Nothing is written beside that report. The orchestrator's own addenda
+(`overrides`, `findings_addressed`, `exposure` — authorship unchanged, see the Rules below) are
+edited INTO that same block in place, so the report still carries exactly one such block, and
+**Commit creation** step 1 re-validates the file after any such edit. That block — never the
+prose around it — is what the BLOCKING Citation audit
 (`orchestrator-protocol.md` → Evidence-Tier Review) validates, via
-`python3 skills/_shared/scripts/check-receipt.py receipt <sidecar> <project_root>`: a
-Python-stdlib, JSON-only structural check (valid shape, CONTAINED on-disk resolution of every
+`python3 skills/_shared/scripts/check-receipt.py receipt <report_destination> <project_root>`: a
+Python-stdlib structural check (valid shape, CONTAINED on-disk resolution of every
 cited `file` — `os.path.realpath` containment under `project_root` plus `os.path.isfile`, never
 a bare existence check — the evidence→trigger coupling, verdict/`verdict_history` coherence,
 `id` uniqueness after NFC normalization, the severity enum, lens `status`/findings coherence,
@@ -213,15 +215,21 @@ a bare existence check — the evidence→trigger coupling, verdict/`verdict_his
 `{command, exit_code, outcome}` per row — or an empty one justified by `verification_omitted_reason` —
 `not_reverified[]` as non-empty strings, and a `project_root` that is an existing directory other
 than the filesystem root; an unusable citation string such as an embedded NUL is a VIOLATION, not
-a crash) — it never re-runs a command and never opens the `.md` report.
-`organic-security` in `threat-model` mode writes no sidecar (it never produces a `verdict` or
-`lenses.correctness` object) — its report notes "no receipt sidecar in this mode" instead.
+a crash) — it never re-runs a command and never parses the report's prose.
+Exactly ONE fenced ```json block per report: zero blocks, two or more blocks, an opening fence
+that is never closed, or text inside the block that is not valid JSON are all structural
+VIOLATIONs at exit 1 — so a JSON excerpt quoted inside a finding is fenced as ```text or
+indented, never as ```json. Exit 2 is reserved for what stopped validation from running at all:
+the report missing on disk, unreadable, not valid UTF-8, or a top-level JSON value that is not
+an object. `organic-security` in `threat-model` mode writes no receipt block (it never produces
+a `verdict` or `lenses.correctness` object) — its report notes "no receipt block in this mode"
+instead.
 
-**`kind` — the FULL-receipt vs SECURITY-FRAGMENT discriminator.** A sidecar is a full reviewer
-receipt by default. It is instead a security-lens fragment ONLY when it declares the top-level
+**`kind` — the FULL-receipt vs SECURITY-FRAGMENT discriminator.** A receipt block is a full
+reviewer receipt by default. It is instead a security-lens fragment ONLY when it declares the top-level
 `kind: "security-fragment"` field explicitly — `organic-security` (code-audit mode) always sets
 it on the fragment it writes (`organic-security/SKILL.md` code-audit Step 6). The ABSENCE of
-`lenses.correctness` is never itself the discriminator: a sidecar with no `kind` and no
+`lenses.correctness` is never itself the discriminator: a receipt with no `kind` and no
 `lenses.correctness` is a truncated full receipt (a contract violation), not a fragment. A
 fragment MUST declare `lenses.security` and MUST NOT declare `lenses.correctness`; it never
 carries a `verdict` field (only `organic-reviewer` computes that field), but if one is present
@@ -261,12 +269,12 @@ exposure:                  # optional — orchestrator-authored addendum measuri
 ```
 
 **Rules:**
-- `kind` (optional, top-level): absent or explicit `null` = a full reviewer receipt; the string `"security-fragment"` = the security lens's stand-alone sidecar (no `lenses.correctness`, no required `verdict`); ANY other value is a validator VIOLATION — a typo'd `kind` is never silently treated as a full receipt.
+- `kind` (optional, top-level): absent or explicit `null` = a full reviewer receipt; the string `"security-fragment"` = the security lens's stand-alone fragment (no `lenses.correctness`, no required `verdict`); ANY other value is a validator VIOLATION — a typo'd `kind` is never silently treated as a full receipt.
 - `verification_omitted_reason` (optional, top-level): a full receipt whose `verification[]` is empty MUST carry this non-empty string naming the contract case that left nothing to re-run ("no candidate changes to review" — `group_files` empty; or "every declared check unrunnable in this environment"); it MUST be absent when `verification[]` is non-empty. A full receipt that re-ran nothing and says nothing is the zero-work class and fails the gate.
 - `kind: "security-fragment"` is the ONLY discriminator between a full reviewer receipt and a
   security-lens fragment — see "kind" above. A full receipt (the default, `kind` absent) REQUIRES
   `lenses.correctness` and a top-level `verdict` in `VERDICTS`; a fragment REQUIRES
-  `lenses.security` and forbids `lenses.correctness`. `check-receipt.py` fails closed on a sidecar
+  `lenses.security` and forbids `lenses.correctness`. `check-receipt.py` fails closed on a receipt
   that declares neither `kind` nor `lenses.correctness` — that shape is a truncated full receipt,
   never treated as an implicit fragment.
 - `tier_reason` is REQUIRED and non-empty for tier 1 and tier 2 — review cost is never unexplained.
@@ -280,7 +288,7 @@ exposure:                  # optional — orchestrator-authored addendum measuri
 - `overrides` is populated only when the user accepted-and-proceeded over a finding instead of re-engaging the worker; omit the field entirely when no override occurred.
 - `verdict_history` is present only on a delta-mode receipt (`orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation): one entry per pass in the chain — the initial full pass, then every delta pass since, oldest first. **Chain custody:** the orchestrator is the chain's custodian — it injects the prior receipt's full `verdict_history` array as `delta_scope.prior_verdict_history` (Critical Context Forwarding) alongside `prior_report`; `organic-reviewer` appends EXACTLY ONE entry, its own pass, and returns the full resulting chain — it never reconstructs earlier entries from the report text. The LAST entry's `verdict` is authoritative for the commit gate (the orchestrator, `orchestrator-protocol.md` → "Commit creation") and MUST mirror this receipt's own top-level `verdict` field; an earlier entry recording `review-blocked` does not itself block once a later entry clears it. A receipt whose last entry disagrees with the top-level `verdict` is a contract violation — the orchestrator fails closed on it (`orchestrator-protocol.md` → "Commit creation"), never silently picking one field over the other. Omit the field entirely for a full-pass receipt.
 - `not_reverified` is present only on a delta-mode receipt: the areas/lenses/files the prior pass covered that this pass did not re-check, mirroring the on-disk report's mandatory "Not Re-Verified" list (`organic-reviewer/references/report-format.md` → Delta Report Variant) — carrying the coverage gap into the envelope itself, since the orchestrator ingests only the envelope and never reads the report's full contents (Purpose above). Omit the field entirely for a full-pass receipt.
-- `findings_addressed` is an optional, orchestrator-authored addendum — mirroring `overrides`, `organic-reviewer` never writes it — recording an inline closure per `orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation → "Inline closure". Eligible only when ALL of: the candidate's authoritative `verdict` was ALREADY `review-clear` before the closure — the correctness receipt's top-level `verdict`, which at tier 2 is the combined verdict the orchestrator derives from both lenses; a `kind: security-fragment` sidecar carries no `verdict` of its own and inherits this condition from that receipt (a `review-blocked` receipt is never cleared this way), every closed finding's fix was mechanically prescribed by the finding text itself (never CRITICAL), and the closure touched only files already in the receipt's `group_files`. Each entry's `finding_id` must resolve inside that same receipt document — the union of ITS OWN `lenses.correctness.findings[].id` and `lenses.security.findings[].id` — never across sidecars: at tier 2, a security-lens finding is closed on its own `kind: security-fragment` sidecar (the file carrying `lenses.security`), never on the correctness receipt, and a correctness-lens finding is closed on the correctness receipt instead. One entry per finding closed this way, citing the fix evidence and the re-run gate results — an entry without gate evidence is invalid. Each entry's `files` field is REQUIRED: the repo-relative paths the closure actually touched — a digest-only `fix_evidence` never substitutes for it. An entry missing `files`, or naming any file outside `group_files`, is invalid and fails the commit gate closed (`orchestrator-protocol.md` → "Commit creation") — a fail-closed gate never treats a pathless entry as an implicit pass. Never used for a CRITICAL finding, and never alters the receipt's top-level `verdict` field — an addendum records that a closure happened, it does not re-compute the gate.
+- `findings_addressed` is an optional, orchestrator-authored addendum — mirroring `overrides`, `organic-reviewer` never writes it — recording an inline closure per `orchestrator-protocol.md` → Evidence-Tier Review → Delta re-validation → "Inline closure". Eligible only when ALL of: the candidate's authoritative `verdict` was ALREADY `review-clear` before the closure — the correctness receipt's top-level `verdict`, which at tier 2 is the combined verdict the orchestrator derives from both lenses; a `kind: security-fragment` report carries no `verdict` of its own and inherits this condition from that receipt (a `review-blocked` receipt is never cleared this way), every closed finding's fix was mechanically prescribed by the finding text itself (never CRITICAL), and the closure touched only files already in the receipt's `group_files`. Each entry's `finding_id` must resolve inside that same receipt document — the union of ITS OWN `lenses.correctness.findings[].id` and `lenses.security.findings[].id` — never across reports: at tier 2, a security-lens finding is closed on the security report itself (the file whose block carries `lenses.security`), never on the correctness report, and a correctness-lens finding is closed on the correctness receipt instead. One entry per finding closed this way, citing the fix evidence and the re-run gate results — an entry without gate evidence is invalid. Each entry's `files` field is REQUIRED: the repo-relative paths the closure actually touched — a digest-only `fix_evidence` never substitutes for it. An entry missing `files`, or naming any file outside `group_files`, is invalid and fails the commit gate closed (`orchestrator-protocol.md` → "Commit creation") — a fail-closed gate never treats a pathless entry as an implicit pass. Never used for a CRITICAL finding, and never alters the receipt's top-level `verdict` field — an addendum records that a closure happened, it does not re-compute the gate.
 - `exposure` is an optional, orchestrator-authored addendum — mirroring `findings_addressed`'s authorship pattern, `organic-reviewer` never writes it — recording a real-data exposure measurement for a CRITICAL or MAJOR finding whose `trigger` names a stored-data precondition, per `orchestrator-protocol.md` → Exposure measurement for a stored-data precondition. Each entry's `finding_id` must resolve inside this same receipt document — the union of `lenses.correctness.findings[].id` and `lenses.security.findings[].id` — exactly as `findings_addressed` resolves its own. Entry shape: `finding_id`, `checked` (bool — whether the measurement was actually taken), and `note` (one line recording what the measurement can and cannot rule out, e.g. a sampled scan vs. a full table count) are ALWAYS present. `precondition_rows` (int — rows matching the finding's stored-data precondition) and `total_rows` (int — the denominator the count was measured against) are present ONLY when `checked: true`; a `checked: false` entry carries `finding_id`, `checked`, and `note` alone — no `precondition_rows`, no `total_rows`. It never alters the receipt's top-level `verdict`, any finding's `severity`, or any `lenses.*` content — the addendum records a measurement, it does not re-compute the gate.
 - The `exposure` addendum is taken AFTER the finding is emitted and BEFORE it is presented to the user, per `orchestrator-protocol.md` → Exposure measurement for a stored-data precondition, so its figures are already available when the finding is presented per `orchestrator-protocol.md` → Reporting to the user; the same figures also land in the matching `.ai-team/tech-debt.md` entry's exposure field when the finding is deferred there. A `checked: false` entry is valid — it records that the exposure question was considered and left unmeasured, never a silent omission — and `exposure` is never REQUIRED: a queued finding whose `trigger` names no stored-data precondition carries no entry at all.
 - A `verification[]` entry carrying `gate:` is an objective `review_gates` outcome from `.ai-team/config.yaml` — exit code only, always `confidence: high` (objective exit-code evidence, not a judgment call). A failing gate additionally lands as a `lenses.correctness.findings[]` entry: `file`/`line` cite the gate's declaring entry in `.ai-team/config.yaml` (always a resolvable citation), and `claim` names gate name + command + exit code. A failing blocking gate is CRITICAL and forces `verdict: review-blocked`; a failing non-blocking gate is MAJOR and does not block.
