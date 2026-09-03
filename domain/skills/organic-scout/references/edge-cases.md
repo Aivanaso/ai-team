@@ -94,6 +94,17 @@ envelope risk: "Very small project — architecture detection skipped."
 
 ---
 
+### Dossier item with no resolvable evidence
+
+**Condition:** a `file_dossier` field cannot be closed from the repository — the module a target sources lives outside the repo (a vendored path, a system library), or the logic the objective replaces is enforced by an external system (a CRM workflow, a SaaS rule) whose conditions are written nowhere in the codebase.
+
+**Action:**
+1. Record the item in `open_scope_questions`, naming exactly what could not be read and where it would be found ("Zoho workflow 'Activar servicio' — gating conditions not in repo; export the workflow definition or ask the user").
+2. Never fill the field from inference — an invented condition is worse than a declared gap, because the orchestrator adopts `constraints_candidates` verbatim.
+3. Return `status: ok` — a declared gap is a valid finding; the orchestrator resolves it before composing (Scope Verification Checklist, failure consequence).
+
+---
+
 ### Topic matches zero files
 
 **Condition:** Grep/glob returns 0 results for the topic.

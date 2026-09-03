@@ -80,6 +80,10 @@ discovery_report:
       - "InvoiceRepository.findForExport(ids: string[]): Promise<Invoice[]> — new interface member, src/billing/repositories/InvoiceRepository.ts:12"
     constraints_candidates:
       - "InvoiceService never returns partial results on a failed batch item — it fails the whole export instead (src/billing/services/InvoiceService.ts:55)"
+      - "InvoiceRepository.findByIds silently drops ids beyond the 500-parameter query limit — callers chunk first (src/billing/repositories/InvoiceRepository.ts:20)"
+    file_dossier:
+      - { path: "src/billing/repositories/InvoiceRepository.ts", documented_gotchas: ["docblock at src/billing/repositories/InvoiceRepository.ts:20 — findByIds silently drops ids beyond the 500-parameter query limit; callers chunk first"], external_conditions: [], constructor_deps: { count: 2, cap: "4-5 (CLAUDE.md:41 'Max 4-5 constructor dependencies')" } }
+      - { path: "tests/Double/billing/InvoiceRepositoryStub.ts", documented_gotchas: [], external_conditions: [] }
     open_scope_questions:
       - "Retention policy for generated exports has no existing caller — cannot cite evidence for a cleanup job path."
     plan_proposal:
