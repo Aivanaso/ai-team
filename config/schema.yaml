@@ -36,7 +36,7 @@
 #   {worker-name}: {model-alias}
 #   e.g.
 #   model_overrides:
-#     organic-reviewer: sonnet   # downgrade from the opus default
+#     organic-reviewer: opus     # upgrade from the sonnet default
 #   Project-level override of the Model Routing table's per-worker
 #   defaults. Read by the orchestrator (orchestrator-protocol.md ->
 #   "Model Routing" -> "Project Override"). Worker names: organic-implementer

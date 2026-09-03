@@ -298,7 +298,7 @@ file; it is orchestrator-authored only, exactly like the Brief File itself.
 ```json
 {
   "ledger": [
-    { "n": 1, "agent": "organic-implementer", "model": "sonnet", "tokens": 50000, "tool_uses": 12, "duration_s": 300, "outcome": "ok" }
+    { "n": 1, "agent": "organic-implementer", "model": "opus", "tokens": 50000, "tool_uses": 12, "duration_s": 300, "outcome": "ok" }
   ],
   "close": {
     "delegations": 1,

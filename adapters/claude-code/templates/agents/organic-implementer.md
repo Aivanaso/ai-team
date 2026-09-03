@@ -2,7 +2,7 @@
 name: organic-implementer
 description: "Task Brief-to-code implementation (organic delegation route)"
 category: organic
-model: sonnet
+model: opus
 tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 

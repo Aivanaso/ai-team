@@ -133,7 +133,7 @@ architecture:
 # model_overrides:
 #   Optional, safe-absent (defaults live in _shared/orchestrator-protocol.md -> "Model
 #   Routing"). Project-level override of the default model per delegated worker.
-#   organic-reviewer: sonnet   # e.g. downgrade from the opus default
+#   organic-reviewer: opus     # e.g. upgrade from the sonnet default
 #   Worker names: organic-implementer | organic-reviewer | organic-security |
 #   organic-scout | organic-retro.
 

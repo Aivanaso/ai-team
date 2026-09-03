@@ -101,8 +101,8 @@ architecture:
 # domain/skills/_shared/orchestrator-protocol.md -> "Model Routing".
 #
 # model_overrides:
-#   organic-reviewer: sonnet   # Cheaper reviews (less correctness depth)
-#   organic-implementer: opus  # More capable implementation for a hard task
+#   organic-reviewer: opus      # Deeper reviews for a high-stakes surface
+#   organic-implementer: sonnet # Cheaper implementation for a simple, well-specified project
 
 # Custom rules for AI agents (optional)
 rules:

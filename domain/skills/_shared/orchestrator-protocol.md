@@ -336,7 +336,7 @@ The named paths are the ai-team framework repo's own; in a target project withou
 |---|---|
 | Preamble | `You are the organic-implementer executor. …` (mirrors the agent template) |
 | `## Skill and Protocol Paths` | `{install_dir}/skills/organic-implementer/SKILL.md`, `{install_dir}/skills/_shared/context-protocol.md`, `…/persistence-contract.md`, `…/common-rules.md`, `…/result-envelope.md`, `…/evidence-protocol.md`, `…/orchestrator-protocol.md`. No `references_dir` — the skill is single-file. |
-| `## Injected Context` | `project_root` (= the brief's target repo), `model_alias: sonnet`, `current_iso_utc`, `install_dir`, `amendment_requests_used`, `amendments_denied` — all resolved per the Critical Context Forwarding table below |
+| `## Injected Context` | `project_root` (= the brief's target repo), `model_alias: opus`, `current_iso_utc`, `install_dir`, `amendment_requests_used`, `amendments_denied` — all resolved per the Critical Context Forwarding table below |
 | `## Task Brief` | the seven-element YAML block (see **Task Brief** above) |
 | `## Skills to load before work` | forwarded from `.ai-team/skill-registry.md` **only when the brief's target repo is the session's project root**; omitted otherwise |
 | Mandatory tail | the verbatim UNTRUSTED CONTENT block in Critical Context Forwarding below — reused, not re-authored |
@@ -843,9 +843,9 @@ Model routing only applies to **delegated sub-agents**. Inline work runs at what
 
 | Worker | Model | Reason |
 |--------|-------|--------|
-| organic-implementer | sonnet | Code generation from a clear Task Brief |
-| organic-reviewer | opus | Full correctness reasoning over a diff is substantive cross-cutting work |
-| organic-security | sonnet | Pattern matching over the diff for security-sensitive surfaces |
+| organic-implementer | opus | Implementation is the substantive work: it carries the TDD cycles, keeps the tree green while changing it, and honors every constraint at once (user decision 2026-09-03) |
+| organic-reviewer | sonnet | Verification that the candidate does what the brief says — executed probes (mutation, re-run checks) are a discipline, not a reasoning load; sonnet already ran clean delta passes (ECO-856 row 9) |
+| organic-security | opus | Security reasoning composes findings across the diff (organic-v2 phase 3: two CRITICALs that only mattered together) — the lens where intelligence, not pattern matching, decides |
 | organic-scout | sonnet | Mandatory pre-brief discovery pass (Medium/Large; Small without a read-record); codebase exploration, structured output |
 | organic-retro | sonnet | Retrospective + convention-capture from durable evidence |
 | default | sonnet | Fallback for any delegation with no row above |
@@ -868,7 +868,7 @@ Use `subagent_type` matching the skill name (`organic-implementer`, `organic-rev
 
 **Why disk-read over inline:** inlining a SKILL.md plus its shared protocols consumes context budget needed for source files and leaves protocols stale by the time the agent needs them (lost-in-the-middle effect after many tool calls). JIT loading keeps each protocol fresh at the step that needs it. Pattern validated by gentle-ai (`skill-resolver.md`).
 
-**Agent description format:** `"{skill} {brief-slug} [{model}]"` — e.g., `"organic-implementer billing-export [sonnet]"`. The model tag makes routing visible in the UI.
+**Agent description format:** `"{skill} {brief-slug} [{model}]"` — e.g., `"organic-implementer billing-export [opus]"`. The model tag makes routing visible in the UI.
 
 **Prompt structure:** `You are the {skill} executor...` → `FIRST ACTION: Read your instructions from the skill path below...` → `## Skill and Protocol Paths` → `## Injected Context` → `## Skills to load before work` (organic-implementer only, when `skills_to_load` matched) → `## Task Brief` (scope, acceptance checks, constraints) → `## Output Contract` → the mandatory Untrusted content block (below).
 

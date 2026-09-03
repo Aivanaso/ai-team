@@ -128,9 +128,9 @@ into that pass's own token count, not a separate delegation.
 
 | # | agent | model | tokens | tool_uses | duration | outcome |
 |---|---|---|---|---|---|---|
-| 1 | organic-implementer | sonnet | 95,000 | 30 | 5m10s | blocked — scope-large |
-| 2 | organic-implementer (re-brief) | sonnet | 110,000 | 38 | 6m40s | ok — 4 files, 2/2 checks |
-| 3 | organic-reviewer (tier 1) | opus | 88,000 | 22 | 7m05s | review-clear — 0 findings |
+| 1 | organic-implementer | opus | 95,000 | 30 | 5m10s | blocked — scope-large |
+| 2 | organic-implementer (re-brief) | opus | 110,000 | 38 | 6m40s | ok — 4 files, 2/2 checks |
+| 3 | organic-reviewer (tier 1) | sonnet | 88,000 | 22 | 7m05s | review-clear — 0 findings |
 
 Re-brief count: 1 (cause: scope-large, F1 not implicated). Commit a1b2c3d was created inline by
 the orchestrator (not a delegation — no Cost Ledger row, `orchestrator-protocol.md` → "Commit

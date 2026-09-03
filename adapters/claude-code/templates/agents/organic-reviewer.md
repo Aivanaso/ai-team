@@ -2,7 +2,7 @@
 name: organic-reviewer
 description: "Correctness + verification review gate for tier>=1 candidates (organic delegation route)"
 category: organic
-model: opus
+model: sonnet
 tools: Read, Write, Bash, Grep, Glob
 ---
 

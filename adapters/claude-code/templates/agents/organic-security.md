@@ -2,7 +2,7 @@
 name: organic-security
 description: "Threat-model or code-audit security lens (organic delegation route)"
 category: organic
-model: sonnet
+model: opus
 tools: Read, Write, Bash, Grep, Glob
 ---
 
