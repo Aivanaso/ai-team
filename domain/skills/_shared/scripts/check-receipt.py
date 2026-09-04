@@ -10,10 +10,17 @@ Validating structure, not content, is the whole point -- prose was never a
 safe parse target.
 
 Modes:
-  receipt <file.md> [project_root]     validate a Review Receipt (Markdown container)
-  ledger  <file.md> [project_root]     validate a Brief File ledger+close (Markdown container)
-  receipt <file.json> [project_root]   legacy: the same object as a bare JSON file
-  ledger  <file.json> [project_root]   legacy: the same object as a bare JSON file
+  receipt <file.md> [project_root]              validate a Review Receipt (Markdown container)
+  ledger  <file.md> [project_root]              validate a Brief File ledger+close (Markdown container)
+  ledger  --open <file.md> [project_root]       the same, for an IN-PROGRESS Brief File (close optional)
+  receipt --legacy <file.json> [project_root]   legacy: the same object as a bare JSON file
+  ledger  --legacy <file.json> [project_root]   legacy: the same object as a bare JSON file
+
+Both flags are optional, and both sit immediately after the mode word, BEFORE
+the positional <file>: argparse matches <file> and [project_root] as one
+positional chunk, so `ledger <file> --open <project_root>` is a usage error,
+never an --open run. --legacy is accepted by receipt AND ledger; --open by
+ledger only.
 
 Container (.md, the primary form): the validated object is the content of the
 SINGLE fenced ```json block in the file; the prose around it is never parsed.
@@ -28,21 +35,29 @@ never checked here. Malformed JSON inside the found block is the same exit-1
 VIOLATION class as a malformed legacy .json file; exit 2 stays reserved for
 what prevented validation from running at all (see Exit codes below).
 
-Container selection is by path suffix and nothing else: a path ending in
-".md" is a Markdown container, anything else is read as bare JSON exactly as
-before (the legacy branch, byte-for-byte unchanged). Both JSON loaders --
-the CLI argument and the receipt a ledger's close.inline_closures[] entry
-cites -- go through the same _load_json_document helper, so the two forms are
-accepted identically in both places.
+Container selection is by path suffix and nothing else -- and the non-".md"
+half of it is GATED. A path ending in ".md" is a Markdown container; any
+other path is a legacy bare-JSON container, read ONLY when --legacy is
+passed. Without the flag such a path is a VIOLATION (exit 1):
+"bare JSON is a legacy container -- pass --legacy for a historical file; new
+receipts and ledgers live in the final fenced json block of a .md". That
+decision is a pure path-string test placed BEFORE any open() call, so a
+missing or unreadable file never masquerades as a suffix violation and, once
+--legacy IS passed, still takes the ordinary I/O ERROR path (exit 2). Both
+JSON loaders -- the CLI argument and the receipt a ledger's
+close.inline_closures[] entry cites -- go through the same
+_load_json_document helper, so the two forms are accepted identically in both
+places, and the one --legacy flag governs both of them (and ledger[].report
+below) for the whole run.
 
 ledger mode's project_root defaults to "." (repo root, matching receipt mode's own
-default) and is used only to resolve close.inline_closures[] entries, when present
-(see below) -- a legacy ledger sidecar with no inline_closures field validates
+default) and is used only to resolve close.inline_closures[] entries and ledger[].report
+citations, when present (see below) -- a ledger carrying neither field validates
 identically whether or not project_root is passed, PROVIDED the root resolves to a real
 directory other than '/': the degenerate-root rule applies in ledger mode exactly as in
-receipt mode, inline_closures present or not.
+receipt mode -- inline_closures present or not, report present or not, --open or not.
 
-A receipt sidecar is either a FULL reviewer receipt (the default) or a
+A receipt document is either a FULL reviewer receipt (the default) or a
 declared SECURITY FRAGMENT (top-level "kind": "security-fragment"). Absence of
 lenses.correctness is never itself the discriminator -- only the explicit
 "kind" field is. A full receipt REQUIRES lenses.correctness and verdict; a
@@ -132,12 +147,14 @@ not a list, has no shape violation defined for that malformation today
 (unchanged, out of scope for this lot) -- it is simply excluded from this
 cross-check, never crashes it.
 
-close.inline_closures: OPTIONAL on a ledger sidecar's close object -- absent
-OR explicit null means no inline closures happened (every legacy sidecar
-validates exactly as before this field existed). When present (and
+close.inline_closures: OPTIONAL on a ledger's close object -- absent
+OR explicit null means no inline closures happened (every ledger written
+before this field existed validates exactly as it did then). When present (and
 non-null) it must be a list of { receipt, finding_ids } objects: receipt is
 a non-empty, repo-relative path ENFORCED to end in ".md" (a Markdown
-container) or ".json" (the legacy bare-JSON form) that must exist and be
+container) -- or in ".json" (the legacy bare-JSON form) ONLY under --legacy,
+the same gate the CLI argument obeys, so an un-flagged ".json" citation is
+its own VIOLATION and the cited file is never opened -- that must exist and be
 CONTAINED under project_root (the same _check_containment used for
 receipt-mode file citations); the container form is decided from that
 declared citation string, never from the path realpath() resolves it to, so
@@ -161,14 +178,39 @@ object -- must be a list, every entry a non-empty string, AND the list
 itself must have at least 1 entry: a close recorded with zero commits is its
 own VIOLATION ("close.commits must have at least 1 entry..."), regardless of
 whether plan (below) is present, explicit null, or an empty list. This is
-the sidecar-side mirror of orchestrator-protocol.md -> "Commit creation"
+the ledger-side mirror of orchestrator-protocol.md -> "Commit creation"
 (one atomic commit created inline by the orchestrator, once per objective) --
 a Close is never valid with zero commits recorded, plan tracked or not. When
 plan IS a populated list, the length rule below (close.commits >= len(plan))
 is a STRICTER floor stacked on top of this one, never a replacement for it.
 
-plan: OPTIONAL on a ledger sidecar -- absent OR explicit null means "not
-recorded" (every ledger sidecar written before this field existed, or any
+ledger --open: the ledger of an IN-PROGRESS Brief File, whose Close has not
+been written yet -- the gate's second prescribed invocation, alongside the
+Close-time one. The ONLY rule it relaxes is "close is required": close
+becomes optional, and when it IS present it validates exactly as it does
+without the flag, including _check_plan's at-Close invariants (every plan
+entry done; close.commits >= len(plan)). Everything else stays
+unconditional -- every per-row rule, n uniqueness, the report citation below,
+the degenerate-root rule and every plan shape rule -- and an empty ledger
+list is legal, a Brief File existing before its first delegation returns.
+Without --open the behaviour is unchanged: an absent close is a VIOLATION.
+
+ledger[].report: OPTIONAL per row -- absent OR explicit null means "no report
+recorded for this row" (every ledger written before this field existed
+validates exactly as it did then). When present it must be a non-empty string
+ending in ".md" -- or in ".json" ONLY under --legacy, the same gate the CLI
+argument and close.inline_closures[].receipt obey -- that _check_containment
+resolves to a regular file under project_root. The cited report's OWN content
+is never opened or parsed in ledger mode: this is a citation check, not a
+nested receipt validation (re-running this tool in receipt mode against that
+path is the caller's job). The string half of the check (non-empty, suffix)
+touches no filesystem and runs unconditionally; the on-disk containment half
+runs only when project_root is not degenerate -- the same short-circuit
+close.inline_closures[] uses above, for the same reason: under a degenerate
+root a citation probe degrades into an unbounded on-disk existence oracle.
+
+plan: OPTIONAL on a ledger -- absent OR explicit null means "not
+recorded" (every ledger written before this field existed, or any
 Small task that never composed one, validates as before EXCEPT the
 unconditional close.commits >= 1 floor, which applies plan or no plan).
 When present it must be a list of { n, title, done } objects: n is a strict
@@ -179,15 +221,16 @@ entry); title is a non-empty string; done is a strict boolean
 pure mirror of the Brief File's `## Plan` (the list) and `## Phases` (the
 done flags) -- the .md sections stay authoritative, this field is only what
 a script can check without parsing prose. TWO further invariants apply only
-when close is present as an object (the gate's one prescribed invocation,
-immediately before the status:done flip): every entry's done must be true
+when close is present as an object (the Close-time invocation, immediately
+before the status:done flip -- an in-progress --open run, the gate's other
+invocation, never reaches them): every entry's done must be true
 (each false entry is its own violation naming plan[i]); and, when
 close.commits is a list, its length must be >= len(plan) (the orchestrator
 creates at least one commit per done plan entry -- orchestrator-protocol.md
 -> "Commit creation") -- STACKED on top of the unconditional close.commits
 >= 1 rule above, never a replacement for it. Before close (absent or not an
-object) neither of these two run. A ledger whose rows still carry a legacy
-agent value from a retired commit-creation worker remains VALID -- ledger
+object) neither of these two run. A ledger whose rows still carry the
+agent value of a retired commit-creation worker remains VALID -- ledger
 rows are agnostic data this validator never inspects by agent name. NO
 FILESYSTEM ACCESS: every plan check is a pure shape/arithmetic check over
 already-parsed JSON, run unconditionally -- regardless of degenerate_root.
@@ -212,6 +255,13 @@ KINDS = ("security-fragment",)
 MARKDOWN_SUFFIX = ".md"
 FENCE_OPEN = re.compile(r"^ {0,3}```json[ \t]*$")
 FENCE_CLOSE = re.compile(r"^ {0,3}```[ \t]*$")
+
+# The --legacy gate's single message (module docstring, "Container"). Printed
+# as one VIOLATION line for a non-".md" CLI argument read without the flag.
+LEGACY_GATE_MESSAGE = (
+    "bare JSON is a legacy container -- pass --legacy for a historical file; new "
+    "receipts and ledgers live in the final fenced json block of a .md"
+)
 
 
 def _is_strict_int(value):
@@ -272,7 +322,7 @@ def _extract_fenced_json(text):
     return ("\n".join(content), open_line), None
 
 
-def _load_json_document(path, container_path=None):
+def _load_json_document(path, container_path=None, legacy=False):
     """Read `path` and JSON-parse it, honouring its container form.
 
     container_path: the path whose suffix decides the container, when it is
@@ -280,9 +330,19 @@ def _load_json_document(path, container_path=None):
     repo-relative citation while opening the realpath, so a symlink can never
     silently switch a declared .md into the legacy branch.
 
+    legacy: the caller's --legacy flag. A non-".md" path is a legacy bare-JSON
+    container and is read ONLY when this is True; without it the path is
+    refused before anything is opened (kind "legacy-error" below). That gate is
+    a pure path-string test placed BEFORE the open() call deliberately: after
+    it, a missing or unreadable legacy file would report a suffix violation
+    instead of its own I/O error, and WITH --legacy the same file must still
+    take that I/O error path (exit 2) rather than the new exit-1 class.
+
     Returns (value, None) -- `value` being any JSON value, the top-level-type
     policy belonging to each caller -- or (None, (kind, message)):
 
+    kind == "legacy-error": the container is not ".md" and --legacy was not
+                            passed -- VIOLATION, exit 1; nothing was opened.
     kind == "block-error": (.md only) the file does not carry exactly one
                            fenced ```json block -- VIOLATION, exit 1.
     kind == "json-error":  the text that should be JSON is not valid JSON
@@ -292,6 +352,10 @@ def _load_json_document(path, container_path=None):
                            input, any other unexpected failure).
     """
     name = path if container_path is None else container_path
+    is_markdown = name.endswith(MARKDOWN_SUFFIX)
+
+    if not is_markdown and not legacy:
+        return None, ("legacy-error", LEGACY_GATE_MESSAGE)
 
     try:
         with open(path, "rb") as handle:
@@ -300,7 +364,7 @@ def _load_json_document(path, container_path=None):
     except Exception as exc:  # noqa: BLE001 -- deliberate: fail-closed, never a traceback
         return None, ("error", "%s: %s" % (type(exc).__name__, exc))
 
-    if name.endswith(MARKDOWN_SUFFIX):
+    if is_markdown:
         block, problem = _extract_fenced_json(text)
         if problem is not None:
             return None, ("block-error", problem)
@@ -323,6 +387,29 @@ def _load_json_document(path, container_path=None):
         )
     except Exception as exc:  # noqa: BLE001 -- deliberate: fail-closed, never a traceback
         return None, ("error", "%s: %s" % (type(exc).__name__, exc))
+
+
+def _check_citation_suffix(where, field, value, legacy):
+    """The one suffix rule every citation slot shares with the CLI argument.
+
+    ".md" (a Markdown container) is always accepted; ".json" (the legacy
+    bare-JSON form) only under --legacy -- the same gate _load_json_document
+    applies to the CLI path, so a single flag governs close.inline_closures[]
+    .receipt, ledger[].report and the argument itself in one run. Returns None
+    when the suffix is accepted, else the VIOLATION text for it.
+    """
+    if legacy:
+        if value.endswith((MARKDOWN_SUFFIX, ".json")):
+            return None
+        return "%s.%s must be a repo-relative '.md' or '.json' path (got %r)" % (
+            where, field, value
+        )
+    if value.endswith(MARKDOWN_SUFFIX):
+        return None
+    return (
+        "%s.%s must be a repo-relative '.md' path (got %r) -- bare JSON is a legacy "
+        "container, pass --legacy for a historical file" % (where, field, value)
+    )
 
 
 def _check_containment(project_root, file_field):
@@ -800,12 +887,13 @@ def validate_receipt(data, project_root):
     return violations, infos
 
 
-def _check_inline_closures(close, project_root, violations):
+def _check_inline_closures(close, project_root, violations, legacy=False):
     """Validate close.inline_closures[] -- OPTIONAL: absent OR explicit null
-    means no inline closures, and every legacy ledger sidecar (no such field,
-    or an explicit null) validates exactly as it did before this field
-    existed. When present, each entry cites a receipt (a repo-relative ".md"
-    or ".json" path that must exist, be CONTAINED under project_root) whose own
+    means no inline closures, and every ledger written before this field
+    existed (no such field, or an explicit null) validates exactly as it did
+    then. When present, each entry cites a receipt (a repo-relative ".md"
+    path -- ".json" only under --legacy -- that must exist, be CONTAINED
+    under project_root) whose own
     findings_addressed[].finding_id values (NFC-normalized) must cover this
     entry's finding_ids (also NFC-normalized). A finding_ids entry that is not
     a non-empty string (including a non-hashable JSON array/object) is its own
@@ -829,12 +917,11 @@ def _check_inline_closures(close, project_root, violations):
         if not isinstance(receipt, str) or not receipt.strip():
             violations.append("%s.receipt must be a non-empty string" % where)
             receipt = None
-        elif not (receipt.endswith(MARKDOWN_SUFFIX) or receipt.endswith(".json")):
-            violations.append(
-                "%s.receipt must be a repo-relative '.md' or '.json' path (got %r)"
-                % (where, receipt)
-            )
-            receipt = None
+        else:
+            problem = _check_citation_suffix(where, "receipt", receipt, legacy)
+            if problem is not None:
+                violations.append(problem)
+                receipt = None
 
         finding_ids = entry.get("finding_ids")
         if not isinstance(finding_ids, list) or len(finding_ids) == 0:
@@ -858,13 +945,19 @@ def _check_inline_closures(close, project_root, violations):
         real_receipt = os.path.realpath(os.path.join(project_root, receipt))
         # Same loader as the CLI argument (_read_and_parse): a cited ".md" is
         # a Markdown container whose single fenced ```json block carries the
-        # receipt, anything else is read as bare JSON. The container form is
-        # decided from the DECLARED citation (the string the extension guard
-        # above accepted), never from the realpath a symlink may resolve to.
-        # Every failure stays a VIOLATION here -- an unreadable, unparsable or
-        # blockless cited receipt never escalates this run to exit 2.
+        # receipt; a cited ".json" is the legacy bare-JSON form, reachable only
+        # because --legacy let _check_citation_suffix above through. That guard
+        # IS this slot's --legacy gate, so the loader is told to honour the
+        # citation it accepted (legacy=True) rather than re-deciding: without
+        # the flag the guard admits only ".md", for which the argument is moot,
+        # and re-gating here would merely mask the guard from its own
+        # calibration assertion. The container form is decided from the
+        # DECLARED citation (the string the guard accepted), never from the
+        # realpath a symlink may resolve to. Every failure stays a VIOLATION
+        # here -- an unreadable, unparsable or blockless cited receipt never
+        # escalates this run to exit 2.
         receipt_data, load_error = _load_json_document(
-            real_receipt, container_path=receipt
+            real_receipt, container_path=receipt, legacy=True
         )
         if load_error is not None:
             violations.append(
@@ -968,7 +1061,15 @@ def _check_plan(data, close, violations):
             )
 
 
-def validate_ledger(data, project_root="."):
+def validate_ledger(data, project_root=".", allow_open=False, legacy=False):
+    """Validate a Brief File's ledger object.
+
+    allow_open (--open): the ledger of an IN-PROGRESS Brief File. The ONLY
+    rule it relaxes is "close is required"; see the module docstring's
+    `ledger --open` paragraph.
+    legacy (--legacy): accept the bare-JSON ".json" form in every citation
+    slot this mode reads (close.inline_closures[].receipt, ledger[].report).
+    """
     violations = []
 
     real_root = os.path.realpath(project_root)
@@ -986,6 +1087,7 @@ def validate_ledger(data, project_root="."):
 
     token_sum = 0
     seen_n = set()
+    cited_reports = []
     for i, row in enumerate(ledger):
         where = "ledger[%d]" % i
         if not isinstance(row, dict):
@@ -1012,16 +1114,45 @@ def validate_ledger(data, project_root="."):
             if not isinstance(value, str) or not value:
                 violations.append("%s.%s must be a non-empty string" % (where, field))
 
+        # report: OPTIONAL -- absent OR explicit null means "no report for this
+        # row". The string half (non-empty, suffix) is a pure shape check and
+        # runs here unconditionally; the on-disk half is deferred to the
+        # degenerate-root guard below.
+        report = row.get("report")
+        if report is not None:
+            if not isinstance(report, str) or not report.strip():
+                violations.append("%s.report must be a non-empty string when present" % where)
+            else:
+                problem = _check_citation_suffix(where, "report", report, legacy)
+                if problem is not None:
+                    violations.append(problem)
+                else:
+                    cited_reports.append((where, report))
+
         tokens = row.get("tokens")
         if _is_strict_int(tokens):
             token_sum += tokens
 
+    # The on-disk half of every ledger[].report citation sits behind the SAME
+    # `not degenerate_root` guard as _check_inline_closures below, for the same
+    # reason (SEC F-5): under a degenerate root a containment probe degrades
+    # into an unbounded on-disk existence oracle. The report's own content is
+    # never opened here -- ledger mode checks the citation, never the cited
+    # document.
+    if not degenerate_root:
+        for where, report in cited_reports:
+            ok, reason = _check_containment(project_root, report)
+            if not ok:
+                violations.append("%s.report %r: %s" % (where, report, reason))
+
     close = data.get("close")
     if close is None:
-        violations.append(
-            "close is required -- the gate's only prescribed invocation is immediately "
-            "before the status:done flip, where close is always mandatory"
-        )
+        if not allow_open:
+            violations.append(
+                "close is required -- pass --open to validate an in-progress Brief File "
+                "whose Close has not been written yet; without it, close is mandatory "
+                "(the Close-time invocation, immediately before the status:done flip)"
+            )
     elif not isinstance(close, dict):
         violations.append("close must be an object")
     else:
@@ -1073,7 +1204,7 @@ def validate_ledger(data, project_root="."):
         # every check that would touch the filesystem rather than opening a
         # cited receipt against an unbounded root (SEC F-5).
         if not degenerate_root:
-            _check_inline_closures(close, project_root, violations)
+            _check_inline_closures(close, project_root, violations, legacy=legacy)
 
     # _check_plan runs unconditionally, regardless of degenerate_root -- every
     # plan rule is a pure shape/arithmetic check over already-parsed JSON, no
@@ -1083,12 +1214,14 @@ def validate_ledger(data, project_root="."):
     return violations, []
 
 
-def _read_and_parse(path):
-    """Load the CLI argument through _load_json_document (Markdown container
-    or legacy bare JSON, by suffix) and apply receipt/ledger mode's own
-    top-level-type policy. Returns (data, None) on success, or
-    (None, (kind, message)) on failure:
+def _read_and_parse(path, legacy=False):
+    """Load the CLI argument through _load_json_document (a Markdown container
+    by suffix, or -- with --legacy -- the legacy bare-JSON form) and apply
+    receipt/ledger mode's own top-level-type policy. Returns (data, None) on
+    success, or (None, (kind, message)) on failure:
 
+    kind == "legacy-error": the path is not ".md" and --legacy was not passed
+                           -- caller prints a VIOLATION line, exit 1.
     kind == "block-error": (.md only) the file does not carry exactly one
                            fenced ```json block -- caller prints a VIOLATION
                            line, exit 1.
@@ -1101,7 +1234,7 @@ def _read_and_parse(path):
                           pathologically nested input, top-level not an
                           object, or any other unexpected failure).
     """
-    data, error = _load_json_document(path)
+    data, error = _load_json_document(path, legacy=legacy)
     if error is not None:
         return None, error
 
@@ -1118,16 +1251,22 @@ def main():
         description=(
             "Structural validator for the Review Receipt and Brief File ledger objects.\n"
             "A .md file carries the object in its single fenced ```json block; any other\n"
-            "suffix is read as bare JSON (the legacy form).\n"
+            "suffix is a legacy bare-JSON container, read only with --legacy.\n"
+            "Both flags go immediately after the mode word, before <file>.\n"
             "Modes:\n"
-            "  receipt <file.md|file.json> [project_root]\n"
-            "  ledger <file.md|file.json> [project_root]"
+            "  receipt [--legacy] <file.md|file.json> [project_root]\n"
+            "  ledger [--open] [--legacy] <file.md|file.json> [project_root]"
         ),
     )
     subparsers = parser.add_subparsers(dest="mode", required=True)
 
     receipt_parser = subparsers.add_parser("receipt", help="validate a Review Receipt")
-    receipt_parser.add_argument("file", help="path to the receipt .md (or legacy .json)")
+    receipt_parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="read a non-.md path as a legacy bare-JSON container (historical files only)",
+    )
+    receipt_parser.add_argument("file", help="path to the receipt .md (a legacy .json needs --legacy)")
     receipt_parser.add_argument(
         "project_root",
         nargs="?",
@@ -1136,20 +1275,34 @@ def main():
     )
 
     ledger_parser = subparsers.add_parser("ledger", help="validate a Brief File ledger")
-    ledger_parser.add_argument("file", help="path to the ledger .md (or legacy .json)")
+    ledger_parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="read a non-.md path as a legacy bare-JSON container (historical files only)",
+    )
+    ledger_parser.add_argument(
+        "--open",
+        action="store_true",
+        dest="open_ledger",
+        help="the Brief File is in progress: close becomes optional, every other rule stands",
+    )
+    ledger_parser.add_argument("file", help="path to the ledger .md (a legacy .json needs --legacy)")
     ledger_parser.add_argument(
         "project_root",
         nargs="?",
         default=".",
-        help="repo root close.inline_closures[].receipt entries resolve against (default: .)",
+        help=(
+            "repo root close.inline_closures[].receipt and ledger[].report citations "
+            "resolve against (default: .)"
+        ),
     )
 
     args = parser.parse_args()
 
-    data, error = _read_and_parse(args.file)
+    data, error = _read_and_parse(args.file, legacy=args.legacy)
     if error is not None:
         kind, message = error
-        if kind in ("json-error", "block-error"):
+        if kind in ("legacy-error", "json-error", "block-error"):
             print("VIOLATION %s: %s" % (args.file, message))
             sys.exit(1)
         sys.stderr.write("ERROR %s: %s\n" % (args.file, message))
@@ -1159,7 +1312,9 @@ def main():
         if args.mode == "receipt":
             violations, infos = validate_receipt(data, args.project_root)
         else:
-            violations, infos = validate_ledger(data, args.project_root)
+            violations, infos = validate_ledger(
+                data, args.project_root, allow_open=args.open_ledger, legacy=args.legacy
+            )
     except Exception as exc:  # noqa: BLE001 -- fail-closed: never a traceback
         sys.stderr.write("ERROR %s: %s: %s\n" % (args.file, type(exc).__name__, exc))
         sys.exit(2)

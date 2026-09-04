@@ -165,6 +165,33 @@
 # string.md is a positive: the literal text ```json appears mid-sentence in its
 # prose alongside one real block, pinning "a fence is a whole line".
 #
+# ELEVENTH exception (the --legacy gate, `ledger --open` and `ledger[].report`):
+# a non-".md" path is no longer read as bare JSON on sight -- it needs
+# --legacy -- so EVERY invocation above whose file argument is a .json now
+# passes that flag, and the 8 .md invocations stay flag-less. Two of
+# the new fixtures step outside the ordinary citation policy, each for the same
+# reason the FOURTH and SEVENTH exceptions do (cite something REAL, so a
+# deleted guard falls through to a clean pass instead of a second, unrelated
+# violation that would hide the mutant): ledger-report-not-md.md cites the
+# sibling fixture receipt-good.json -- a real, contained, parseable file -- so
+# the ONLY thing that can fail without --legacy is the suffix rule itself, and
+# with --legacy the same fixture is a clean positive; ledger-report-traversal.md
+# cites "../../../README.md" and is asserted with scripts/tests/fixtures ITSELF
+# as project_root, so the chain resolves to a file that genuinely EXISTS but
+# lies outside the declared root -- the traversal arm in isolation, discriminating
+# because deleting _check_containment makes it pass rather than fail on
+# existence. ledger-open-*.md, ledger-report-missing-file.md and
+# ledger-report-good.md keep the ordinary policy (nothing on disk, a
+# guaranteed-absent path, or README.md). Two more cases are GENERATED at test
+# time rather than committed (the fixture list is closed, as in the SEVENTH and
+# TENTH exceptions): MISSING_LEGACY_FILE, a .json path never created, which is
+# the only shape that can observe WHERE the --legacy gate sits (exit 1 without
+# the flag = gate before open(); exit 2 with it = the I/O error path preserved);
+# and MD_LEDGER_CITING_JSON, a .md ledger citing the sibling
+# receipt-findings-addressed-good.json, the only shape that can exercise the
+# gate on close.inline_closures[].receipt (a .json CLI argument would need
+# --legacy for itself, which would open the cited .json too).
+#
 # Runs known-NEGATIVE fixtures FIRST (must exit 1) and known-EXIT-2 fixtures
 # next (must exit 2 -- usage/parse failures that prevent validation from
 # running at all, never a shape violation), THEN known-POSITIVE fixtures LAST
@@ -239,44 +266,44 @@ assert_violation_count() {
 # --- Known-negative fixtures FIRST: each must exit 1 -- proving the check
 #     CAN fail before its green counts as evidence (Rule 7). ---
 
-assert_exit "receipt-missing-file" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-missing-file.json" "$REPO_ROOT"
-assert_exit "receipt-line-as-string" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-line-as-string.json" "$REPO_ROOT"
-assert_exit "receipt-trigger-missing-major-read" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-trigger-missing-major-read.json" "$REPO_ROOT"
-assert_exit "receipt-verdict-mismatch" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-verdict-mismatch.json" "$REPO_ROOT"
-assert_exit "receipt-history-mismatch" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-history-mismatch.json" "$REPO_ROOT"
-assert_exit "receipt-duplicate-ids" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-duplicate-ids.json" "$REPO_ROOT"
-assert_exit "receipt-unknown-severity" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-unknown-severity.json" "$REPO_ROOT"
-assert_exit "receipt-file-not-on-disk" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-file-not-on-disk.json" "$REPO_ROOT"
-assert_exit "receipt-not-json" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-not-json.json" "$REPO_ROOT"
-assert_exit "ledger-bad-sum" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-bad-sum.json"
-assert_exit "ledger-tokens-string" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-tokens-string.json"
+assert_exit "receipt-missing-file" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-missing-file.json" "$REPO_ROOT"
+assert_exit "receipt-line-as-string" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-line-as-string.json" "$REPO_ROOT"
+assert_exit "receipt-trigger-missing-major-read" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-trigger-missing-major-read.json" "$REPO_ROOT"
+assert_exit "receipt-verdict-mismatch" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-verdict-mismatch.json" "$REPO_ROOT"
+assert_exit "receipt-history-mismatch" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-history-mismatch.json" "$REPO_ROOT"
+assert_exit "receipt-duplicate-ids" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-duplicate-ids.json" "$REPO_ROOT"
+assert_exit "receipt-unknown-severity" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-unknown-severity.json" "$REPO_ROOT"
+assert_exit "receipt-file-not-on-disk" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-file-not-on-disk.json" "$REPO_ROOT"
+assert_exit "receipt-not-json" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-not-json.json" "$REPO_ROOT"
+assert_exit "ledger-bad-sum" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-bad-sum.json"
+assert_exit "ledger-tokens-string" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-tokens-string.json"
 
 # --- New negatives: containment (SEC-F-1/F-2), empty-but-passing
 #     (REV-F-1/F-2/F-13/F-14, SEC-F-5), type strictness (REV-F-5/F-6/F-7),
 #     identity (SEC-F-3/F-8), history coverage (SEC-F-6). ---
 
-assert_exit "receipt-file-absolute" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-file-absolute.json" "$REPO_ROOT"
-assert_exit "receipt-file-traversal" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-file-traversal.json" "$REPO_ROOT"
-assert_exit "receipt-file-is-directory" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-file-is-directory.json" "$REPO_ROOT"
-assert_exit "receipt-correctness-null" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-correctness-null.json" "$REPO_ROOT"
-assert_exit "receipt-truncated-no-correctness" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-truncated-no-correctness.json" "$REPO_ROOT"
-assert_exit "receipt-security-fragment-bad-verdict" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-security-fragment-bad-verdict.json" "$REPO_ROOT"
-assert_exit "receipt-lens-status-incoherent" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-lens-status-incoherent.json" "$REPO_ROOT"
-assert_exit "receipt-tier-bool" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-tier-bool.json" "$REPO_ROOT"
-assert_exit "receipt-duplicate-ids-unicode" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-duplicate-ids-unicode.json" "$REPO_ROOT"
-assert_exit "receipt-history-garbage-entry" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-history-garbage-entry.json" "$REPO_ROOT"
-assert_exit "ledger-no-close" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-no-close.json"
-assert_exit "ledger-close-bool" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-bool.json"
-assert_exit "ledger-negative-tokens" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-negative-tokens.json"
-assert_exit "ledger-duplicate-n" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-duplicate-n.json"
+assert_exit "receipt-file-absolute" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-file-absolute.json" "$REPO_ROOT"
+assert_exit "receipt-file-traversal" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-file-traversal.json" "$REPO_ROOT"
+assert_exit "receipt-file-is-directory" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-file-is-directory.json" "$REPO_ROOT"
+assert_exit "receipt-correctness-null" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-correctness-null.json" "$REPO_ROOT"
+assert_exit "receipt-truncated-no-correctness" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-truncated-no-correctness.json" "$REPO_ROOT"
+assert_exit "receipt-security-fragment-bad-verdict" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-security-fragment-bad-verdict.json" "$REPO_ROOT"
+assert_exit "receipt-lens-status-incoherent" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-lens-status-incoherent.json" "$REPO_ROOT"
+assert_exit "receipt-tier-bool" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-tier-bool.json" "$REPO_ROOT"
+assert_exit "receipt-duplicate-ids-unicode" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-duplicate-ids-unicode.json" "$REPO_ROOT"
+assert_exit "receipt-history-garbage-entry" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-history-garbage-entry.json" "$REPO_ROOT"
+assert_exit "ledger-no-close" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-no-close.json"
+assert_exit "ledger-close-bool" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-close-bool.json"
+assert_exit "ledger-negative-tokens" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-negative-tokens.json"
+assert_exit "ledger-duplicate-n" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-duplicate-n.json"
 
 # --- Pass-2 negatives: kind enum, fragment/correctness exclusivity, verification
 #     shape + non-empty (zero-work class), absolute path INSIDE the root (isolates
 #     the isabs guard from containment -- generated, since the value is the checkout path).
-assert_exit "receipt-kind-unknown" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-kind-unknown.json" "$REPO_ROOT"
-assert_exit "receipt-fragment-with-correctness" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-fragment-with-correctness.json" "$REPO_ROOT"
-assert_exit "receipt-verification-empty" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-verification-empty.json" "$REPO_ROOT"
-assert_exit "receipt-verification-garbage" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-verification-garbage.json" "$REPO_ROOT"
+assert_exit "receipt-kind-unknown" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-kind-unknown.json" "$REPO_ROOT"
+assert_exit "receipt-fragment-with-correctness" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-fragment-with-correctness.json" "$REPO_ROOT"
+assert_exit "receipt-verification-empty" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-verification-empty.json" "$REPO_ROOT"
+assert_exit "receipt-verification-garbage" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-verification-garbage.json" "$REPO_ROOT"
 ABS_INSIDE_FILE="$TMP_WORKDIR/receipt-abs-inside.json"
 python3 - "$FIXTURES/receipt-good.json" "$REPO_ROOT/README.md" "$ABS_INSIDE_FILE" <<'PY'
 import json, sys
@@ -285,7 +312,7 @@ d = json.load(open(src))
 d["lenses"]["correctness"]["findings"][0]["file"] = abs_path
 json.dump(d, open(dst, "w"))
 PY
-assert_exit "receipt-file-absolute-inside-root (generated)" 1 "$VALIDATOR" receipt "$ABS_INSIDE_FILE" "$REPO_ROOT"
+assert_exit "receipt-file-absolute-inside-root (generated)" 1 "$VALIDATOR" receipt --legacy "$ABS_INSIDE_FILE" "$REPO_ROOT"
 # Degenerate root isolation: cite a file that DOES exist under "/" (etc/passwd,
 # present on every POSIX system) so containment passes and ONLY the
 # degenerate-root guard can produce the violation.
@@ -297,7 +324,7 @@ d = json.load(open(src))
 d["lenses"]["correctness"]["findings"][0]["file"] = "etc/passwd"
 json.dump(d, open(dst, "w"))
 PY
-assert_exit "receipt-degenerate-root (generated)" 1 "$VALIDATOR" receipt "$DEGENERATE_FILE" "/"
+assert_exit "receipt-degenerate-root (generated)" 1 "$VALIDATOR" receipt --legacy "$DEGENERATE_FILE" "/"
 
 # --- F-6 receipt-mode degenerate-root SHORT-CIRCUIT (mirrors ledger mode's
 #     own SEC F-5 short-circuit below): receipt-degenerate-root-single-
@@ -310,14 +337,14 @@ assert_exit "receipt-degenerate-root (generated)" 1 "$VALIDATOR" receipt "$DEGEN
 #     healthy root) or not at all (even under "/") would turn one of these
 #     red. ---
 
-assert_violation_count "receipt-degenerate-root-single-violation (degenerate root)" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-degenerate-root-single-violation.json" "/"
-assert_violation_count "receipt-degenerate-root-single-violation (healthy root)" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-degenerate-root-single-violation.json" "$REPO_ROOT"
+assert_violation_count "receipt-degenerate-root-single-violation (degenerate root)" 1 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-degenerate-root-single-violation.json" "/"
+assert_violation_count "receipt-degenerate-root-single-violation (healthy root)" 1 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-degenerate-root-single-violation.json" "$REPO_ROOT"
 
-assert_exit "receipt-not-reverified-garbage" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-not-reverified-garbage.json" "$REPO_ROOT"
-assert_exit "receipt-file-nul" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-file-nul.json" "$REPO_ROOT"
-assert_exit "receipt-verification-reason-with-entries" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-verification-reason-with-entries.json" "$REPO_ROOT"
-assert_exit "ledger-commits-garbage" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-commits-garbage.json"
-assert_exit "receipt-fragment-with-omitted-reason" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-fragment-with-omitted-reason.json" "$REPO_ROOT"
+assert_exit "receipt-not-reverified-garbage" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-not-reverified-garbage.json" "$REPO_ROOT"
+assert_exit "receipt-file-nul" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-file-nul.json" "$REPO_ROOT"
+assert_exit "receipt-verification-reason-with-entries" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-verification-reason-with-entries.json" "$REPO_ROOT"
+assert_exit "ledger-commits-garbage" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-commits-garbage.json"
+assert_exit "receipt-fragment-with-omitted-reason" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-fragment-with-omitted-reason.json" "$REPO_ROOT"
 
 # --- findings_addressed calibration (4 existing per-entry rules, each
 #     isolated to one fixture): finding_id required, files non-empty list,
@@ -325,11 +352,11 @@ assert_exit "receipt-fragment-with-omitted-reason" 1 "$VALIDATOR" receipt "$FIXT
 #     "must be a list" guard. Every fixture is otherwise a full valid receipt
 #     (calibration isolation). ---
 
-assert_exit "receipt-findings-addressed-not-list" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-not-list.json" "$REPO_ROOT"
-assert_exit "receipt-findings-addressed-no-id" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-no-id.json" "$REPO_ROOT"
-assert_exit "receipt-findings-addressed-empty-files" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-empty-files.json" "$REPO_ROOT"
-assert_exit "receipt-findings-addressed-no-evidence" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-no-evidence.json" "$REPO_ROOT"
-assert_exit "receipt-findings-addressed-no-gate" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-no-gate.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-not-list" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-not-list.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-no-id" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-no-id.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-empty-files" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-empty-files.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-no-evidence" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-no-evidence.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-no-gate" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-no-gate.json" "$REPO_ROOT"
 
 # --- F-7 findings_addressed[].finding_id cross-check (unconditional): the
 #     cited id must resolve, after NFC normalization, against the union of
@@ -337,18 +364,18 @@ assert_exit "receipt-findings-addressed-no-gate" 1 "$VALIDATOR" receipt "$FIXTUR
 #     must not be CRITICAL. Each fixture is otherwise a full valid receipt
 #     isolating to exactly the one new violation. ---
 
-assert_exit "receipt-findings-addressed-unknown-id" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-unknown-id.json" "$REPO_ROOT"
-assert_exit "receipt-findings-addressed-critical-id" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-critical-id.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-unknown-id" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-unknown-id.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-critical-id" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-critical-id.json" "$REPO_ROOT"
 
 # --- ledger close.inline_closures[] calibration (new field): not-a-list,
 #     missing/unreadable receipt, finding_ids not covered by the cited
 #     receipt's findings_addressed, empty finding_ids -- each isolated to one
 #     fixture (calibration isolation, FOURTH citation-policy exception above). ---
 
-assert_exit "ledger-inline-closures-not-list" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-not-list.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-missing-receipt" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-missing-receipt.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-id-not-covered" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-id-not-covered.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-empty-ids" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-empty-ids.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-not-list" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-not-list.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-missing-receipt" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-missing-receipt.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-id-not-covered" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-id-not-covered.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-empty-ids" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-empty-ids.json" "$REPO_ROOT"
 
 # --- ledger close.inline_closures[] calibration, re-brief additions: the five
 #     rules REV F-2 found surviving deletion (entry-must-be-object,
@@ -358,13 +385,13 @@ assert_exit "ledger-inline-closures-empty-ids" 1 "$VALIDATOR" ledger "$FIXTURES/
 #     exit 1, never exit 2) and the .json extension check (REV F-5 / SEC F-2)
 #     -- each isolated to one fixture (calibration isolation). ---
 
-assert_exit "ledger-inline-closures-unhashable-id" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-unhashable-id.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-entry-not-object" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-entry-not-object.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-receipt-not-string" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-receipt-not-string.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-id-not-string" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-id-not-string.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-receipt-not-object" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-receipt-not-object.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-receipt-not-json" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-receipt-not-json.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-receipt-not-json-ext" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-receipt-not-json-ext.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-unhashable-id" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-unhashable-id.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-entry-not-object" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-entry-not-object.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-receipt-not-string" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-receipt-not-string.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-id-not-string" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-id-not-string.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-receipt-not-object" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-receipt-not-object.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-receipt-not-json" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-receipt-not-json.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-receipt-not-json-ext" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-receipt-not-json-ext.json" "$REPO_ROOT"
 
 # --- ledger mode's own degenerate-root guard, isolated: ledger-good.json (no
 #     inline_closures at all) is otherwise a fully valid ledger object, so
@@ -374,7 +401,7 @@ assert_exit "ledger-inline-closures-receipt-not-json-ext" 1 "$VALIDATOR" ledger 
 #     here the existing positive fixture already carries no inline_closures,
 #     so no new fixture file is needed). ---
 
-assert_exit "ledger-degenerate-root" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-good.json" "/"
+assert_exit "ledger-degenerate-root" 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-good.json" "/"
 
 # --- degenerate-root SHORT-CIRCUIT (SEC F-5, re-brief): ledger-inline-closures-
 #     good.json's inline_closures entry is fully valid, so a naive
@@ -384,7 +411,48 @@ assert_exit "ledger-degenerate-root" 1 "$VALIDATOR" ledger "$FIXTURES/ledger-goo
 #     cannot detect that regression -- both exit 1 either way -- so this uses
 #     assert_violation_count to pin the count at exactly 1. ---
 
-assert_violation_count "ledger-inline-closures-good-degenerate-root-short-circuit" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-good.json" "/"
+assert_violation_count "ledger-inline-closures-good-degenerate-root-short-circuit" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-good.json" "/"
+
+# --- --legacy gate (bare JSON is no longer read on sight): a non-".md" CLI
+#     argument is a VIOLATION in BOTH modes unless --legacy is passed. These
+#     two run the very fixtures every positive below runs WITH the flag, so
+#     they prove the flag is load-bearing rather than decorative. The third is
+#     the pair-half that pins the gate's PLACEMENT before any open(): a .json
+#     path that is never created still fails on the suffix (exit 1, one
+#     violation) rather than on I/O -- its --legacy counterpart in the exit-2
+#     block below shows the I/O ERROR path survives the flag. ---
+
+assert_violation_count "ledger-legacy-absent (ledger-good.json, no --legacy)" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-good.json" "$REPO_ROOT"
+assert_violation_count "receipt-legacy-absent (receipt-good.json, no --legacy)" 1 1 "$VALIDATOR" receipt "$FIXTURES/receipt-good.json" "$REPO_ROOT"
+MISSING_LEGACY_FILE="$TMP_WORKDIR/does-not-exist-anywhere.json"
+assert_violation_count "receipt-legacy-absent-missing-file (generated, gate before open())" 1 1 "$VALIDATOR" receipt "$MISSING_LEGACY_FILE" "$REPO_ROOT"
+
+# --- ledger --open (an IN-PROGRESS Brief File): the flag relaxes exactly one
+#     rule, "close is required", and nothing else. ledger-open-good.md run
+#     WITHOUT the flag is the negative that proves the flag load-bearing (its
+#     positive is the last section); the other three prove that the per-row
+#     shape rules, a present-but-invalid close, and the degenerate-root rule
+#     all keep firing under it. Each isolates exactly one rule. ---
+
+assert_violation_count "ledger-open-good (no --open)" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-open-good.md" "$REPO_ROOT"
+assert_violation_count "ledger-open-row-bad" 1 1 "$VALIDATOR" ledger --open "$FIXTURES/ledger-open-row-bad.md" "$REPO_ROOT"
+assert_violation_count "ledger-open-close-present-bad" 1 1 "$VALIDATOR" ledger --open "$FIXTURES/ledger-open-close-present-bad.md" "$REPO_ROOT"
+assert_violation_count "ledger-open-degenerate-root" 1 1 "$VALIDATOR" ledger --open "$FIXTURES/ledger-open-good.md" "/"
+
+# --- ledger[].report (new optional per-row citation, ELEVENTH exception
+#     above): the suffix rule without --legacy, the containment probe's
+#     existence and traversal arms, and the degenerate-root SHORT-CIRCUIT of
+#     that probe. The missing-file fixture is asserted under BOTH roots for
+#     the same reason receipt-degenerate-root-single-violation.json is: under
+#     "/" only the degenerate-root violation may appear (the probe never
+#     runs), under a healthy root only the containment violation -- one line
+#     either way, but a different one, which is what distinguishes a
+#     short-circuit from "ran and found nothing". ---
+
+assert_violation_count "ledger-report-not-md (no --legacy)" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-report-not-md.md" "$REPO_ROOT"
+assert_violation_count "ledger-report-missing-file (healthy root)" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-report-missing-file.md" "$REPO_ROOT"
+assert_violation_count "ledger-report-missing-file (degenerate root, short-circuit)" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-report-missing-file.md" "/"
+assert_violation_count "ledger-report-traversal" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-report-traversal.md" "$FIXTURES"
 
 # --- Exit-2 fixtures: anything that prevents validation from running at all
 #     (REV-F-16, SEC-F-4) -- fixed-content fixtures plus one generated at test
@@ -392,12 +460,18 @@ assert_violation_count "ledger-inline-closures-good-degenerate-root-short-circui
 #     RecursionError traceback). Never confuse this with the exit-1 shape
 #     violations above (REV-F-11: the runner must assert exit 2 explicitly). ---
 
-assert_exit "receipt-not-utf8" 2 "$VALIDATOR" receipt "$FIXTURES/receipt-not-utf8.json" "$REPO_ROOT"
-assert_exit "receipt-top-level-array" 2 "$VALIDATOR" receipt "$FIXTURES/receipt-top-level-array.json" "$REPO_ROOT"
+assert_exit "receipt-not-utf8" 2 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-not-utf8.json" "$REPO_ROOT"
+assert_exit "receipt-top-level-array" 2 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-top-level-array.json" "$REPO_ROOT"
+
+# The other half of the gate-placement pair above: WITH --legacy the same
+# never-created .json path must still take the ordinary I/O ERROR path (exit
+# 2), never the new exit-1 suffix class. A gate placed AFTER the open() call
+# would keep this green while turning its exit-1 partner above red.
+assert_exit "receipt-legacy-missing-file (generated, --legacy keeps the I/O path)" 2 "$VALIDATOR" receipt --legacy "$MISSING_LEGACY_FILE" "$REPO_ROOT"
 
 DEEP_NESTING_FILE="$TMP_WORKDIR/deep-nesting.json"
 python3 -c "open('$DEEP_NESTING_FILE', 'w').write('[' * 200000 + ']' * 200000)"
-assert_exit "receipt-deep-nesting (generated)" 2 "$VALIDATOR" receipt "$DEEP_NESTING_FILE" "$REPO_ROOT"
+assert_exit "receipt-deep-nesting (generated)" 2 "$VALIDATOR" receipt --legacy "$DEEP_NESTING_FILE" "$REPO_ROOT"
 
 # --- Generated containment negative: a symlink inside a throwaway fake
 #     project root resolving OUTSIDE that root (SEC-F-2's third shape --
@@ -425,7 +499,7 @@ cat > "$FAKE_ROOT/receipt.json" <<'EOF'
   "verification": [{"command": "true", "exit_code": 0, "outcome": "pass"}]
 }
 EOF
-assert_exit "receipt-symlink-escape (generated)" 1 "$VALIDATOR" receipt "$FAKE_ROOT/receipt.json" "$FAKE_ROOT"
+assert_exit "receipt-symlink-escape (generated)" 1 "$VALIDATOR" receipt --legacy "$FAKE_ROOT/receipt.json" "$FAKE_ROOT"
 
 # --- F-6-style containment on close.inline_closures[].receipt itself (the
 #     citation slot, not the cited receipt's own content): absolute path,
@@ -474,17 +548,17 @@ PY
 
 ABSOLUTE_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-absolute.json"
 _build_inline_closure_ledger "$ESCAPE_TARGET" "$ABSOLUTE_LEDGER"
-assert_violation_count "ledger-inline-closures-receipt-absolute (generated)" 1 1 "$VALIDATOR" ledger "$ABSOLUTE_LEDGER" "$REPO_ROOT"
+assert_violation_count "ledger-inline-closures-receipt-absolute (generated)" 1 1 "$VALIDATOR" ledger --legacy "$ABSOLUTE_LEDGER" "$REPO_ROOT"
 
 TRAVERSAL_RECEIPT_REL="$(python3 -c "import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))" "$ESCAPE_TARGET" "$REPO_ROOT")"
 TRAVERSAL_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-traversal.json"
 _build_inline_closure_ledger "$TRAVERSAL_RECEIPT_REL" "$TRAVERSAL_LEDGER"
-assert_violation_count "ledger-inline-closures-receipt-traversal (generated)" 1 1 "$VALIDATOR" ledger "$TRAVERSAL_LEDGER" "$REPO_ROOT"
+assert_violation_count "ledger-inline-closures-receipt-traversal (generated)" 1 1 "$VALIDATOR" ledger --legacy "$TRAVERSAL_LEDGER" "$REPO_ROOT"
 
 ln -sf "$ESCAPE_TARGET" "$FAKE_ROOT/escape-link.json"
 SYMLINK_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-symlink.json"
 _build_inline_closure_ledger "escape-link.json" "$SYMLINK_LEDGER"
-assert_violation_count "ledger-inline-closures-receipt-symlink (generated)" 1 1 "$VALIDATOR" ledger "$SYMLINK_LEDGER" "$FAKE_ROOT"
+assert_violation_count "ledger-inline-closures-receipt-symlink (generated)" 1 1 "$VALIDATOR" ledger --legacy "$SYMLINK_LEDGER" "$FAKE_ROOT"
 
 # --- Markdown container, CITED-receipt loader FAIL-CLOSED shape (TENTH
 #     exception above): each generated ledger cites a real, contained .md
@@ -501,11 +575,45 @@ assert_violation_count "ledger-inline-closures-receipt-symlink (generated)" 1 1 
 
 MD_NO_BLOCK_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-md-no-block.json"
 _build_inline_closure_ledger "scripts/tests/fixtures/receipt-md-no-block.md" "$MD_NO_BLOCK_LEDGER"
-assert_violation_count "ledger-inline-closures-receipt-md-no-block (generated)" 1 1 "$VALIDATOR" ledger "$MD_NO_BLOCK_LEDGER" "$REPO_ROOT"
+assert_violation_count "ledger-inline-closures-receipt-md-no-block (generated)" 1 1 "$VALIDATOR" ledger --legacy "$MD_NO_BLOCK_LEDGER" "$REPO_ROOT"
 
 MD_TWO_BLOCKS_LEDGER="$TMP_WORKDIR/ledger-inline-closures-receipt-md-two-blocks.json"
 _build_inline_closure_ledger "scripts/tests/fixtures/receipt-md-two-blocks.md" "$MD_TWO_BLOCKS_LEDGER"
-assert_violation_count "ledger-inline-closures-receipt-md-two-blocks (generated)" 1 1 "$VALIDATOR" ledger "$MD_TWO_BLOCKS_LEDGER" "$REPO_ROOT"
+assert_violation_count "ledger-inline-closures-receipt-md-two-blocks (generated)" 1 1 "$VALIDATOR" ledger --legacy "$MD_TWO_BLOCKS_LEDGER" "$REPO_ROOT"
+
+# --- The --legacy gate on close.inline_closures[].receipt (ELEVENTH exception
+#     above): only a .md CONTAINER can carry an un-flagged run whose CITATION
+#     is a .json, so this ledger is generated as a Markdown container citing the
+#     sibling receipt-findings-addressed-good.json. Without --legacy the
+#     citation's suffix is its own violation and the cited file is never opened
+#     (exactly one violation); WITH the flag the same ledger validates clean
+#     (asserted in the positives section below), which is what proves the one
+#     flag reaches the cited-receipt slot and not just the CLI argument. ---
+
+MD_LEDGER_CITING_JSON="$TMP_WORKDIR/ledger-md-citing-json-receipt.md"
+python3 - "$MD_LEDGER_CITING_JSON" <<'PY'
+import json, sys
+dst = sys.argv[1]
+ledger = {
+    "ledger": [
+        {"n": 1, "agent": "organic-implementer", "model": "sonnet", "tokens": 50000, "tool_uses": 12, "duration_s": 300, "outcome": "ok"},
+        {"n": 2, "agent": "organic-reviewer", "model": "opus", "tokens": 30000, "tool_uses": 8, "duration_s": 200, "outcome": "review-clear"},
+        {"n": 3, "agent": "commit-step", "model": "sonnet", "tokens": 5000, "tool_uses": 3, "duration_s": 60, "outcome": "ok"},
+    ],
+    "close": {
+        "delegations": 3,
+        "subagent_tokens": 85000,
+        "commits": ["a1b2c3d"],
+        "re_briefs": 0,
+        "inline_closures": [
+            {"receipt": "scripts/tests/fixtures/receipt-findings-addressed-good.json", "finding_ids": ["F-1"]}
+        ],
+    },
+}
+with open(dst, "w") as handle:
+    handle.write("# Brief File (generated)\n\n## Ledger\n\n```json\n%s\n```\n" % json.dumps(ledger, indent=2))
+PY
+assert_violation_count "ledger-md-citing-json-receipt (generated, no --legacy)" 1 1 "$VALIDATOR" ledger "$MD_LEDGER_CITING_JSON" "$REPO_ROOT"
 
 # --- REV F-5 (re-brief): the os.path.isabs arm of findings[].file is a pure
 #     string check and must keep running under a degenerate root, unlike the
@@ -525,29 +633,29 @@ d = json.load(open(src))
 d["lenses"]["correctness"]["findings"][0]["file"] = "/etc/passwd"
 json.dump(d, open(dst, "w"))
 PY
-assert_violation_count "receipt-degenerate-root-absolute-file-still-checked (generated)" 1 2 "$VALIDATOR" receipt "$DEGENERATE_ABS_FILE" "/"
+assert_violation_count "receipt-degenerate-root-absolute-file-still-checked (generated)" 1 2 "$VALIDATOR" receipt --legacy "$DEGENERATE_ABS_FILE" "/"
 
 # --- SEC F-1 / REV F-4 findings_addressed[].finding_id predicate tightening,
 #     and SEC F-4 overrides[].finding_id cross-check (re-brief additions):
 #     each isolated to one fixture (calibration isolation, EIGHTH exception
 #     above). ---
 
-assert_exit "receipt-findings-addressed-id-not-string" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-id-not-string.json" "$REPO_ROOT"
-assert_exit "receipt-overrides-unknown-id" 1 "$VALIDATOR" receipt "$FIXTURES/receipt-overrides-unknown-id.json" "$REPO_ROOT"
+assert_exit "receipt-findings-addressed-id-not-string" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-id-not-string.json" "$REPO_ROOT"
+assert_exit "receipt-overrides-unknown-id" 1 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-overrides-unknown-id.json" "$REPO_ROOT"
 
 # --- ledger `plan[]` calibration (NINTH exception above): each negative
 #     fixture isolates to exactly one rule -- assert_violation_count pins both
 #     the exit code and the single VIOLATION line, proving calibration
 #     isolation the same way the degenerate-root short-circuit assertions do. ---
 
-assert_violation_count "ledger-plan-not-list" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-not-list.json" "$REPO_ROOT"
-assert_violation_count "ledger-plan-entry-not-object" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-entry-not-object.json" "$REPO_ROOT"
-assert_violation_count "ledger-plan-n-gap" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-n-gap.json" "$REPO_ROOT"
-assert_violation_count "ledger-plan-n-not-int" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-n-not-int.json" "$REPO_ROOT"
-assert_violation_count "ledger-plan-title-empty" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-title-empty.json" "$REPO_ROOT"
-assert_violation_count "ledger-plan-done-not-bool" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-done-not-bool.json" "$REPO_ROOT"
-assert_violation_count "ledger-plan-not-done-at-close" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-not-done-at-close.json" "$REPO_ROOT"
-assert_violation_count "ledger-plan-fewer-commits" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-fewer-commits.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-not-list" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-not-list.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-entry-not-object" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-entry-not-object.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-n-gap" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-n-gap.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-n-not-int" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-n-not-int.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-title-empty" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-title-empty.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-done-not-bool" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-done-not-bool.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-not-done-at-close" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-not-done-at-close.json" "$REPO_ROOT"
+assert_violation_count "ledger-plan-fewer-commits" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-fewer-commits.json" "$REPO_ROOT"
 
 # --- close.commits unconditional >= 1 floor (RG-1, tier-2 security F-1,
 #     re-brief 2/2): the plan-based rule above (close.commits >= len(plan))
@@ -558,9 +666,9 @@ assert_violation_count "ledger-plan-fewer-commits" 1 1 "$VALIDATOR" ledger "$FIX
 #     ledger-plan-* block above) across the three plan shapes the finding
 #     named: absent, explicit null, and an empty list. ---
 
-assert_violation_count "ledger-close-zero-commits-no-plan" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-zero-commits-no-plan.json" "$REPO_ROOT"
-assert_violation_count "ledger-close-zero-commits-plan-null" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-zero-commits-plan-null.json" "$REPO_ROOT"
-assert_violation_count "ledger-close-zero-commits-plan-empty" 1 1 "$VALIDATOR" ledger "$FIXTURES/ledger-close-zero-commits-plan-empty.json" "$REPO_ROOT"
+assert_violation_count "ledger-close-zero-commits-no-plan" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-close-zero-commits-no-plan.json" "$REPO_ROOT"
+assert_violation_count "ledger-close-zero-commits-plan-null" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-close-zero-commits-plan-null.json" "$REPO_ROOT"
+assert_violation_count "ledger-close-zero-commits-plan-empty" 1 1 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-close-zero-commits-plan-empty.json" "$REPO_ROOT"
 
 # --- Markdown container, CLI-argument loader (TENTH exception above): each
 #     negative isolates to exactly one container rule, so assert_violation_count
@@ -585,12 +693,12 @@ assert_violation_count "receipt-md-unterminated-fence (generated)" 1 1 "$VALIDAT
 
 # --- Known-positive fixtures LAST: each must exit 0. ---
 
-assert_exit "receipt-good" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-good.json" "$REPO_ROOT"
-assert_exit "receipt-verification-omitted-with-reason" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-verification-omitted-with-reason.json" "$REPO_ROOT"
-assert_exit "receipt-security-fragment-good" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-security-fragment-good.json" "$REPO_ROOT"
-assert_exit "ledger-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-good.json"
-assert_exit "receipt-findings-addressed-good" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-findings-addressed-good.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-good.json" "$REPO_ROOT"
+assert_exit "receipt-good" 0 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-good.json" "$REPO_ROOT"
+assert_exit "receipt-verification-omitted-with-reason" 0 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-verification-omitted-with-reason.json" "$REPO_ROOT"
+assert_exit "receipt-security-fragment-good" 0 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-security-fragment-good.json" "$REPO_ROOT"
+assert_exit "ledger-good" 0 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-good.json"
+assert_exit "receipt-findings-addressed-good" 0 "$VALIDATOR" receipt --legacy "$FIXTURES/receipt-findings-addressed-good.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-good" 0 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-good.json" "$REPO_ROOT"
 
 # --- ledger close.inline_closures[] calibration, re-brief positives:
 #     null-tolerance (REV F-7 -- inline_closures: null mirrors
@@ -600,8 +708,8 @@ assert_exit "ledger-inline-closures-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledge
 #     still match even with normalization removed entirely; see D-3 below for
 #     the pair that actually requires normalizing both sides). ---
 
-assert_exit "ledger-inline-closures-nfc-id" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-nfc-id.json" "$REPO_ROOT"
-assert_exit "ledger-inline-closures-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-null.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-nfc-id" 0 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-nfc-id.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-null" 0 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-null.json" "$REPO_ROOT"
 
 # --- D-3: a genuinely MIXED pair -- ledger-inline-closures-mixed-nfd-nfc.json
 #     carries its finding_id NFD-decomposed, receipt-findings-addressed-
@@ -611,15 +719,15 @@ assert_exit "ledger-inline-closures-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledge
 #     _check_inline_closures (the pre-existing nfc-id pair above does not,
 #     since it is NFD/NFD and already byte-identical). ---
 
-assert_exit "ledger-inline-closures-mixed-nfd-nfc" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-mixed-nfd-nfc.json" "$REPO_ROOT"
+assert_exit "ledger-inline-closures-mixed-nfd-nfc" 0 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-inline-closures-mixed-nfd-nfc.json" "$REPO_ROOT"
 
 # --- ledger `plan[]` positives: plan absent OR explicit null validates as
 #     before, EXCEPT the unconditional close.commits >= 1 floor (plan or no
 #     plan); ledger-plan-good.json is a fully populated, all-done plan
 #     consistent with its ledger/close rows. ---
 
-assert_exit "ledger-plan-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-good.json" "$REPO_ROOT"
-assert_exit "ledger-plan-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-null.json" "$REPO_ROOT"
+assert_exit "ledger-plan-good" 0 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-good.json" "$REPO_ROOT"
+assert_exit "ledger-plan-null" 0 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-plan-null.json" "$REPO_ROOT"
 
 # --- Markdown container positives (TENTH exception above): a report-shaped
 #     receipt whose single fenced ```json block is a full valid receipt; the
@@ -632,6 +740,17 @@ assert_exit "ledger-plan-null" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-plan-null
 assert_exit "receipt-md-block-good" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-md-block-good.md" "$REPO_ROOT"
 assert_exit "receipt-md-prose-fence-string" 0 "$VALIDATOR" receipt "$FIXTURES/receipt-md-prose-fence-string.md" "$REPO_ROOT"
 assert_exit "ledger-inline-closures-receipt-md-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-inline-closures-receipt-md-good.md" "$REPO_ROOT"
+
+# --- `ledger --open` and `ledger[].report` positives, each paired with a
+#     negative already asserted above: the in-progress Brief File that only
+#     --open accepts; a valid .md report citation; the same .json report
+#     citation --legacy makes legal; and the .md ledger whose cited .json
+#     receipt --legacy makes legal. ---
+
+assert_exit "ledger-open-good (--open)" 0 "$VALIDATOR" ledger --open "$FIXTURES/ledger-open-good.md" "$REPO_ROOT"
+assert_exit "ledger-report-good" 0 "$VALIDATOR" ledger "$FIXTURES/ledger-report-good.md" "$REPO_ROOT"
+assert_exit "ledger-report-not-md (--legacy)" 0 "$VALIDATOR" ledger --legacy "$FIXTURES/ledger-report-not-md.md" "$REPO_ROOT"
+assert_exit "ledger-md-citing-json-receipt (generated, --legacy)" 0 "$VALIDATOR" ledger --legacy "$MD_LEDGER_CITING_JSON" "$REPO_ROOT"
 
 echo ""
 if (( fail_count > 0 )); then
