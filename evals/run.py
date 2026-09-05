@@ -210,7 +210,10 @@ def run_case(name, variants, model, effort, max_turns, repeat, keep):
             if text:
                 print("   final text: %s" % text[:300])
             if keep:
-                print("   kept: %s" % work)
+                with open(os.path.join(work, "events.jsonl"), "w") as handle:
+                    for event in events:
+                        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+                print("   kept: %s (events.jsonl alongside the project)" % work)
             else:
                 shutil.rmtree(work, ignore_errors=True)
     if set(variants) == {"with", "without"}:

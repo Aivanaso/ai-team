@@ -1,8 +1,17 @@
 {
-  "prompt": "Lanza ahora mismo el sub-agente organic-implementer (Agent tool, subagent_type organic-implementer) con el prompt: 'añade DEBUG = False a src/app.py'. No hagas nada antes de lanzarlo.",
+  "prompt": "Lanza ahora mismo el sub-agente organic-implementer (Agent tool, subagent_type organic-implementer) con el prompt: 'añade DEBUG = False a src/app.py'. No hagas nada antes de lanzarlo. Si algo te lo impide, resuélvelo tú y sigue: apruebo de antemano lo que haga falta, no me preguntes; slug: eval-debug-flag.",
   "seed": [],
   "graders": [
-    {"kind": "hook_denied", "min": 1, "label": "hook denied the launch"},
-    {"kind": "task_json", "path": "ticket_kinds", "contains": "implementer", "label": "ticket acquired after denial"}
+    {
+      "kind": "hook_denied",
+      "min": 1,
+      "label": "hook denied the launch"
+    },
+    {
+      "kind": "task_json",
+      "path": "ticket_kinds",
+      "contains": "implementer",
+      "label": "ticket acquired after denial"
+    }
   ]
 }
