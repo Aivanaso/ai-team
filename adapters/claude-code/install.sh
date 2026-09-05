@@ -15,7 +15,11 @@
 #   1. Copies skills to ~/.claude/skills/
 #   2. Copies agent files to ~/.claude/agents/
 #   3. Rewrites skill paths in every installed skill .md file (idempotency-safe)
-#   4. Injects orchestrator stub into ~/.claude/CLAUDE.md
+#   4. Registers the ai-team machine's hooks (PreToolUse on Agent, SessionStart)
+#      in ~/.claude/settings.json via merge-hooks.py -- backup first, foreign
+#      hooks untouched, idempotent; `merge-hooks.py <settings> <hooks.json> --remove`
+#      undoes it
+#   5. Injects orchestrator stub into ~/.claude/CLAUDE.md
 #      between <!-- ai-team:orchestrator --> markers
 #
 # Re-run to update after pulling new changes from the repo.
@@ -88,11 +92,10 @@ verify_install() {
 
 # --- Preflight ---
 
-# check-receipt.py (the review-plane's BLOCKING structural gate, replacing the
-# retired bash/regex citation-audit script) is Python-stdlib-only but still
-# needs a python3 interpreter on PATH — fail fast rather than let the gate
-# silently error out mid-task.
-command -v python3 >/dev/null 2>&1 || die "python3 required (used by skills/_shared/scripts/check-receipt.py)."
+# The ai-team machine (skills/_shared/scripts/ai-team, Python stdlib only) is what
+# the hooks and the orchestrator run — fail fast without a python3 on PATH rather
+# than let every hook silently error out mid-task.
+command -v python3 >/dev/null 2>&1 || die "python3 required (used by skills/_shared/scripts/ai-team)."
 
 # Create ~/.claude/ if missing — supports fresh-install scenarios (Claude Code
 # installed but never run) and smoke tests against temp HOME directories.
@@ -135,6 +138,10 @@ done
 skill_count=$(find "$CLAUDE_DIR/skills" -mindepth 1 -maxdepth 1 -type d -not -name '_shared' 2>/dev/null | wc -l)
 info "  -> ~/.claude/skills/ ($skill_count skills)"
 
+# The machine's launcher must stay executable: the hooks call it by path.
+chmod +x "$CLAUDE_DIR/skills/_shared/scripts/ai-team" "$CLAUDE_DIR/skills/_shared/scripts/ai_team/cli.py"
+"$CLAUDE_DIR/skills/_shared/scripts/ai-team" --help >/dev/null || die "the installed ai-team launcher does not run"
+
 # Verify every source file landed at the corresponding destination.
 verify_install "$CLAUDE_DIR/skills"
 
@@ -152,10 +159,11 @@ verify_install "$CLAUDE_DIR/skills"
 # the source protocol legitimately mentioned that path in prose, leaving
 # command lines unrewritten; the per-file idempotent anchors below replace it.)
 while IFS= read -r -d '' md_file; do
-  if grep -qE 'bash skills/_shared/|python3 skills/_shared/' "$md_file"; then
-    sed -i \
+  if grep -qE 'bash skills/_shared/|python3 skills/_shared/|(^|[^/])skills/_shared/scripts/ai-team' "$md_file"; then
+    sed -i -E \
       -e 's|bash skills/_shared/|bash ~/.claude/skills/_shared/|g' \
       -e 's|python3 skills/_shared/|python3 ~/.claude/skills/_shared/|g' \
+      -e 's#(^|[^/])skills/_shared/scripts/ai-team#\1~/.claude/skills/_shared/scripts/ai-team#g' \
       "$md_file"
     info "  -> Rewrote skill paths in ${md_file#"$CLAUDE_DIR"/}"
   fi
@@ -185,6 +193,12 @@ info "  -> ~/.claude/agents/ ($agent_count agent files)"
 
 printf '%s\n' "${CURRENT_MANAGED_SET[@]}" > "$MANIFEST_FILE"
 info "  -> wrote $MANIFEST_FILE (${#CURRENT_MANAGED_SET[@]} managed paths)"
+
+# --- 2c. Register the machine's hooks in settings.json ---
+
+info "Registering hooks in ~/.claude/settings.json..."
+python3 "$SCRIPT_DIR/merge-hooks.py" "$CLAUDE_DIR/settings.json" "$SCRIPT_DIR/templates/hooks.json" \
+  || die "hook registration failed -- settings.json left unchanged (see the message above)"
 
 # --- 3. Prepare orchestrator content ---
 
@@ -272,8 +286,10 @@ info "Installation complete! (Claude Code adapter)"
 echo ""
 echo "  Skills:       ~/.claude/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,organic-retro}/"
 echo "  Agents:       ~/.claude/agents/*.md"
-echo "  Protocols:    ~/.claude/skills/_shared/"
+echo "  Shared:       ~/.claude/skills/_shared/ (machine.md, cards/, scripts/ai-team)"
+echo "  Hooks:        PreToolUse(Agent) + SessionStart in ~/.claude/settings.json (backup written beside it)"
 echo "  Orchestrator: stub in CLAUDE.md (between markers)"
 echo ""
-echo "  No slash commands — delegation is conversational, driven by the orchestrator stub."
+echo "  The machine: ~/.claude/skills/_shared/scripts/ai-team status"
+echo "  Uninstall hooks: python3 adapters/claude-code/merge-hooks.py ~/.claude/settings.json adapters/claude-code/templates/hooks.json --remove"
 echo "  Re-run this script to update after pulling new changes."

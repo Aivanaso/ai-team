@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/skills/_shared/scripts/ai-team\" hook pre-tool-use",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/skills/_shared/scripts/ai-team\" hook session-start",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

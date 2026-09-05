@@ -14,7 +14,7 @@ import json
 import sys
 
 from ai_team.machine import AGENT_KINDS, Machine
-from ai_team.store import MachineError, Store, find_root
+from ai_team.store import MachineError, Store, find_root, launcher
 
 
 def _deny(reason):
@@ -86,7 +86,7 @@ def session_start(payload):
     paused = store.paused()
     if paused:
         text += "\nPaused: %s" % ", ".join("%s (%s)" % (t["task"], t.get("pending_question") or "no question recorded") for t in paused)
-    return 0, "ai-team status (SessionStart hook):\n" + text + "\n", ""
+    return 0, "ai-team status (SessionStart hook; run the machine as `%s <verb>`):\n%s\n" % (launcher(), text), ""
 
 
 def run(event, stdin_text):

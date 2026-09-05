@@ -4,12 +4,20 @@ import datetime
 import json
 import os
 import re
+import shutil
 import tempfile
 
 AI_TEAM_DIR = ".ai-team"
 TASKS_SUBDIR = "tasks"
 DATE_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}-")
 SCHEMA = 1
+
+
+def launcher():
+    """How to invoke the machine from a shell: `ai-team` when on PATH, else the launcher's path."""
+    if shutil.which("ai-team"):
+        return "ai-team"
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ai-team")
 
 
 class MachineError(Exception):
