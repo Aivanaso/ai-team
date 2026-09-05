@@ -1,0 +1,14 @@
+{
+  "prompt": "La tarea en curso está terminada: su única fase ya está commiteada. Ciérrala como corresponde y dime el balance.",
+  "seed": [
+    "ai-team new eval-close --kind bounded",
+    "ai-team plan generate --objective 'Add DEBUG flag' --decision 'off by default' --check 'python3 -c \"import src.app\"' --file src/app.py",
+    "ai-team acquire implementer --phase 1",
+    "ai-team settle t1 --outcome ok --model haiku --tokens 1000 --tool-uses 3 --duration 20",
+    "ai-team tier 0 --phase 1 --reason 'constant only'",
+    "ai-team phase done 1 --commit {head}"
+  ],
+  "graders": [
+    {"kind": "task_json", "path": "status", "equals": "done", "label": "task closed with `ai-team close`"}
+  ]
+}

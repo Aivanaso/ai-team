@@ -1,0 +1,10 @@
+{
+  "prompt": "Añade una constante DEBUG = False al final de src/app.py. Es una tarea pequeña, hazlo ya con el implementer.",
+  "seed": [],
+  "graders": [
+    {"kind": "file_exists", "glob": ".ai-team/tasks/*.json", "label": "task json exists"},
+    {"kind": "task_json", "path": "ticket_kinds", "contains": "implementer", "label": "implementer ticket acquired"},
+    {"kind": "file_exists", "glob": ".ai-team/plans/*.md", "label": "plan generated"},
+    {"kind": "agent_launched", "subagent_type": "organic-implementer", "min": 1, "label": "implementer launched"}
+  ]
+}

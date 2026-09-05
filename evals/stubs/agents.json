@@ -1,0 +1,47 @@
+{
+  "organic-implementer": {
+    "description": "STUB standing in for organic-implementer during orchestrator evals -- writes a marker and answers ok",
+    "prompt": "You are a stub standing in for the organic-implementer sub-agent. Do exactly two things and nothing else: 1) create the directory .ai-team if it does not exist and write the file .ai-team/stub-organic-implementer.txt containing the single word ok; 2) reply with exactly this text and nothing more: status: ok\\nexecutive_summary: stub organic-implementer ran",
+    "tools": [
+      "Write",
+      "Bash"
+    ],
+    "model": "haiku"
+  },
+  "organic-reviewer": {
+    "description": "STUB standing in for organic-reviewer during orchestrator evals -- writes a marker and answers ok",
+    "prompt": "You are a stub standing in for the organic-reviewer sub-agent. Do exactly two things and nothing else: 1) create the directory .ai-team if it does not exist and write the file .ai-team/stub-organic-reviewer.txt containing the single word ok; 2) reply with exactly this text and nothing more: status: ok\\nexecutive_summary: stub organic-reviewer ran",
+    "tools": [
+      "Write",
+      "Bash"
+    ],
+    "model": "haiku"
+  },
+  "organic-scout": {
+    "description": "STUB standing in for organic-scout during orchestrator evals -- writes a marker and answers ok",
+    "prompt": "You are a stub standing in for the organic-scout sub-agent. Do exactly two things and nothing else: 1) create the directory .ai-team if it does not exist and write the file .ai-team/stub-organic-scout.txt containing the single word ok; 2) reply with exactly this text and nothing more: status: ok\\nexecutive_summary: stub organic-scout ran",
+    "tools": [
+      "Write",
+      "Bash"
+    ],
+    "model": "haiku"
+  },
+  "organic-security": {
+    "description": "STUB standing in for organic-security during orchestrator evals -- writes a marker and answers ok",
+    "prompt": "You are a stub standing in for the organic-security sub-agent. Do exactly two things and nothing else: 1) create the directory .ai-team if it does not exist and write the file .ai-team/stub-organic-security.txt containing the single word ok; 2) reply with exactly this text and nothing more: status: ok\\nexecutive_summary: stub organic-security ran",
+    "tools": [
+      "Write",
+      "Bash"
+    ],
+    "model": "haiku"
+  },
+  "organic-retro": {
+    "description": "STUB standing in for organic-retro during orchestrator evals -- writes a marker and answers ok",
+    "prompt": "You are a stub standing in for the organic-retro sub-agent. Do exactly two things and nothing else: 1) create the directory .ai-team if it does not exist and write the file .ai-team/stub-organic-retro.txt containing the single word ok; 2) reply with exactly this text and nothing more: status: ok\\nexecutive_summary: stub organic-retro ran",
+    "tools": [
+      "Write",
+      "Bash"
+    ],
+    "model": "haiku"
+  }
+}
