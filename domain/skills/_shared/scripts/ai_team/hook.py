@@ -25,14 +25,18 @@ def _deny(reason):
     }})
 
 
-def _acquire_hint(machine, task, kinds):
+ORDER = ("You (the orchestrator) run these commands yourself with Bash, now and in this order; "
+         "do not report them to the user and do not ask the user to run them.")
+
+
+def _acquire_hint(machine, task, kinds, bin_):
     current = machine.current_phase(task)
     commands = []
     for kind in kinds:
         if kind in ("implementer", "reviewer", "security-audit") and current is not None:
-            commands.append("ai-team acquire %s --phase %d" % (kind, current["n"]))
+            commands.append("%s acquire %s --phase %d" % (bin_, kind, current["n"]))
         else:
-            commands.append("ai-team acquire %s" % kind)
+            commands.append("%s acquire %s" % (bin_, kind))
     return " or ".join("`%s`" % c for c in commands)
 
 
@@ -60,18 +64,19 @@ def pre_tool_use(payload):
         for ticket in machine.open_tickets(candidate):
             if ticket["kind"] in kinds:
                 return 0, "", ""
+    bin_ = launcher()
     if task is None and "retro" not in kinds:
         return 0, _deny(
-            "ai-team: no task in progress under %s -- a sub-agent launch needs a ticket. Bounded change: "
-            "`ai-team new <slug> --kind bounded` then `ai-team plan generate --objective ... --decision ... --check ... --file ...`; "
-            "large change: `ai-team new <slug> --kind large` and follow `ai-team status`. Then `ai-team acquire %s`."
-            % (root, " | ".join(kinds))
+            "ai-team: no task in progress under %s -- a sub-agent launch needs a ticket. %s Bounded change: "
+            "`%s new <slug> --kind bounded` then `%s plan generate --objective ... --decision ... --check ... --file ...`; "
+            "large change: `%s new <slug> --kind large` and follow `%s status`. Then `%s acquire %s` and relaunch the sub-agent."
+            % (root, ORDER, bin_, bin_, bin_, bin_, bin_, " | ".join(kinds))
         ), ""
     if task is None:
-        return 0, _deny("ai-team: no closed task to run a retro on -- `ai-team close` first, then `ai-team acquire retro`."), ""
+        return 0, _deny("ai-team: no closed task to run a retro on. %s `%s close` first, then `%s acquire retro`." % (ORDER, bin_, bin_)), ""
     return 0, _deny(
-        "ai-team: no open ticket for %s on task %s. Run `ai-team status`, then %s; if it refuses, do what it names first."
-        % (agent, task["task"], _acquire_hint(machine, task, kinds))
+        "ai-team: no open ticket for %s on task %s. %s `%s status`, then %s; if it refuses, do what it names first, then relaunch the sub-agent."
+        % (agent, task["task"], ORDER, bin_, _acquire_hint(machine, task, kinds, bin_))
     ), ""
 
 
