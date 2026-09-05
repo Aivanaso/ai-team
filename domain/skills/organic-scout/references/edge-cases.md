@@ -11,7 +11,7 @@ Handling for non-happy-path scenarios per mode.
 **Action:** Return `status: blocked` with message that an existing config.yaml was found. The
 orchestrator decides whether to re-run with --force.
 > "config.yaml already exists at `.ai-team/config.yaml`. Delete it manually if you want to
-> regenerate, or use discover mode to investigate the current stack."
+> regenerate, or use map mode to investigate the current stack."
 
 **Rationale:** Overwriting a user-edited config silently would destroy conventions and
 architecture decisions the team made.
@@ -81,7 +81,7 @@ envelope risk: "Very small project — architecture detection skipped."
 
 ---
 
-## Discover Edge Cases
+## Map / Scope Edge Cases
 
 ### Topic too broad
 
@@ -90,7 +90,7 @@ envelope risk: "Very small project — architecture detection skipped."
 **Action:**
 1. Narrow the search with more specific patterns (function names, class names, route paths).
 2. If still >50 matches after narrowing, read only the top 15 most relevant files (ranked by match density).
-3. Note in the discovery report: "Search returned {N} files; analysis limited to top 15 by relevance."
+3. Note in the map report: "Search returned {N} files; analysis limited to top 15 by relevance."
 
 ---
 
@@ -109,7 +109,7 @@ envelope risk: "Very small project — architecture detection skipped."
 
 **Condition:** Grep/glob returns 0 results for the topic.
 
-**Action:** Return a discovery report that documents:
+**Action:** Return a map report that documents:
 - Exact search terms tried
 - Directory scope searched
 - Conclusion: "Feature appears absent from codebase or named differently"

@@ -19,10 +19,8 @@
 #   4. Merges agent definitions into ~/.config/opencode/opencode.json (deep-merge)
 #
 # Requirements:
-#   python3 (used by skills/_shared/scripts/check-receipt.py, the review-plane's
-#            BLOCKING structural gate)
-#   jq      (for the opencode.json deep-merge only — never used to validate
-#            receipts or ledgers; the sole validator for those is check-receipt.py)
+#   python3 (runs skills/_shared/scripts/ai-team, the task state machine)
+#   jq      (for the opencode.json deep-merge only)
 #
 # Re-run to update after pulling new changes from the repo.
 # Existing operator agents not named after this framework's own agents are preserved.
@@ -88,10 +86,10 @@ verify_install() {
 
 # --- Preflight ---
 
-# check-receipt.py (the review-plane's BLOCKING structural gate) is
+# The ai-team machine (skills/_shared/scripts/ai-team, Python stdlib) is
 # Python-stdlib-only but still needs a python3 interpreter on PATH — fail
 # fast rather than let the gate silently error out mid-task.
-command -v python3 >/dev/null 2>&1 || die "python3 required (used by skills/_shared/scripts/check-receipt.py)."
+command -v python3 >/dev/null 2>&1 || die "python3 required (used by skills/_shared/scripts/ai-team)."
 
 command -v jq >/dev/null 2>&1 || die "jq required for OpenCode adapter. Install it (brew install jq / apt install jq) and retry."
 
@@ -139,22 +137,23 @@ verify_install "$OPENCODE_DIR/skills"
 printf '%s\n' "${CURRENT_MANAGED_SET[@]}" > "$MANIFEST_FILE"
 info "  -> wrote $MANIFEST_FILE (${#CURRENT_MANAGED_SET[@]} managed paths)"
 
+# The machine's launcher must stay executable.
+chmod +x "$OPENCODE_DIR/skills/_shared/scripts/ai-team" "$OPENCODE_DIR/skills/_shared/scripts/ai_team/cli.py"
+"$OPENCODE_DIR/skills/_shared/scripts/ai-team" --help >/dev/null || die "the installed ai-team launcher does not run"
+
 # Rewrite skill paths for the installed location, across every .md file of the
-# skills THIS installer ships (the same set the copy loop above wrote) — not
-# just orchestrator-protocol.md, and never third-party skills under
-# ~/.config/opencode/skills. Two invocation prefixes need the rewrite:
-# `bash skills/_shared/...` (refresh-skill-registry.sh) and
-# `python3 skills/_shared/scripts/check-receipt.py` (the review-plane's
-# BLOCKING structural gate, invoked verbatim from organic-reviewer/SKILL.md,
-# organic-security/SKILL.md, and orchestrator-protocol.md alike). Anchored
-# patterns are idempotent by construction — after one rewrite the pattern no
-# longer matches — and they leave `{install_dir}/skills/...` references and
-# prose mentioning skill roots untouched.
+# skills THIS installer ships (the same set the copy loop above wrote), never
+# third-party skills under ~/.config/opencode/skills. Three invocation prefixes
+# need the rewrite: `bash skills/_shared/...` (refresh-skill-registry.sh),
+# `python3 skills/_shared/...`, and the machine `skills/_shared/scripts/ai-team`
+# (anchored on a non-slash predecessor so a rewritten path is never rewritten
+# again). Idempotent by construction.
 while IFS= read -r -d '' md_file; do
-  if grep -qE 'bash skills/_shared/|python3 skills/_shared/' "$md_file"; then
-    sed -i \
+  if grep -qE 'bash skills/_shared/|python3 skills/_shared/|(^|[^/])skills/_shared/scripts/ai-team' "$md_file"; then
+    sed -i -E \
       -e 's|bash skills/_shared/|bash ~/.config/opencode/skills/_shared/|g' \
       -e 's|python3 skills/_shared/|python3 ~/.config/opencode/skills/_shared/|g' \
+      -e 's#(^|[^/])skills/_shared/scripts/ai-team#\1~/.config/opencode/skills/_shared/scripts/ai-team#g' \
       "$md_file"
     info "  -> Rewrote skill paths in ${md_file#"$OPENCODE_DIR"/}"
   fi

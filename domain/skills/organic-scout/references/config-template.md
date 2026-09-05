@@ -9,7 +9,7 @@ mode.
 > uses.
 
 > **Canonical key set**: the orchestrator's Config Refresh Check (Session Init in
-> `_shared/orchestrator-protocol.md`) diffs existing project configs against this template's
+> `_shared/cards/classify.md`) diffs existing project configs against this template's
 > top-level keys and offers to append the missing ones. When adding a key here, give it a
 > safe-absent default (every consumer keeps working when the key is missing) so pre-existing
 > projects upgrade additively on their next session.
@@ -45,7 +45,7 @@ conventions:
 
 commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits at each objective's
                        # close without pausing; manual = presents the staged file set and waits for
-                       # user confirmation before committing (orchestrator-protocol.md -> "Commit creation")
+                       # user confirmation before committing (_shared/cards/commit.md)
 
 # strict_tdd: true
 #   Optional, safe-absent default: false. The orchestrator appends the
@@ -55,7 +55,7 @@ commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits
 #   declared runner can exercise (never prose/docs/config/templates/skill
 #   definitions). strict_tdd: true with test_commands.unit absent sends no
 #   directive -- the orchestrator tells the user and records the gap in the
-#   Brief File, never inventing a runner command. organic-implementer then
+#   task's design notes, never inventing a runner command. organic-implementer then
 #   returns tdd_cycles evidence for each red -> green cycle
 #   (red -> green -> triangulate -> refactor).
 
@@ -73,7 +73,7 @@ commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits
 #                             # lives inside the command / project config, not in this key.
 #     blocking: true          # optional, default true
 #   Optional, safe-absent. Objective review gates executed by organic-reviewer's verification
-#   lens (SKILL.md Step 4) alongside the Task Brief's acceptance_checks re-run — exit code
+#   lens alongside the phase's acceptance_checks re-run — exit code
 #   only. A failing gate lands in `lenses.correctness.findings[]` citing this gate's own
 #   declaration line — always a resolvable citation. Findings carry their own per-finding
 #   `confidence`; the orchestrator's downstream triage is the filter, never a suppression rule
@@ -88,11 +88,10 @@ commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits
 #   reference.
 
 # retro: on-signal
-#   Optional, safe-absent default: on-signal. Read by the orchestrator when a task's Brief File
-#   flips to `status: done` (orchestrator-protocol.md -> "Retro trigger"), to decide whether to
-#   delegate organic-retro:
+#   Optional, safe-absent default: on-signal. Read by the orchestrator when `ai-team close` flips a task to
+#   `done` (_shared/cards/close.md), to decide whether to delegate organic-retro:
 #     always     -> delegate organic-retro (mode: retro) unconditionally at task close
-#     on-signal  -> delegate only when >=1 signal fired this task: any re-brief, an infra-death,
+#     on-signal  -> delegate only when >=1 signal fired this task: >=2 attempts on a phase, an infra-death,
 #                   a red blocking review_gates gate, or a single delegation reporting >300k
 #                   tokens
 #     off        -> never delegate organic-retro
@@ -131,7 +130,7 @@ architecture:
     # Empty list [] when no patterns detected
 
 # model_overrides:
-#   Optional, safe-absent (defaults live in _shared/orchestrator-protocol.md -> "Model
+#   Optional, safe-absent (defaults live in the adapter's agent files and _shared/cards/delegate.md -> "Model
 #   Routing"). Project-level override of the default model per delegated worker.
 #   organic-reviewer: opus     # e.g. upgrade from the sonnet default
 #   Worker names: organic-implementer | organic-reviewer | organic-security |

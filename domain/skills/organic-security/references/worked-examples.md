@@ -15,7 +15,7 @@ magic-link auth change. Use it as a reference when running the sweep in threat-m
 The fourth row (`sessions.refresh_expires_at`) is the finding that slipped past an earlier
 design pass and was only caught by a later code-audit. With the sweep, this finding fires
 before code is written — and converts into a `MUST` security requirement a follow-up Task
-Brief must implement.
+phase must implement.
 
 **Finding that would have been emitted:**
 

@@ -1,6 +1,7 @@
 # ai-team — Claude Code Adapter
 
-Install the ai-team organic evidence-tiered delegation framework for use with Claude Code.
+Install the ai-team framework — a task state machine, two hooks, eight orchestrator cards and
+five sub-agent skills — for use with Claude Code.
 
 ## Install
 
@@ -14,31 +15,42 @@ Install the ai-team organic evidence-tiered delegation framework for use with Cl
 
 ## Prerequisites
 
-Claude Code must be installed and `~/.claude/` must exist. The installer aborts if that directory is missing. `python3` (standard library only, no third-party packages) must also be on `PATH` — it runs `check-receipt.py`, the blocking gate the review plane validates every Review Receipt and Brief File ledger against.
+Claude Code installed. `python3` (standard library only) on `PATH`: it runs the machine
+(`~/.claude/skills/_shared/scripts/ai-team`) that the hooks and the orchestrator call.
 
 ## What the install does
 
-1. **Copies skills** from `domain/skills/` to `~/.claude/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,organic-retro}/` and `~/.claude/skills/_shared/`
-2. **Rewrites skill paths** in `~/.claude/skills/_shared/orchestrator-protocol.md` — relative `skills/` references become absolute `~/.claude/skills/` paths so Claude can read them without knowing the repo location
-3. **Injects orchestrator content** from `adapters/claude-code/templates/CLAUDE.md` inline into `~/.claude/CLAUDE.md`, between `<!-- ai-team:orchestrator -->` and `<!-- /ai-team:orchestrator -->` markers
+1. **Copies skills** from `domain/skills/` to `~/.claude/skills/{organic-implementer,organic-reviewer,organic-scout,organic-security,organic-retro}/` and `~/.claude/skills/_shared/` (protocols, `machine.md`, `cards/`, `scripts/ai-team` + the `ai_team/` package). The launcher is made executable and smoke-run.
+2. **Rewrites skill paths** in the installed `.md` files — relative `skills/_shared/…` references become `~/.claude/skills/_shared/…`, idempotently.
+3. **Copies agent files** to `~/.claude/agents/` (model and effort per worker live in their frontmatter).
+4. **Registers two hooks** in `~/.claude/settings.json` through `merge-hooks.py`: `PreToolUse` on `Agent` (a sub-agent named `organic-*` needs an open ticket, else the launch is denied with the exact command to run) and `SessionStart` on `startup|clear|compact` (prints `ai-team status` into the session's context). A backup `settings.json.bak-<UTC stamp>` is written first; every foreign hook and setting survives byte for byte; re-running is idempotent.
+5. **Injects the orchestrator stub** from `templates/CLAUDE.md` into `~/.claude/CLAUDE.md` between `<!-- ai-team:orchestrator -->` markers.
 
-User content outside the markers is never modified.
+User content outside the markers, and every hook not ours, is never modified.
+
+## How a session runs
+
+The stub tells the orchestrator to run `ai-team status` before any delegation and to read the
+one card the moment names (`~/.claude/skills/_shared/cards/<card>.md`). The machine's
+contract — verbs, ticket conditions, the task JSON, the inputs it parses — is
+`~/.claude/skills/_shared/machine.md`.
 
 ## Idempotency
 
-Safe to re-run after pulling new changes. The installer:
-- Replaces the existing orchestrator block between markers (marker-based injection, no drift)
-- Wipes and re-copies each skill directory (including `_shared/`) on every run, so stale files *inside* a still-shipped skill are cleared automatically
-- Writes `~/.claude/.ai-team-manifest` listing every installed path; on the next run, paths present in the previous manifest but gone from the source are pruned. Limitation: a pre-manifest install (no `.ai-team-manifest` yet) is never pruned on its first run — skills or agents that a newer framework version removed must be deleted manually once, or delete `~/.claude/skills/` + the framework's `~/.claude/agents/*.md` and re-install
+Safe to re-run after pulling. The installer replaces the stub between markers, wipes and
+re-copies each skill directory, writes `~/.claude/.ai-team-manifest` and prunes paths a newer
+version no longer ships, and re-merges the hooks (removing its own handlers first, so two runs
+give a byte-identical `settings.json`).
 
-## No slash commands
+## Evals
 
-The organic route has no pipeline entry commands. Delegation is conversational: the orchestrator stub in `~/.claude/CLAUDE.md` classifies every request (Small/Medium/Large) and delegates to `organic-implementer`, with review and commit gated by evidence tier — see `~/.claude/skills/_shared/orchestrator-protocol.md` for the full model.
-
-## Note on adapters
-
-Both adapters install the same `domain/skills/` source, so the delegation model and skill files are identical — only the invocation surface differs (Claude Code: conversational, via the `CLAUDE.md` stub; OpenCode: conversational, via `AGENTS.md` and the primary agent).
+`evals/run.py` (repo-local) runs the orchestrator against fixture projects with stub agents and
+this checkout's hooks — see `evals/README.md`.
 
 ## Uninstall
 
-Remove the orchestrator block from `~/.claude/CLAUDE.md` (between the markers) and delete `~/.claude/skills/` (or just the `organic-*` and `_shared` subdirectories) plus `~/.claude/agents/*.md`. The installer does not provide an automated uninstall command.
+```bash
+python3 adapters/claude-code/merge-hooks.py ~/.claude/settings.json adapters/claude-code/templates/hooks.json --remove
+```
+Then remove the block between the markers in `~/.claude/CLAUDE.md`, and delete
+`~/.claude/skills/{organic-*,_shared}` and the framework's `~/.claude/agents/organic-*.md`.

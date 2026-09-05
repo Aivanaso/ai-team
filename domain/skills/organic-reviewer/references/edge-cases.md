@@ -9,11 +9,11 @@
 
 **Behavior:** Return `status: ok`, `verdict: review-clear`, `lenses.correctness.findings: []`,
 `verification: []` WITH `verification_omitted_reason: "no candidate changes to review"` — the
-receipt gate (`check-receipt.py`, run against the report itself) rejects an empty `verification`
+receipt gate (`ai-team receipt check`, run against the report itself) rejects an empty `verification`
 that carries no reason. Note in executive summary: "no candidate changes to review — gate passes
 with no findings".
 
-Rationale: an empty change set is a valid state (e.g., the Task Brief declared a file the
+Rationale: an empty change set is a valid state (e.g., the phase declared a file the
 implementer did not need to touch). The gate must not block on a clean slate.
 
 ## All Findings Low-Confidence
@@ -44,7 +44,7 @@ whatever the lens itself judges the defect to warrant.
 
 **Behavior:** Return `status: blocked`, executive summary names the missing field. Do NOT
 widen scope to "all changed files" — reviewing outside the declared candidate produces
-findings the orchestrator cannot route back to the Task Brief.
+findings the orchestrator cannot route back to the phase.
 
 ## Large File Set (read budget)
 
@@ -126,7 +126,7 @@ a named finding that is still open, or a new inconsistency introduced by the fix
 
 **Behaviour:** Set `verdict: review-blocked` as normal (Decision Gates). Do NOT chain a further
 delta pass for the same objective's finding set — a delta pass finding a CRITICAL is itself the
-full-re-review trigger (`orchestrator-protocol.md` → Evidence-Tier Review → Delta
+full-re-review trigger (`_shared/cards/review.md`; a non-decreasing finding count reopens the design — Delta
 re-validation). Note this in the executive summary and in `risks`: "delta pass found a CRITICAL
 — escalate to a full re-review, not a further delta." The orchestrator re-engages
 `organic-implementer`, then delegates a full pass (no `prior_report` injected) rather than

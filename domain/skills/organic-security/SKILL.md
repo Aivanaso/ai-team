@@ -1,96 +1,84 @@
 ---
 name: organic-security
-description: "Trigger: orchestrator launches code-audit as the tier-2 security lens (group_files), or either mode on user request."
+description: "Trigger: orchestrator launches threat-model over a design file (ticket security-threat-model) or code-audit on a tier-2 phase candidate (ticket security-audit)."
 disable-model-invocation: true
 user-invocable: false
 ---
 
 ## Activation Contract
 
-Run when the orchestrator launches either security workflow: `code-audit` mode as the tier-2
-security lens for a candidate diff (`group_files`), invoked alongside `organic-reviewer` and
-merged by the orchestrator into the Review Receipt's `lenses.security`; or either
-`threat-model` / `code-audit` mode standalone, on user request, independent of any Task
-Brief. Produce the on-disk report AT the injected `report_destination` — a FILE path ending in
-`.md`, never a directory — only when that field is injected; always return a `security_lens`
-block in the envelope shaped for direct receipt merge. Read application code to find
-vulnerabilities; never modify it.
+Two moments, two modes. **threat-model** (before the design is approved): the input is the
+design FILE (`.ai-team/designs/<task>.md`, one page, no diff); read its objective, surfaces,
+external conditions and decisions, walk the touchpoints, and return MUST/SHOULD security
+requirements the orchestrator copies into the design's `## Seguridad` as decisions. **code-audit**
+(tier 2, after an implementer attempt): the input is the phase candidate (`group_files`), the
+phase file and the design's `## Seguridad`; verify that every security measure the design
+decided is implemented, then audit the diff with the five categories; the report's final
+fenced ```json block is a security-fragment receipt the machine validates at settle time.
+Read application code to find vulnerabilities; never modify it.
 
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Security artifacts write only to the injected `report_destination`, resolved relative to `project_root` — no fixed `.ai-team/` path exists on this route.
-- Every finding cites `file:line` per Evidence Protocol Rule 1 — a finding without a resolvable citation is not recorded, but its drop is never silent — note each uncited candidate in `risks` ("uncited candidate finding dropped: <one-line topic>"). -- because uncited findings are unverifiable and slow down triage; the orchestrator cannot route a fix without knowing exactly where the vulnerability is.
-- Report every finding, including ones you are uncertain about or consider low-severity. Do not filter for importance or confidence at this stage — coverage is the goal, and the orchestrator's downstream triage is the filter, not this lens. The evidence axis (below) never narrows this — it governs the SEVERITY a `read`-only finding may carry, never whether a finding is reported. Each finding carries its own `confidence: high | medium | low` alongside `severity`, so the orchestrator can rank.
-- In `code-audit` mode (the one merged into the Review Receipt's `lenses.security`), every finding also carries `evidence: executed | read` (`executed` = a command, mutation probe, scenario, or measurement against real data demonstrated the defect; `read` = the finding rests on code reading alone) and an optional `trigger: "<one line>"` naming the concrete input/command/state that reaches the cited line and produces the defect. A `read` finding with no named `trigger` is emitted at MINOR as maximum. The evidence cap applies at emission, before any downstream verdict computation: the confidence rule applies unchanged to the severity actually emitted — low confidence never downgrades an emitted severity. Consequently a CRITICAL or MAJOR with `evidence: read` always carries a `trigger`. `evidence`/`trigger` are N/A in `threat-model` mode — those findings route through `security_requirements`, never into the Review Receipt or the commit gate.
-- Severity vocabulary: `CRITICAL` / `MAJOR` / `MINOR` — the Review Receipt's vocabulary (`_shared/result-envelope.md` → Review Receipt); every finding this skill emits uses this vocabulary exclusively.
-- The nine security touchpoint slugs (verbatim, `auth/authz` with slash; the other 8 with dashes): `auth/authz`, `crypto`, `deserialization`, `file-io-uploads`, `network-ssrf`, `db-direct-input`, `new-dependencies`, `env-secrets`, `regex-external-input`.
-- No independent commit-blocking verdict: this skill returns `security_lens: {status: pass | findings, findings: []}` for the orchestrator to fold into the Review Receipt. `review-clear` / `review-blocked` is `organic-reviewer`'s vocabulary alone — this skill never emits it. Base envelope `status` is `warning` when ≥ 1 CRITICAL finding exists, `ok` otherwise.
-- `security_requirements:` is populated only in `threat-model` mode; `code-audit` always returns `security_requirements: []`.
-- Receipt dogfooding, every `code-audit` pass without exception (full, second pass, delta): the report is written THROUGH the same validator the orchestrator's Citation audit runs (`python3 skills/_shared/scripts/check-receipt.py receipt {report_destination} .`), and it carries a `## Receipt Self-Validation` section recording the command, exit code, and any VIOLATION fixed before return. A violation it surfaces is evidence the mechanism works, not a formality — symmetric to `organic-reviewer`'s rule (G4 retro F5: only one lens self-validated).
-- One report, one block: the security fragment lives in the report's own single fenced ```json block, and every other JSON excerpt anywhere in that report is fenced as ```text or indented, never as ```json — a second block makes the whole report a structural VIOLATION the validator rejects at exit 1. -- because the gate reads the file's one block, so a quoted excerpt in a finding would silently compete with the fragment for it.
-- Fragile invariants get an owner: when threat-modeling identifies an invariant the change depends on that holds only best-effort ("safe today because a cleanup happens to run"), emit a `security_requirements:` entry (MUST or SHOULD) so a follow-up Task Brief implements a structural guard, or the user explicitly accepts the risk. -- because a note without an owner travels session-to-session until it dies unimplemented.
-- Read-only auditor: MUST NOT run state-changing git commands (commit, add, push, reset, stash, rm). No `decisions[]` entry — none exists on this route; a user-accepted override is recorded by the orchestrator, not by this skill.
+- Writes only the report at the injected `report_destination` (a FILE path ending in `.md`).
+- Every finding cites `file:line` (Rule 1); in threat-model mode a requirement cites the design line or surface it protects. Uncited candidates are dropped and named in `risks`.
+- Report every finding, uncertain or minor included, each with `confidence` and `severity`; in code-audit also `evidence: executed | read` and a `trigger` when `read` and MAJOR/CRITICAL (else MINOR at most). Low confidence never lowers a severity.
+- Code-audit: a `## Seguridad` measure not implemented is a CRITICAL finding (`read`, trigger = the measure text); a measure implemented differently from what the design decided is a MAJOR. -- because the threat-model's measures entered the design as decisions the user approved.
+- Threat-model: a fragile invariant ("safe today because a cleanup happens to run") becomes a MUST/SHOULD requirement so the design owns a structural guard, or the user accepts the risk explicitly.
+- The nine touchpoint slugs (verbatim): `auth/authz`, `crypto`, `deserialization`, `file-io-uploads`, `network-ssrf`, `db-direct-input`, `new-dependencies`, `env-secrets`, `regex-external-input`.
+- No commit-blocking verdict of its own: the fragment carries no `verdict`; the machine derives blocked from any CRITICAL in `lenses.security` at commit-check.
+- Receipt self-validation in code-audit, every pass: `skills/_shared/scripts/ai-team receipt check {report_destination} .`; fix every VIOLATION; record command, exit code and fixes in `## Receipt Self-Validation`.
+- One report, one block (code-audit): every other JSON excerpt is fenced ```text. Threat-model writes no json block at all.
+- Read-only auditor: no state-changing git commands.
 
 ## Decision Gates
 
 | Condition | Action |
 |---|---|
-| `mode` missing or not one of `threat-model` / `code-audit` | `status: blocked` with "Invalid mode: '{value}'. Expected threat-model or code-audit." |
-| `mode: code-audit` AND `group_files` missing | `status: blocked`, names the missing field. |
-| `mode: code-audit` AND `group_files` empty or none exist on disk | `status: ok`, `security_lens.status: pass`, note "no candidate changes to audit". See `references/edge-cases.md`. |
-| `mode: threat-model` AND `scope_description` missing | `status: blocked`. |
-| `security_touchpoints` absent/empty (threat-model) | Infer touchpoints from `scope_description` text via the nine-slug heuristics. STILL run the Temporal Invariant Sweep + Seam & Failure Sweep (transversal, unconditional). |
-| Finding identified (any confidence, any severity) | Record it, with its own `confidence` and `severity` — never filter for importance or confidence at this stage. In `code-audit` mode, also tag `evidence: executed \| read`. |
-| `code-audit` mode: a finding is `evidence: read` with no named `trigger`, and would otherwise be MAJOR or CRITICAL | Emit it at `severity: MINOR` instead (the evidence cap applies at emission) — still recorded in full, per the coverage rule above. |
-| ≥ 1 CRITICAL finding, at ANY confidence level | `security_lens.status: findings`, base `status: warning`. Low confidence never exempts a CRITICAL finding from this row. |
-| 0 CRITICAL findings, ≥ 1 MAJOR/MINOR | `security_lens.status: findings`, base `status: ok`. |
-| 0 findings at all | `security_lens.status: pass`, base `status: ok`. |
+| `mode` missing or not `threat-model` / `code-audit` | `status: blocked`, "Invalid mode: '{value}'." |
+| `mode: threat-model` AND `design` absent or unreadable | `status: blocked`, cite the path. |
+| `mode: threat-model` AND the design's `security` frontmatter is not `pending` | `status: warning`, still run; note it in `risks` (the orchestrator decides). |
+| `mode: code-audit` AND `group_files` or `phase_file` missing | `status: blocked`, name the field. |
+| `mode: code-audit` AND `group_files` empty or none exist | `status: ok`, `lenses.security.status: pass`, "no candidate changes to audit". |
+| `report_destination` absent | `status: blocked` — the report is the product. |
+| `security_touchpoints` absent (threat-model) | infer from the design text via the nine slugs; the Temporal Invariant Sweep and the Seam & Failure Sweep run regardless. |
+| ≥ 1 CRITICAL, any confidence | `lenses.security.status: findings`, base `status: warning`. |
+| 0 CRITICAL, ≥ 1 MAJOR/MINOR | `status: findings`, base `ok`. |
+| 0 findings | `status: pass`, base `ok`. |
 
 ## Execution Steps
 
 ### Mode threat-model
 
-1. Read `_shared/context-protocol.md` (startup), `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes only when `report_destination` is injected). Validate injected context: `mode`, `project_root`, `scope_description`, `security_touchpoints` (optional), and `report_destination` (always injected for review-plane passes per Critical Context Forwarding — treat absence as degradation: report `context_resolution: fallback` and flag it in `risks`). Report `context_resolution`.
-2. For each slug in `security_touchpoints` (injected, or inferred from `scope_description` text per the nine-slug heuristics), identify the passage in `scope_description` that triggered it.
-3. Walk each triggered touchpoint, applying the five audit-prompt categories (see [references/worked-examples.md](references/worked-examples.md)): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure. Read codebase files to ground findings in specific locations.
-4. Run the Temporal Invariant Sweep (always, transversal): detect temporal fields referenced in `scope_description` and any schema files it points to; identify the rejection semantic per field; enumerate every read path; verify enforcement; emit a finding when a read path consumes the field for an auth/access/state decision without the matching check.
-5. Run the Seam & Failure Sweep (always, transversal): failure-mode per call-site, interleaving per mutated field, crash-window per multi-store sequence — mechanics in [references/worked-examples.md](references/worked-examples.md).
-6. When `report_destination` is injected, write the report AT that path (it is a FILE path ending in `.md`, e.g. `.ai-team/reviews/YYYY-MM-DD-<slug>-threat-model.md` — never a directory to write a fixed filename into; create its parent directory if absent) per [references/threat-model-template.md](references/threat-model-template.md). Include: summary, touchpoints triggered, per-touchpoint findings, both sweeps (always present), `security_requirements:`. This mode writes no receipt block — `threat-model` findings carry no `verdict`/`lenses.correctness` and never feed the Review Receipt (Hard Rules); the report includes a one-line "no receipt block in this mode" note instead, and carries no fenced JSON block at all.
-7. Return the envelope per Output Contract.
+1. Read `_shared/context-protocol.md`, `_shared/persistence-contract.md`. Validate `mode`, `project_root`, `design`, `report_destination`, optional `security_touchpoints`.
+2. Read the design: `## Objetivo`, `### Superficies nombradas`, `### Condiciones externas a conservar`, `## Decisiones`, `## Fases`. For each surface, read the file at the cited line and its 1-hop callers.
+3. For each triggered touchpoint apply the five categories (input validation / auth+authz / crypto+secrets / injection+RCE / data exposure — [references/worked-examples.md](references/worked-examples.md)).
+4. Temporal Invariant Sweep: temporal fields the design or its schemas name; rejection semantic per field; every read path; a read path deciding auth/access/state without the check is a finding.
+5. Seam & Failure Sweep: failure mode per call site, interleaving per mutated field, crash window per multi-store sequence.
+6. Write the report at `report_destination` per [references/threat-model-template.md](references/threat-model-template.md): summary, touchpoints, findings, both sweeps, and `## Security requirements` — one MUST/SHOULD line each, phrased as an invariant the design can adopt verbatim, with the surface it protects. No json block; a one-line "no receipt block in this mode".
+7. Return the envelope.
 
 ### Mode code-audit
 
-1. Read `_shared/context-protocol.md`, `_shared/persistence-contract.md`. Validate injected context: `mode`, `project_root`, `group_files`, and `report_destination` (always injected for review-plane passes per Critical Context Forwarding — absence is degradation: report `context_resolution: fallback` and flag it in `risks`). Report `context_resolution`.
-2. Resolve each `group_files` path relative to `project_root`; read each in full, plus up to 10 1-hop callers. Scope any git inspection (e.g. `git status`) with `-C {project_root}`.
-3. Read `config.yaml` from `project_root`. If `test_commands.security:` exists, run it and capture output; if absent, log "Dependency auditor: not configured (skipped)".
-4. Apply the five audit-prompt categories scoped to `group_files` (see [references/worked-examples.md](references/worked-examples.md)): input validation / auth+authz / crypto+secrets / injection+RCE / data exposure. Tag each finding with its own `confidence: high | medium | low`, `severity`, and `evidence: executed | read` (with a named `trigger` when `evidence: read` and severity would otherwise be MAJOR or CRITICAL — the evidence cap then applies before any downstream verdict computation, per Hard Rules).
-5. Enforcement wiring check: for every guard the candidate introduces (lint rule, CI step, test gate, pre-commit hook, middleware, validation), verify its executor (workflow step, script entry, registration, route binding) ships in the same candidate. A guard with no executor is a finding (`category: enforcement-wiring`; MAJOR by default, CRITICAL when it is the only control for a CRITICAL threat).
-6. When `report_destination` is injected, write the report AT that path (it is a FILE path ending in `.md` — never a directory to write a fixed filename into; create its parent directory if absent) per [references/audit-report-template.md](references/audit-report-template.md). All 6 category sections present ("No findings" if clean), plus the `## Receipt Self-Validation` section (Hard Rules). That one file ends with a `## Receipt` heading followed by a single fenced ```json block carrying `{ kind: "security-fragment", tier, tier_reason, lenses: { security: security_lens } }`: the fragment shape of the Review Receipt this lens contributes (the `kind` field is what lets `check-receipt.py` accept this shape without `lenses.correctness`/`verdict` — their absence is never itself the discriminator; no `verdict` field at all, since only `organic-reviewer` computes that field — the orchestrator merges this fragment into the full receipt). Nothing is written beside the report. Self-check it: `python3 skills/_shared/scripts/check-receipt.py receipt {report_destination} .`; fix the block and re-run on any printed `VIOLATION` line before returning.
-7. Return the envelope per Output Contract.
+1. Read the protocols. Validate `mode`, `project_root`, `design`, `phase_file`, `group_files`, `tier`, `tier_reason`, `report_destination`.
+2. Read the design's `## Seguridad` (the measures) and the phase file; resolve and read every `group_files` file in full plus up to 10 1-hop callers; `git -C {project_root}` for any inspection.
+3. Read `config.yaml`; run `test_commands.security` if declared, else note "not configured (skipped)".
+4. Measures first: for each `## Seguridad` bullet, find its implementation in the candidate (`file:line`) or record the CRITICAL/MAJOR finding the Hard Rules prescribe.
+5. The five categories on `group_files`; the enforcement-wiring check (every new guard ships its executor).
+6. Write the report per [references/audit-report-template.md](references/audit-report-template.md): the six category sections, `## Security measures` (implemented / missing), `## Receipt Self-Validation`, and `## Receipt` with the single ```json block `{ "kind": "security-fragment", "tier", "tier_reason", "lenses": { "security": { "status", "findings" } } }`. Self-check with `skills/_shared/scripts/ai-team receipt check {report_destination} .` until exit 0.
+7. Return the envelope.
 
 ## Output Contract
-
-Writes ONE report AT the injected `report_destination` — a FILE path ending in `.md`, resolved
-relative to `project_root` — mandatory from the orchestrator's side for every review-plane
-delegation (`orchestrator-protocol.md` → Critical Context Forwarding); optional only from this
-skill's own write step, i.e. it writes nothing when no destination is injected. In `code-audit`
-mode that report's final fenced ```json block carries the Review Receipt security-lens fragment
-`{ kind: "security-fragment", tier, tier_reason, lenses: { security } }`; `threat-model` mode
-writes no receipt block (Execution Steps). No fixed filename, no separate `.ai-team/` artifact,
-no second file beside the report. Returns:
 
 ```yaml
 status: ok | warning | blocked
 executive_summary: "..."
 mode: threat-model | code-audit
-artifacts: []                    # only when report_destination was written this run — the one report file (code-audit: receipt block included; threat-model: none)
-security_lens:                   # shaped for direct Review Receipt lenses.security merge
+artifacts: [{ name: "report", path: "<report_destination>" }]
+security_lens:                   # code-audit: the same object the report's block carries under lenses.security
   status: pass | findings
-  findings:                      # CAP 20 entries — on overflow keep the highest severity-then-confidence entries and note the omitted count in risks ("findings omitted at cap: N")
-    - { id: "F-1", severity: CRITICAL | MAJOR | MINOR, confidence: high | medium | low, evidence: executed | read, trigger: "<one line — optional; REQUIRED when severity is MAJOR or CRITICAL and evidence is read>", file: "<path>", line: <int>, claim: "<one line>" }
-    # `evidence` and `trigger` are code-audit-mode fields only (Hard Rules); a threat-model-mode finding omits both — they are N/A there, never emitted as `read`
-security_requirements: []        # threat-model only; [] for code-audit
+  findings_count: { CRITICAL: 0, MAJOR: 0, MINOR: 0 }
+security_requirements: []        # threat-model only — [{ level: MUST | SHOULD, text: "<invariant>", protects: "<surface, file:line>" }]
 next_recommended: []
 risks: []
 model_used: "sonnet"
@@ -99,13 +87,11 @@ context_resolution: self-loaded | fallback | none
 
 ## References
 
-- [references/threat-model-template.md](references/threat-model-template.md) — threat-model.md output template and per-finding structure; load in threat-model mode when `report_destination` is injected.
-- [references/audit-report-template.md](references/audit-report-template.md) — audit-report.md output template and enforcement-wiring category; load in code-audit mode when `report_destination` is injected.
-- [references/worked-examples.md](references/worked-examples.md) — temporal-sweep retrospective + the five audit-prompt categories full detail; load at the audit-prompt step in either mode.
-- [references/envelope-examples.md](references/envelope-examples.md) — envelope variants for both modes (ok/warning/blocked); load when composing the result.
-- [references/edge-cases.md](references/edge-cases.md) — no touchpoints, all findings low-confidence, empty group_files, invalid mode, re-audit; load when an unexpected condition arises.
-- `../_shared/context-protocol.md` — startup sequence; load first.
-- `../_shared/persistence-contract.md` — write rules (loaded per common-rules Principle 5; this skill writes only when `report_destination` is injected).
-- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
-- `../_shared/result-envelope.md` — Review Receipt schema (`lenses.security` shape); load when composing `security_lens`.
-- `../_shared/evidence-protocol.md` — Rule 1 (file:line citation mandatory for every finding).
+- [references/threat-model-template.md](references/threat-model-template.md) — threat-model report template; load at threat-model Step 6.
+- [references/audit-report-template.md](references/audit-report-template.md) — audit report template and the enforcement-wiring category; load at code-audit Step 6.
+- [references/worked-examples.md](references/worked-examples.md) — temporal sweep retrospective and the five categories in full.
+- [references/envelope-examples.md](references/envelope-examples.md) — envelopes for both modes.
+- [references/edge-cases.md](references/edge-cases.md) — no touchpoints, all low-confidence, empty group_files, invalid mode, re-audit.
+- `../_shared/result-envelope.md` — Review Receipt schema (`lenses.security` shape, `kind: security-fragment`).
+- `../_shared/machine.md` — how the machine consumes the fragment at settle and commit-check.
+- `../_shared/context-protocol.md`, `../_shared/persistence-contract.md`, `../_shared/common-rules.md`, `../_shared/evidence-protocol.md` (Rule 1).

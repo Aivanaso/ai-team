@@ -9,7 +9,7 @@ Review Receipt security-lens fragment this mode contributes; the top-level `kind
 REQUIRED (it is the only discriminator the validator accepts — a fragment without it is
 rejected as a truncated full receipt) (`_shared/result-envelope.md` → Review
 Receipt). That block, never the prose around it, is what the orchestrator's Citation audit
-validates (`_shared/scripts/check-receipt.py`), and nothing is written beside the report.
+validates (`ai-team receipt check`), and nothing is written beside the report.
 `threat-model` mode writes no receipt block (SKILL.md, Execution Steps, threat-model Step 6).
 
 **Exactly one ```json block per report.** A second one anywhere in the file — a JSON excerpt
@@ -62,7 +62,7 @@ Files audited: {group_files}
 
 | Command | Exit Code | Violations fixed before return |
 |---------|-----------|--------------------------------|
-| python3 skills/_shared/scripts/check-receipt.py receipt {report_destination} . | {int} | none / {one line per VIOLATION fixed} |
+| skills/_shared/scripts/ai-team receipt check {report_destination} . | {int} | none / {one line per VIOLATION fixed} |
 
 ## Receipt
 
@@ -116,11 +116,11 @@ Each finding MUST include all twelve fields:
 | `trigger` | One line naming the concrete input/command/state that reaches the cited line and produces the defect. Optional in general; REQUIRED when `severity` is MAJOR or CRITICAL and `evidence` is `read` — a `read` finding with no `trigger` is emitted at MINOR as maximum (see SKILL.md Hard Rules) |
 | `description` | 1-3 sentences: what the issue is. A code or data excerpt here is fenced as ```text or indented — never as ```json, which would add a second block and fail the report's own gate |
 | `exploit_scenario` | One paragraph: how an attacker would use this — a payload shown here follows the same fencing rule |
-| `recommendation` | One paragraph or fix sketch — an unverified hypothesis: the lens verified the defect, not this fix; the orchestrator re-derives the edge case before acting on it (`orchestrator-protocol.md` → Recommendation ingestion) |
+| `recommendation` | One paragraph or fix sketch — an unverified hypothesis: the lens verified the defect, not this fix; the orchestrator re-derives the edge case before acting on it (`_shared/cards/review.md`: name the case, never paste the patch) |
 | `confidence_rationale` | One sentence: why this confidence level |
 
 ## Scope Semantics
 
 `group_files` is resolved relative to the injected `project_root` — this route audits a
 declared file set, never a branch diff. There is no `base_branch`/`change_branch` concept on
-this route; scope is exactly the Task Brief's candidate files.
+this route; scope is exactly the phase's candidate files (`group_files`).

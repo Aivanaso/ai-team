@@ -5,7 +5,6 @@ so the checks are proven able to fail before their green counts (evidence-protoc
 
 import os
 import shutil
-import subprocess
 import tempfile
 import unittest
 
@@ -153,12 +152,6 @@ class Generated(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(len(violations(out)), 1)
         self.assertIn("never closed", out)
-
-    def test_check_receipt_shim_forwards(self):
-        shim = os.path.join(REPO_ROOT, "domain", "skills", "_shared", "scripts", "check-receipt.py")
-        good = fixture("receipt-good")
-        self.assertEqual(subprocess.run(["python3", shim, "receipt", good, REPO_ROOT], capture_output=True).returncode, 0)
-        self.assertEqual(subprocess.run(["python3", shim, "ledger", good], capture_output=True).returncode, 2)
 
 
 if __name__ == "__main__":

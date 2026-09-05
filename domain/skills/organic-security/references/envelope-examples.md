@@ -24,7 +24,7 @@ context_resolution: self-loaded
 
 ```yaml
 status: ok
-executive_summary: "Threat model complete. 2 MINOR findings (no CRITICAL), one at low confidence. Recommend folding security_requirements into the next Task Brief."
+executive_summary: "Threat model complete. 2 MINOR findings (no CRITICAL), one at low confidence. The orchestrator copies security_requirements into the design's ## Seguridad before approval."
 mode: threat-model
 artifacts: []
 security_lens:

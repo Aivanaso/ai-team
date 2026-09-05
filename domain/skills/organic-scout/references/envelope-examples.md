@@ -1,113 +1,124 @@
 # Envelope Examples — organic-scout
 
-Result envelopes for each mode. Return the appropriate variant.
-
 ## Bootstrap — success
 
 ```yaml
 status: ok
-executive_summary: "Detected TypeScript/NestJS monorepo (pnpm, DDD architecture). Generated config.yaml with 2 bounded contexts (orders, customers) and cqrs+repository-pattern."
+executive_summary: "Bootstrapped project config. Detected <language> + <framework> + <test runner>, package manager <name>. Wrote config.yaml with commit_strategy: auto."
+mode: bootstrap
 artifacts:
   - { name: "config", path: ".ai-team/config.yaml" }
 next_recommended: []
-model_used: "sonnet"
-context_resolution: "none"
-```
-
-## Bootstrap — ambiguous stack
-
-```yaml
-status: ok
-executive_summary: "Generated config.yaml. Stack partially detected: TypeScript confirmed, no framework markers found. Defaulted architecture to 'unknown'. Review and adjust config.yaml before delegating."
-artifacts:
-  - { name: "config", path: ".ai-team/config.yaml" }
 risks:
-  - "Architecture style defaulted to 'unknown' — no recognizable directory pattern found. Review bounded_contexts before the next Task Brief."
-next_recommended: []
+  - "Architecture style defaulted to 'unknown' — no recognizable directory pattern found. Review bounded_contexts before the first design."
 model_used: "sonnet"
 context_resolution: "none"
 ```
 
-## Discover — success (pre-brief pass)
+## Bootstrap — blocked (config exists)
+
+```yaml
+status: blocked
+executive_summary: "config.yaml already exists at .ai-team/config.yaml; bootstrap never overwrites it."
+mode: bootstrap
+artifacts: []
+next_recommended: []
+risks: []
+model_used: "sonnet"
+context_resolution: "none"
+```
+
+## Map — success
 
 ```yaml
 status: ok
-executive_summary: "Discovery pass for 'billing export'. Found 8 relevant files. Existing ExportService pattern to follow; two open questions on retention policy."
-artifacts: []
+executive_summary: "Mapped 'billing export': the flow lives in ExportController → ExportService → InvoiceRepository; the closest analogue is the CSV report export; two documented gotchas and one external condition found."
+mode: map
+artifacts:
+  - { name: "map report", path: ".ai-team/explorations/2026-09-05-billing-export-map.md" }
 discovery_report:
   key_files:
-    - { path: "src/billing/services/InvoiceService.ts", role: "closest existing analogue — same export-then-notify flow", evidence: "src/billing/services/InvoiceService.ts:40" }
-    - { path: "src/billing/repositories/InvoiceRepository.ts", role: "repository pattern to follow for the new export query", evidence: "src/billing/repositories/InvoiceRepository.ts:12" }
+    - { path: "src/Billing/ExportController.php", role: "entry point", evidence: "src/Billing/ExportController.php:24" }
+    - { path: "src/Billing/ExportService.php", role: "assembles rows", evidence: "src/Billing/ExportService.php:41" }
+    - { path: "src/Report/CsvReportExporter.php", role: "analogue to follow", evidence: "src/Report/CsvReportExporter.php:18" }
   patterns:
-    - "Repository pattern: interface in domain/, implementation in infrastructure/ (src/billing/repositories/InvoiceRepository.ts:1)"
-  risks:
-    - "No existing retention policy for generated exports — needs a decision before the Task Brief sets out_of_scope"
+    - "exporters stream rows through a generator (src/Report/CsvReportExporter.php:30)"
+  documented_gotchas:
+    - "InvoiceRepository::forPeriod() loads eagerly; docblock warns above 10k rows (src/Billing/InvoiceRepository.php:57)"
+  external_conditions:
+    - "the legacy cron only exports invoices with status = paid (crontab.d/billing:3 → bin/legacy-export.sh:12)"
+  risks: []
   open_questions:
-    - "Should the export include soft-deleted invoices? No existing caller answers this (searched InvoiceService, InvoiceRepository)."
+    - "No retention policy for generated exports exists — a decision for the design's ## Fuera de alcance or ## Decisiones"
 next_recommended: []
+risks: []
 model_used: "sonnet"
 context_resolution: "self-loaded"
 ```
 
-## Discover — success, scope_proposal requested
+## Scope — success
 
 ```yaml
 status: ok
-executive_summary: "Discovery pass for 'billing export' with scope_proposal requested. Chain closes to ExportService, InvoiceRepository, and the repository's existing test double."
-artifacts: []
+executive_summary: "Scoped the approved design's 2 phases: 4 files with evidence, 3 checks verified runnable and able to fail, 2 anchored constraint candidates; the report ends with the scope-report json block."
+mode: scope
+artifacts:
+  - { name: "scope report", path: ".ai-team/explorations/2026-09-05-billing-export-scope.md" }
 discovery_report:
   key_files:
-    - { path: "src/billing/services/InvoiceService.ts", role: "closest existing analogue — same export-then-notify flow", evidence: "src/billing/services/InvoiceService.ts:40" }
-    - { path: "src/billing/repositories/InvoiceRepository.ts", role: "repository pattern to follow for the new export query", evidence: "src/billing/repositories/InvoiceRepository.ts:12" }
-  patterns:
-    - "Repository pattern: interface in domain/, implementation in infrastructure/ (src/billing/repositories/InvoiceRepository.ts:1)"
-  risks:
-    - "No existing retention policy for generated exports — needs a decision before the Task Brief sets out_of_scope"
-  open_questions:
-    - "Should the export include soft-deleted invoices? No existing caller answers this (searched InvoiceService, InvoiceRepository)."
-  scope_proposal:
-    expected_files:
-      - { action: CREATE, path: "src/billing/services/ExportService.ts", evidence: "src/billing/services/InvoiceService.ts:40 — export-then-notify flow to replicate" }
-      - { action: MODIFY, path: "src/billing/repositories/InvoiceRepository.ts", evidence: "src/billing/repositories/InvoiceRepository.ts:12 — new export query needs a method added here" }
-      - { action: CREATE, path: "tests/billing/services/ExportService.test.ts", evidence: "tests/billing/services/InvoiceService.test.ts:1 — sibling test file for the existing analogue" }
-      - { action: MODIFY, path: "tests/Double/billing/InvoiceRepositoryStub.ts", evidence: "tests/Double/billing/InvoiceRepositoryStub.ts:8 — object-literal stub builds InvoiceRepository and needs the new method added" }
-    construction_sites_swept: true
-    acceptance_checks:
-      - { command: "npm test -- tests/billing/services/ExportService.test.ts", verified: "target exists at package.json:14 (\"test\": \"vitest run\")", expect: "exit 0" }
-      - { command: "npm run typecheck", verified: "executed read-only, exit 0 on current tree", expect: "exit 0" }
-    public_contracts:
-      - "ExportService.export(invoiceIds: string[]): Promise<ExportResult> — new public method (does not exist yet, modeled on InvoiceService.ts:40)"
-      - "InvoiceRepository.findForExport(ids: string[]): Promise<Invoice[]> — new interface member, src/billing/repositories/InvoiceRepository.ts:12"
-    constraints_candidates:
-      - "InvoiceService never returns partial results on a failed batch item — it fails the whole export instead (src/billing/services/InvoiceService.ts:55)"
-      - "InvoiceRepository.findByIds silently drops ids beyond the 500-parameter query limit — callers chunk first (src/billing/repositories/InvoiceRepository.ts:20)"
-    file_dossier:
-      - { path: "src/billing/repositories/InvoiceRepository.ts", documented_gotchas: ["docblock at src/billing/repositories/InvoiceRepository.ts:20 — findByIds silently drops ids beyond the 500-parameter query limit; callers chunk first"], external_conditions: [], constructor_deps: { count: 2, cap: "4-5 (CLAUDE.md:41 'Max 4-5 constructor dependencies')" } }
-      - { path: "tests/Double/billing/InvoiceRepositoryStub.ts", documented_gotchas: [], external_conditions: [] }
-    open_scope_questions:
-      - "Retention policy for generated exports has no existing caller — cannot cite evidence for a cleanup job path."
-    plan_proposal:
-      - { title: "Repository can find invoices for export", behavior: "InvoiceRepository exposes findForExport(ids) and its test double builds it", demonstrating_check: { command: "npm run typecheck", verified: "executed read-only, exit 0 on the current tree; goes red the moment InvoiceRepository gains findForExport until tests/Double/billing/InvoiceRepositoryStub.ts:8 implements it — this slice's red", expect: "exit 0" }, contract_left: "InvoiceRepository.findForExport(ids: string[]): Promise<Invoice[]> — src/billing/repositories/InvoiceRepository.ts:12", decisions_candidates: [], files: ["src/billing/repositories/InvoiceRepository.ts", "tests/Double/billing/InvoiceRepositoryStub.ts"] }
-      - { title: "ExportService exports a batch of invoices", behavior: "ExportService.export(invoiceIds) returns an ExportResult using the repository query from slice 1", demonstrating_check: { command: "npm test -- tests/billing/services/ExportService.test.ts", verified: "fails today because src/billing/services/ExportService.ts does not exist yet — a CREATE slice's red (target exists at package.json:14)", expect: "exit 0" }, contract_left: "ExportService.export(invoiceIds: string[]): Promise<ExportResult> — created by this brief: src/billing/services/ExportService.ts", decisions_candidates: ["a failed batch item fails the whole export, never partial results (src/billing/services/InvoiceService.ts:55)"], files: ["src/billing/services/ExportService.ts", "tests/billing/services/ExportService.test.ts"] }
-next_recommended: []
-model_used: "sonnet"
-context_resolution: "self-loaded"
-```
-
-## Discover — topic not found
-
-```yaml
-status: ok
-executive_summary: "Discovery pass for 'payment webhooks'. No files matching the topic found in the source tree. Either the feature does not exist yet or is implemented under a different name."
-artifacts: []
-discovery_report:
-  key_files: []
+    - { path: "src/Billing/ExportService.php", role: "phase 1 MODIFY", evidence: "src/Billing/ExportService.php:41" }
+    - { path: "src/Billing/Export/RowBuilder.php", role: "phase 1 CREATE — insertion site", evidence: "src/Billing/ExportService.php:44 will call it" }
   patterns: []
-  risks:
-    - "Zero matches (searched: webhook, stripe, payment). Feature likely does not exist yet."
+  risks: []
   open_questions:
-    - "Confirm with the user whether this is greenfield or a naming mismatch before writing the Task Brief."
+    - "phase 2's check `composer phpcs` covers src/Billing/ (phpcs.xml:14) — verified; no runner covers bin/ scripts"
+scope_phases: 2
 next_recommended: []
+risks: []
+model_used: "sonnet"
+context_resolution: "self-loaded"
+```
+
+The report's final block, for the same pass (fenced as ```json in the report itself):
+
+```text
+{"kind": "scope-report", "phases": [
+  {"n": 1, "expected_files": [
+     {"action": "MODIFY", "path": "src/Billing/ExportService.php", "evidence": "src/Billing/ExportService.php:41"},
+     {"action": "CREATE", "path": "src/Billing/Export/RowBuilder.php", "evidence": "src/Billing/ExportService.php:44 (insertion site)"}],
+   "acceptance_checks": [{"command": "vendor/bin/phpunit tests/Billing/ExportServiceTest.php", "verified": "executed read-only: 4 tests; deleting the new assertion makes it fail", "expect": "exit 0"}],
+   "constraints_candidates": ["exports include only status = paid invoices — bin/legacy-export.sh:12"],
+   "open_questions": []},
+  {"n": 2, "expected_files": [{"action": "MODIFY", "path": "src/Billing/ExportController.php", "evidence": "src/Billing/ExportController.php:24"}],
+   "acceptance_checks": [{"command": "composer phpcs", "verified": "phpcs.xml:14 covers src/Billing/", "expect": "exit 0"}],
+   "constraints_candidates": [], "open_questions": []}
+]}
+```
+
+## Scope — blocked (design not approved)
+
+```yaml
+status: blocked
+executive_summary: "The injected design .ai-team/designs/2026-09-05-billing-export.md has status: draft; scope runs against an approved design only."
+mode: scope
+artifacts: []
+next_recommended: ["approve the design (`ai-team design approve`) then relaunch the scope pass"]
+risks: []
+model_used: "sonnet"
+context_resolution: "self-loaded"
+```
+
+## Map — needs_input (topic matches zero files)
+
+```yaml
+status: needs_input
+executive_summary: "Topic 'loyalty points' matches no file, directory or symbol in the project."
+mode: map
+artifacts: []
+questions:
+  - "Is this greenfield (no analogue to map) or a naming mismatch? Name a file or symbol if the latter."
+next_recommended: []
+risks: []
 model_used: "sonnet"
 context_resolution: "self-loaded"
 ```

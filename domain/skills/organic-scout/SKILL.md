@@ -1,116 +1,98 @@
 ---
 name: organic-scout
-description: "Trigger: orchestrator launches scout for bootstrap (no config.yaml), pre-brief discovery, or on-demand inspection."
+description: "Trigger: orchestrator launches scout to bootstrap config.yaml, to map a zone before a design exists (mode map), or to scope an approved design phase by phase (mode scope)."
 disable-model-invocation: true
 user-invocable: false
 ---
 
 ## Activation Contract
 
-Run when the orchestrator launches scout at the start of a new project (no `config.yaml`
-yet), before every Medium or Large Task Brief — and before a Small one naming a file the
-orchestrator's Brief File does not record as read this session — or on demand for
-open-ended project inspection. Two modes: **bootstrap**
-detects the project stack and generates `config.yaml`; **discover** investigates a topic or
-objective and returns a discovery report — key files, structure, existing patterns to
-follow, and risks, grounded in read evidence with `file:line` citations. Never write
-application code. Never modify existing source files. Writes only `config.yaml` (bootstrap
-mode) and its own report at an injected `report_destination` (discover mode) — never
-`design.md`, and never under `.ai-team/briefs/` (Brief Files are orchestrator-authored only).
+Run when the orchestrator launches scout in one of three modes. **bootstrap**: no
+`.ai-team/config.yaml` yet — detect the stack and write it. **map** (before the design, ticket
+`scout-map`): a narrow topic; return where the flow lives, the existing analogue, the gotchas
+already written down, the external conditions the logic being replaced gates on, and the open
+questions — every claim `file:line`; never a scope proposal, never a plan. **scope** (after the
+design is approved, ticket `scout-scope`): for every phase of the injected design, the files,
+the checks, the anchored constraint candidates and the open questions, ending with the json
+block the machine turns into the plan (`_shared/machine.md` → "Scope report"). The scout
+verifies, never composes: a path without evidence is a guess, and a guess goes to
+`open_questions`. Never write application code; never modify existing source files. Writes
+only `config.yaml` (bootstrap) and its own report at the injected `report_destination`.
 
 ## Hard Rules
 
 - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Bootstrap: preserve existing `config.yaml` — return `status: blocked` if it already exists (user customizations accumulated across prior sessions must not be lost). -- because overwriting destroys user customizations (test runner paths, language versions, project conventions) accumulated over time.
-- Bootstrap writes a `commit_strategy: auto` field at the root of generated `config.yaml`. Existing configs without the field are valid (backward-compatible default).
-- Config evolution for existing projects is owned exclusively by the orchestrator's Config Refresh Check; scout writes `config.yaml` only on first bootstrap. -- because a single additive owner keeps user customizations safe — two writers of the same file with different merge semantics would race.
-- Discover: ground every codebase claim in read evidence with a `file:line` citation (Evidence Protocol Rule 1); an unfamiliar pattern or absent evidence is surfaced as an open question, never guessed.
-- Discover: name actual files, classes, interfaces, and directories. Abstract descriptions ("a service", "some module") are not accepted. -- because abstract descriptions force the Task Brief author to make decisions scout had the evidence to answer.
-- Discover: follow existing project patterns in the report's recommendations — if the project uses a repository pattern, the report names it as the pattern to follow; it does not propose a new paradigm the discovery request did not ask for.
-- Discover: `report_destination` is always injected by the orchestrator for a discovery pass that feeds a Task Brief or otherwise counts as review-plane/scope-authority material (Critical Context Forwarding, `orchestrator-protocol.md`) — write the report there; an absent injection is degradation, not a design choice: report `context_resolution: fallback` and flag the gap in `risks`. An on-demand inspection that feeds no brief may omit the injection — the report then returns in the result envelope only, and the orchestrator folds it directly into whatever it composes next.
-- Discover, scope_proposal: when the orchestrator injects `scope_proposal: true`, every `expected_files` entry in the proposal carries its own `file:line` evidence — a path without evidence is not a proposal, it is a guess.
-- Discover, scope_proposal: every proposed `acceptance_checks.command` is verified runnable BEFORE proposing it — execute it read-only when side-effect-free, otherwise cite the declaring target's existence (e.g. the `targets` block of a `project.json`, a script in `package.json`/`Makefile`) with `file:line`. An unrunnable check protects nothing and burns a delegation round. Runnable is not calibrated: when the check is executed read-only, its `verified:` note also states what a known-negative run of the same command would show (or that no such run was tried) — a check that cannot be shown able to fail is a weaker proposal than one that has been (`_shared/evidence-protocol.md` → Rule 7). A linter or static-analysis command is proposed only when its own configuration scope (a `phpcs.xml` `<file>` entry, an eslint flat-config `files` glob, a `tsconfig` `include`) covers at least one `expected_files` path — cited `file:line`; otherwise it goes to `open_scope_questions` as structurally unable to fail for this candidate. -- because a check whose config never reaches the changed files scans everything and fails on nothing (ECO-856 retro F3: `composer phpcs` scoped to three trees none of the 14 changed files lived in, re-run as a gate on every pass).
-- Discover, scope_proposal: before closing `expected_files`, sweep construction sites of every touched type/interface — grep for object literals, builders, stubs, and factories that build it, not only files that annotate or mention it. A type gaining a required member breaks its constructors first.
-- Discover, scope_proposal: trace the objective's chain to the leaves — if the report's prose describes a data/control flow, every link of that flow appears in `expected_files`, or in `open_scope_questions` with the reason it could not be closed.
-- Discover, scope_proposal: a `constraints_candidates` entry without a `file:line` anchor is not proposed — the same evidence discipline as `expected_files`.
-- Discover, scope_proposal: file_dossier: for every `expected_files` MODIFY/REMOVE path, for every module a CREATE target will source/import, and for a class the at-cap rule below redirects to a CREATE alternative (its entry is kept), `documented_gotchas` lists the failure modes already written down in that file and in the modules it sources/imports — comments, docblocks, README notes — each with `file:line`. -- because a gotcha documented in the module the new code imports is the cheapest constraint there is, and a brief that omits it delegates its rediscovery to review (archive-stale retro F4: `lib/sentry.sh:148-169`, sourced by the script, unread by author and worker alike).
-- Discover, scope_proposal: file_dossier: when the objective replaces or mirrors logic an external or sibling system enforces (a workflow rule, a legacy handler, a cron), `external_conditions` lists every condition that logic gates on, with the citation naming it — the target behavior alone is not the inventory. -- because the condition the replaced logic enforced silently is the one the new code drops (ECO-856 retro F1: `Origen = Venta`).
-- Discover, scope_proposal: file_dossier: for a class the proposal marks MODIFY, `constructor_deps` records its current constructor dependency count against the project's declared cap (CLAUDE.md or `config.yaml` conventions — cited); at or over the cap, the proposal names a CREATE alternative instead of the MODIFY, the dossier entry for that class is KEPT (it is still the site the objective would have touched), and the reading lands in `constraints_candidates` as a constraint ("no new dependency on <class> — at cap N/N, file:line"); under the cap the reading is informational and lands nowhere. -- because a MODIFY entry against a class already at the cap forces the worker into a paused amendment the brief author could have avoided (ECO-856 retro F5: `CrmServiceSyncService` at 5).
-- Discover, scope_proposal: file_dossier feeds `constraints_candidates`: every dossier item that names a condition — each `documented_gotchas` entry, each `external_conditions` entry, a `constructor_deps` reading at or over the cap — becomes a `constraints_candidates` entry or an `open_scope_questions` entry — never a third destination, never left only in the dossier. -- because two homes for the same evidence is how a constraint gets adopted from one and lost from the other.
-- Discover, scope_proposal: plan_proposal: every entry is a vertical slice — it crosses every layer its behavior needs, leaves the application working and committable on its own, and names a demonstrating check; never a layer-by-layer split, never split for size (orchestrator-protocol.md → Plan of briefs). -- because a layer-split slice cannot stand alone, and the whole point of a plan proposal is briefs the orchestrator can commit one at a time.
-- Discover, scope_proposal: plan_proposal, CREATE slices: a file that does not exist yet is evidenced by its INSERTION SITE — the caller, route table, DI/config entry, or import that will reference it — cited file:line in `expected_files.evidence`; the slice's `demonstrating_check` is a named test or command that fails today because that code does not exist, and that failing state IS its calibration (evidence-protocol Rule 7): `verified:` names the missing symbol/route/file. -- because a file that does not exist yet has no body to cite, only a site that will call it — that site is the only evidence a CREATE proposal can offer.
-- Discover, scope_proposal: plan_proposal, no runner: when the repo has nothing runnable (no `.ai-team/config.yaml → test_commands.unit`, and no test/build/CLI target the scout can cite from a manifest with file:line) the FIRST slice is the scaffold — "the application runs and one smoke check passes" — and the missing runner is an `open_scope_questions` entry; when a runner exists in the repo but config does not declare it, the entry names it ("`phpunit` at composer.json:31 — `test_commands.unit` not declared"); the scout never invents a command and never writes config outside bootstrap. -- because a proposal built on an invented runner would look calibrated while testing nothing, and only bootstrap may fix config.
-- Discover, scope_proposal: plan_proposal: every `expected_files` path belongs to at least one slice's `files`, and every `files` path is in `expected_files`; a path that fits no slice is an open question, not a silent orphan. -- because an orphaned expected file is scope the orchestrator would adopt into `## Plan` with no brief ever claiming responsibility for it.
-- Discover, scope_proposal: plan_proposal: `contract_left` and `decisions_candidates` derive from `public_contracts` and `constraints_candidates` — the same evidence discipline; nothing appears in a slice that the report cannot cite. -- because inventing a slice-local contract or decision would duplicate, uncited, what the report already gathered under stricter discipline elsewhere in the same block.
+- Bootstrap: preserve an existing `config.yaml` — `status: blocked` if it exists. -- because overwriting destroys user customizations accumulated over time.
+- Every codebase claim, in every mode, carries a `file:line` citation (`_shared/evidence-protocol.md` Rule 1); absent evidence is an open question, never a guess.
+- Name actual files, classes, interfaces, directories — "a service", "some module" is not accepted. -- because an abstract description makes the design author decide what the scout had the evidence to answer.
+- Map: the topic is narrow and so is the read budget (15 files); a topic that needs more is reported as two topics, not read twice as long. -- because several narrow passes in parallel are cheaper and sharper than one wide pass.
+- Map: `documented_gotchas` lists the failure modes already written down in each touched file and in the modules it sources/imports — comments, docblocks, README notes — each `file:line`. -- because a gotcha documented in the module the new code will import is the cheapest constraint there is (archive-stale retro F4).
+- Map: when the objective replaces or mirrors logic an external or sibling system enforces, `external_conditions` lists every condition that logic gates on, with the citation naming it. -- because the condition the replaced logic enforced silently is the one the new code drops (ECO-856 retro F1).
+- Scope: every `expected_files` entry cites the evidence that puts the file in the chain; a CREATE entry cites its insertion site (the caller, route table, config entry or import that will reference it). -- because a file that does not exist yet has no body to cite, only a site that will call it.
+- Scope: before closing a phase's files, sweep construction sites of every touched type — object literals, builders, stubs, factories that BUILD it, not only files that mention it. -- because a type gaining a required member breaks its constructors first.
+- Scope: every `acceptance_checks.command` is verified runnable BEFORE it is proposed (executed read-only when side-effect-free, else the declaring target cited `file:line`) and its `verified` note says what a known failure of the same command shows; a linter or analyzer is proposed only when its own configuration scope covers a file of the phase. A check that cannot be shown able to fail goes to `open_questions` (`_shared/evidence-protocol.md` Rule 7). -- because a green that cannot go red protects nothing (ECO-856 retro F3).
+- Scope: a `constraints_candidates` entry carries a `file:line` anchor or it is not proposed; it is a candidate — the design's decisions are the constraints, and only the user's yes promotes a candidate.
+- Scope: every phase of the design appears in the json block, in the design's order; a phase the scout cannot scope with evidence still appears, with the gap in its `open_questions`. -- because `ai-team plan generate` refuses a report missing a phase.
+- Scope: when the repo has nothing runnable, say so in `open_questions` — never invent a command, never write config outside bootstrap.
+- One report, one block: the json block is the report's only fenced ```json block; any other JSON excerpt is fenced ```text.
+- Framework-agnostic: no rule names a language, framework, package manager or test runner outside `# e.g.` enumerations.
 
 ## Decision Gates
 
 | Condition | Action |
 |---|---|
-| `mode: bootstrap` AND `config.yaml` already exists | Return `status: blocked`. |
-| `mode: bootstrap` AND `config.yaml` missing | Run Phase A stack detection → write `config.yaml` per [references/config-template.md](references/config-template.md). |
-| `mode: discover` | Run Phase A/B scoped to `topic` → return a discovery report in the envelope. |
-| `mode: discover` AND `scope_proposal: true` injected | Produce the discovery report AND the `scope_proposal` block (Output Contract) AND the `plan_proposal` block; a chain link with no resolvable evidence goes in `open_scope_questions` — never silently omitted. |
-| `mode` missing, or `topic` absent in discover mode | Recover from user-facing prompt text if possible; else `status: needs_input`, `context_resolution: fallback`, flag in envelope. |
-| Architecture signals conflict during bootstrap | Default to `ddd` if `domain/application/infrastructure/` appear in ≥2 feature folders; else `layered`; else `unknown`. See [references/edge-cases.md](references/edge-cases.md). |
+| `mode: bootstrap` AND `config.yaml` exists | `status: blocked`. |
+| `mode: bootstrap` AND `config.yaml` missing | Phase A stack detection → write `config.yaml` per [references/config-template.md](references/config-template.md). |
+| `mode: map` AND `topic` absent | `status: needs_input`, name the missing field. |
+| `mode: map` | Phase A/B on `topic` → map report at `report_destination` + `discovery_report` in the envelope. |
+| `mode: scope` AND `design` absent, unreadable, or its frontmatter `status` is not `approved` | `status: blocked`, cite the path or the status — scope runs against an approved design only. |
+| `mode: scope` | read the design, the map reports it names, then one scope entry per phase; the json block closes the report. |
+| Any mode AND `report_destination` absent (map/scope) | `status: blocked` — the report is the product; the envelope alone is not durable. |
+| Architecture signals conflict during bootstrap | `ddd` if `domain/application/infrastructure/` appear in ≥2 feature folders; else `layered`; else `unknown`. See [references/edge-cases.md](references/edge-cases.md). |
+| `mode` missing or unknown | `status: blocked`, "Invalid mode: '{value}'. Expected bootstrap, map or scope." |
 
 ## Execution Steps
 
-### Phase A — Glob/grep (free, no token budget)
+### Phase A — Glob/grep (free)
 
-1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules — loaded per common-rules Principle 5; this skill writes `.ai-team/config.yaml` only in bootstrap mode). Identify mode from injected context (`mode:`, `project_root`, plus `topic` and the optional `scope_proposal: true` flag in discover mode).
-2. Glob project root for stack markers: `package.json`, `composer.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `Gemfile`, `turbo.json`, `pnpm-workspace.yaml`, `lerna.json`. Detect language, framework, package manager, monorepo status from these files without reading them fully (names suffice for a first pass).
-3. Grep for architecture signals: directory names `domain/`, `application/`, `infrastructure/`, `controllers/`, `services/`, `entities/` under `src/`. Grep for code patterns: `*Command.ts`, `*Handler.ts`, `*Event.ts`, `*Repository.ts`, `*Saga.ts`.
-4. Discover mode: grep for `topic` keywords to locate relevant files (controllers, services, entities, DTOs, test files, pages/components).
+1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules). Identify `mode`, `project_root`, `report_destination`, and per mode: `topic` (map) or `design` + `map_reports` (scope).
+2. Glob project root for stack markers (`package.json`, `composer.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `Gemfile`, workspace files). Grep architecture signals under `src/` (`domain/`, `application/`, `infrastructure/`, `controllers/`, `services/`).
+3. Map: grep the `topic` keywords to locate the flow's files. Scope: read the design's `### Superficies nombradas` and each phase's `Entrega`/`Escenarios`; grep every named surface and every type the scenarios mention.
 
-### Phase B — Selective reads (budgeted, max 15–25 files)
+### Phase B — Selective reads (budgeted)
 
-5. **Bootstrap**: read `package.json` (if Node.js) for `name`, `workspaces`, framework deps. Read `tsconfig.json` for `strict`, path aliases. Scan top 2 levels of `src/` directory tree.
-6. **Discover**: read the most relevant files (ranked by keyword match density) in priority order: (a) an existing feature similar to the one the topic describes — the best template is the project itself; (b) shared base classes, interfaces, abstract types (extension points); (c) entity/model definitions the topic touches; (d) module registration / dependency injection setup; (e) middleware, guards, interceptors, pipes (cross-cutting concerns); (f) existing tests for similar features (patterns only, not individual cases). Cap at 15 files for a narrow topic, 25 for a full pre-brief pass.
+4. Bootstrap: manifests, `tsconfig`/equivalent, top two levels of `src/`.
+5. Map (cap 15 files): (a) the existing feature most like the topic — the project itself is the best template; (b) shared base classes and extension points; (c) the models the topic touches; (d) registration / wiring; (e) cross-cutting guards; (f) tests of the analogue, for patterns only. Collect gotchas and external conditions while reading.
+6. Scope (cap 25 files): per phase, the files the design names plus their construction sites and 1-hop callers; the analogue's tests, to find the check that already exists; the config scope of every linter or analyzer proposed.
 
-### Compose output
+### Compose
 
-7. **Bootstrap**: generate `.ai-team/config.yaml` using [references/config-template.md](references/config-template.md). In addition to existing fields, write `commit_strategy: auto` at the root level. This is mandatory for new bootstraps. Language detection heuristics:
-   - Monorepo: `turbo.json` OR `pnpm-workspace.yaml` OR `lerna.json` OR `workspaces` field in `package.json` OR multiple package manifests in direct child dirs.
-   - App vs library: `main.ts`/routes/controllers → `app`; `package.json` with `main`/`exports`/`types` and no server code → `library`.
-   - Package manager lock file precedence: `pnpm-lock.yaml` > `yarn.lock` > `bun.lockb` > `package-lock.json` > `composer.lock`.
-8. **Discover**: compose the discovery report — Key Files (path, role, `file:line` evidence), Patterns Observed (existing conventions the Task Brief should follow), Risks (grounded citations), Open Questions (claims with no resolvable evidence). When the orchestrator injected `scope_proposal: true`, additionally compose the `scope_proposal` block: cite `file:line` evidence for every `expected_files` entry, verify each `acceptance_checks.command` runnable before proposing it, sweep construction sites for every touched type, name each seam's `public_contracts`, compose the `file_dossier` (one entry per MODIFY/REMOVE path, per module a CREATE target sources/imports, and per class kept at the cap, per the Hard Rules above — documented gotchas, external conditions, constructor dependency count), and feed `constraints_candidates` from it alongside analogue files and prior decisions (never invented — every dossier item that names a condition lands there or in `open_scope_questions`); then compose the `plan_proposal` block — ordered vertical slices per the Hard Rules above, each entry's `files` drawn from `expected_files`. Return it all in the envelope's `discovery_report` field. When `report_destination` is injected, also write it there (create its parent directory if absent).
-9. Return the envelope per Output Contract.
+7. Bootstrap: write `.ai-team/config.yaml` per the template, `commit_strategy: auto` at the root.
+8. Map: write the report at `report_destination` — Where it lives · Analogue · Documented gotchas · External conditions · Open questions — every line `file:line`. No json block.
+9. Scope: write the report at `report_destination` — one section per phase (files with evidence, checks with `verified`, candidates, questions) — and END it with the machine block:
+   ```text
+   {"kind": "scope-report", "phases": [{"n": 1, "expected_files": [{"action": "CREATE|MODIFY|REMOVE", "path": "…", "evidence": "file:line"}],
+     "acceptance_checks": [{"command": "…", "verified": "…", "expect": "…"}], "constraints_candidates": ["… (file:line)"], "open_questions": ["…"]}]}
+   ```
+   (fenced as ```json in the real report — the only such block in it).
+10. Return the envelope per the Output Contract.
 
 ## Output Contract
-
-- Bootstrap: writes `.ai-team/config.yaml`. `context_resolution: none`.
-- Discover: writes the report at the injected `report_destination` (resolved relative to `project_root`) — mandatory from the orchestrator's side for every discovery pass that feeds a Task Brief or otherwise counts as review-plane/scope-authority material (Critical Context Forwarding); optional only from this skill's own write step, i.e. it writes nothing when no destination is injected. `context_resolution: self-loaded` (or `fallback` when the injection is absent and the pass was review-plane material).
 
 ```yaml
 status: ok | warning | needs_input | blocked
 executive_summary: "1-3 sentences"
-artifacts: []                    # config.yaml entry (bootstrap) or report entry (discover, only if report_destination given)
-discovery_report:                # discover mode only
-  key_files:                     # CAP 25 entries
-    - { path: "<repo-relative path>", role: "<one line>", evidence: "<path:line>" }
+mode: bootstrap | map | scope
+artifacts: []                    # config.yaml (bootstrap) or the report (map/scope)
+discovery_report:                # map and scope; CAP 25 key_files
+  key_files:
+    - { path: "<repo-relative>", role: "<one line>", evidence: "<path:line>" }
   patterns: []                   # existing conventions to follow, each grounded
+  documented_gotchas: []         # map — each with file:line
+  external_conditions: []        # map — each with the citation naming it
   risks: []
   open_questions: []
-  scope_proposal:                # discover mode, only when the orchestrator requests it (scope_proposal: true)
-    expected_files:
-      - { action: CREATE|MODIFY|REMOVE, path: "<repo-relative>", evidence: "<path:line — why this file is in the chain>" }
-    construction_sites_swept: true # object literals, builders, stubs, factories that BUILD the touched types were grepped — not just annotations/mentions
-    acceptance_checks:
-      - { command: "<verbatim>", verified: "<how runnability was proven: executed read-only | target exists at path:line>", expect: "<observable outcome>" }
-    public_contracts:            # what the change creates/modifies/deletes at its seams
-      - "<one line each: signatures, events + fields, named test cases, DB schema, user-visible copy — with a file:line anchor>"
-    constraints_candidates:      # an existing invariant/pattern/decision the objective must honor — evidence-derived (file_dossier items below, analogue files, prior decisions), never invented
-      - "<one line — an existing invariant/pattern/decision the objective must honor, with file:line>"
-    file_dossier:                # one entry per MODIFY/REMOVE path, per module a CREATE target will source/import, and per class kept at the cap (Hard Rules above); every item that names a condition feeds constraints_candidates or open_scope_questions
-      - path: "<repo-relative>"
-        documented_gotchas: ["<one line — a failure mode written down in this file or in a module it sources/imports, with file:line>"]
-        external_conditions: ["<one line — a condition the external/sibling logic this objective replaces gates on, with the citation naming it>"]
-        constructor_deps: { count: 0, cap: "<the project's declared cap with file:line, or 'none declared'>" }   # classes only — omit the key for scripts, config, tests
-    open_scope_questions: []     # anything the scout could not close with evidence
-    plan_proposal:                # CAP 8 entries — ordered vertical slices — the same vocabulary as a Brief File ## Plan entry; a slice that cannot be cut with evidence is NOT proposed — it goes to open_scope_questions naming the missing evidence
-      - { title: "<one line>", behavior: "<one line — what this brief delivers, observable>", demonstrating_check: { command: "<verbatim>", verified: "<executed read-only | target exists at path:line | fails today because <the missing symbol/route/file> — a CREATE slice's red>", expect: "<observable outcome>" }, contract_left: "<one line — the signature, event, schema, or user-visible outcome the next brief may assume; file:line anchor, or 'created by this brief: <path>'>", decisions_candidates: ["<one line, file:line>"], files: ["<repo-relative — a subset of expected_files above>"] }
-      # on overflow: last entry becomes "N further slices omitted", noted in risks
+scope_phases: 0                  # scope — how many phases the json block carries
 next_recommended: []
 risks: []
 model_used: "sonnet"
@@ -119,11 +101,12 @@ context_resolution: self-loaded | fallback | none
 
 ## References
 
-- [references/config-template.md](references/config-template.md) — annotated config.yaml template; load during bootstrap when generating config.
-- [references/envelope-examples.md](references/envelope-examples.md) — envelope variants per mode; load when building the result envelope.
-- [references/edge-cases.md](references/edge-cases.md) — monorepo multi-stack, ambiguous architecture, config.yaml exists, no language detected, topic too broad, topic matches zero files, dossier item with no resolvable evidence; load when encountering non-happy-path conditions.
+- [references/config-template.md](references/config-template.md) — annotated config.yaml template; load during bootstrap.
+- [references/envelope-examples.md](references/envelope-examples.md) — envelope variants per mode; load when building the result.
+- [references/edge-cases.md](references/edge-cases.md) — monorepo multi-stack, ambiguous architecture, config exists, no language detected, topic too broad, topic matches zero files, an item with no resolvable evidence.
+- `../_shared/machine.md` — the scope report's json block, exactly as `ai-team plan generate` reads it; load at Step 9.
 - `../_shared/context-protocol.md` — startup sequence.
-- `../_shared/persistence-contract.md` — write rules (loaded per common-rules Principle 5; this skill writes `.ai-team/config.yaml` only in bootstrap mode).
-- `../_shared/common-rules.md` — consolidated principles (read-only, write-scope, envelope-always, seniority); load at startup.
+- `../_shared/persistence-contract.md` — write rules and the `.ai-team/` tree (`explorations/` is this skill's report home).
+- `../_shared/common-rules.md` — consolidated principles; load at startup.
 - `../_shared/result-envelope.md` — envelope schema.
-- `../_shared/evidence-protocol.md` — Rule 1 (file:line citation mandatory for every codebase claim).
+- `../_shared/evidence-protocol.md` — Rule 1 (citations), Rule 4 (validate an invariant the design asserts), Rule 7 (a check must be able to fail).

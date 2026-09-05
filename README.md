@@ -1,103 +1,80 @@
 # ai-team
 
-A tool-agnostic framework for organic, evidence-tiered AI agent delegation.
+A tool-agnostic framework for delegated software work with a mechanical spine: a task state
+machine gates every sub-agent launch, the plan is generated from an approved design, and the
+orchestrator keeps only the decisions that need judgment.
 
 ## How It Works
 
-One execution model for every task size. The orchestrator (your AI coding tool's main
-conversation) classifies each request, delegates implementation to `organic-implementer`,
-and lets the evidence in the resulting diff — not the task's size — decide how much review
-runs before commit.
+The orchestrator (your AI coding tool's main conversation) classifies each request aloud,
+writes the design **with** you when the change is large, and delegates each phase of a
+generated plan to a sub-agent. What must always happen is not asked of the model — it is
+taken away from it and given to the machine.
 
 ```
-User ↔ Claude Code (orchestrator)                                User ↔ OpenCode (orchestrator agent)
-│                                                                │
-├── Small: delegate (no gate)                                    ├── Small: delegate (no gate)
-├── Medium: discovery pass + plan of briefs + delegate           ├── Medium: discovery pass + plan of briefs + delegate
-└── Large: discovery pass + plan of briefs + delegate            └── Large: discovery pass + plan of briefs + delegate
-                         ↓                                             ↓
-                    domain/skills/    ←─── shared skills ───→    domain/skills/
+request ─► classify aloud ─┬─ question        → answer, nothing saved
+                           ├─ bounded change  → 4 approved lines → one-phase plan → implementer
+                           └─ large change    → map pass → design (approved by you) → threat-model?
+                                                → scope pass → plan generated → phase by phase
+each phase: implementer (attempt 1..6) → tier from the diff → reviewer [+ security] → commit
 ```
 
-### Classification (plan ceremony only)
+| Piece | What it owns |
+|---|---|
+| `ai-team` machine (`domain/skills/_shared/scripts/ai-team`, Python stdlib) | one JSON per task under `.ai-team/tasks/`; tickets for every launch; attempts per phase; plan generation; receipt validation; the commit gate; the balance |
+| two hooks (Claude Code) | `PreToolUse` on `Agent`: an `organic-*` launch without a ticket is denied with the exact command to run; `SessionStart`: `ai-team status` lands in the session's context |
+| eight cards (`domain/skills/_shared/cards/`) | the orchestrator's judgment, one short card per moment: classify · design · plan · delegate · ingest · review · commit · close |
+| five skills (`domain/skills/organic-*/`) | scout (bootstrap · map · scope), implementer, reviewer, security (threat-model · code-audit), retro |
 
-| Size | Signals | Ceremony |
-|------|---------|----------|
-| **Small** | 1 file, <50 lines, fully clear scope | Delegate directly, no gate (trivial mechanical edits run inline); a brief naming a file the Brief File's read-record does not cover gets a narrow discovery pass first |
-| **Medium** | 2-5 files, 50-300 lines | Announce the provisional plan, run the `organic-scout` discovery pass (`scope_proposal: true`), adopt its proposal into the plan of briefs (vertical slices), approve brief by brief or fast-forward, then delegate |
-| **Large** | 6+ files, crosses modules, needs discovery | Same as Medium — the discovery pass is mandatory, never offered; a large-but-clear scope still gets its files, checks and constraints from scout-cited evidence |
+### The design is the source of constraints
 
-Classification never decides review depth — only how much planning precedes delegation.
+A large change has a design file (`.ai-team/designs/<task>.md`) written in conversation and
+approved by you, section by section. Its **decisions** are invariants, never mechanisms (if the
+sentence stays true when the function is rewritten from scratch, it is a decision). Its
+**phases** carry given/when/then scenarios and a runnable check. When a design touches a
+sensitive surface, `organic-security` threat-models the file before approval and its
+requirements become decisions. The plan is generated from the design plus the scout's scope
+pass — the orchestrator never writes it.
 
-### Evidence-tiered review (post-candidate)
+### Attempts, not re-briefs
 
-Once `organic-implementer` returns a candidate, the orchestrator classifies its diff into a
-review tier and names the reason:
+Per phase: attempt 1 is a fresh implementer; attempts 2–4 resume the same implementer with the
+reviewer's findings; 5–6 are a fresh implementer on the stronger model; a 7th is denied — the
+design is reopened. Findings that do not decrease between attempts mean the fix class is wrong.
+
+### Evidence-tiered review
 
 | Tier | Trigger | Review |
 |------|---------|--------|
-| **0** | Docs, comments, non-runtime config, renames | Result envelope only — no reviewer |
-| **1** | Standard code change | `organic-reviewer` (correctness + verification) |
-| **2** | Auth/authz, crypto, secrets, payments, PII, migrations, untrusted-input parsing, permission checks, public contracts | `organic-reviewer` + `organic-security` |
+| **0** | docs, comments, non-runtime config, renames | none |
+| **1** | any other code change | `organic-reviewer`: conformity to the design and phase, correctness, verification re-run |
+| **2** | auth/authz, crypto, secrets, payments, PII, migrations, untrusted input, permission checks, public contracts | reviewer + `organic-security` code-audit (verifies the design's security measures are implemented) |
 
-A tier ≥ 1 candidate produces a **Review Receipt**; the orchestrator refuses to commit
-tier ≥ 1 work without one. The user can accept-and-proceed over a finding instead of
-re-engaging the worker (recorded in the receipt's `overrides` field). Commit creation itself is
-an orchestrator-inline action, never delegated — one atomic commit per objective, gated
-fail-closed for tier ≥ 1 by a `check-receipt.py` re-run immediately before the commit.
-
-### Review kill switch
-
-"review off" / "sin review" turns the review plane off entirely — no tiers, nothing ever
-reported as reviewed or approved while off. "review on" re-validates from the current state
-only; nothing is retroactively resurrected.
-
-### Execution gears
-
-| Gear | Behavior |
-|------|----------|
-| `normal` (default) | Ceremony per task size, exactly as above |
-| `fast-forward` | One confirmation of the whole `## Plan` (the definitive one, after adoption of the scout's proposal), then every brief chains to completion; the review plane stays fully intact, pausable at any brief boundary |
-| `unattended` | Fast-forward, plus never self-approves — pauses with the pending question recorded for the next session |
-
-Set via the Brief File's `mode:` field; any non-`normal` gear — at task start or mid-task — requires explicit user instruction.
+A lens writes one report whose final fenced json block is the Review Receipt; the machine
+validates it when the ticket settles and again at `commit-check`. A blocked verdict is cleared
+only by a further attempt or by a recorded ruling per CRITICAL finding.
 
 ## Project Structure
 
 ```
 ai-team/
-├── domain/
-│   └── skills/
-│       ├── _shared/                  # Protocols shared by every skill
-│       │   ├── context-protocol.md
-│       │   ├── persistence-contract.md
-│       │   ├── result-envelope.md
-│       │   ├── evidence-protocol.md
-│       │   ├── common-rules.md
-│       │   └── orchestrator-protocol.md   # classification, tiers, delegation, model routing
-│       ├── organic-implementer/      # Task Brief → code
-│       ├── organic-reviewer/         # correctness + verification review gate
-│       ├── organic-security/         # threat-model / code-audit security lens
-│       ├── organic-scout/            # bootstrap config.yaml / pre-brief discovery
-│       └── organic-retro/            # post-task retrospective + convention-capture proposals
+├── domain/skills/
+│   ├── _shared/
+│   │   ├── machine.md                # the machine's contract: verbs, ticket conditions, task JSON, parsed inputs
+│   │   ├── cards/                    # orchestrator cards, one per moment (≤ 60 lines each)
+│   │   ├── scripts/ai-team           # launcher → ai_team/ (cli, machine, receipt, design, plan, hook, debt, engram)
+│   │   ├── context-protocol.md · persistence-contract.md · result-envelope.md · evidence-protocol.md · common-rules.md
+│   │   └── skill-style-guide.md
+│   ├── organic-scout/ · organic-implementer/ · organic-reviewer/ · organic-security/ · organic-retro/
 ├── adapters/
-│   ├── claude-code/                  # Claude Code adapter
-│   │   ├── install.sh
-│   │   ├── templates/
-│   │   │   ├── CLAUDE.md             # Stub injected into ~/.claude/CLAUDE.md
-│   │   │   └── agents/               # Agent files → ~/.claude/agents/
-│   │   └── README.md
-│   └── opencode/                     # OpenCode adapter
-│       ├── install.sh
-│       ├── templates/
-│       │   ├── AGENTS.md             # Copied to ~/.config/opencode/AGENTS.md
-│       │   └── opencode.json         # Merged into ~/.config/opencode/opencode.json
-│       └── README.md
+│   ├── claude-code/                  # install.sh, merge-hooks.py, templates/{CLAUDE.md,hooks.json,agents/}
+│   └── opencode/                     # install.sh, templates/{AGENTS.md,opencode.json} — machine yes, hooks no
+├── evals/                            # layer-3 evals: the orchestrator against fixture projects with stub agents
 ├── scripts/
-│   └── install.sh                    # Adapter selector (routes to adapters/<name>/install.sh)
-└── config/
-    ├── schema.yaml                   # .ai-team/config.yaml field reference
-    └── project-config.template.yaml  # Annotated illustration of every config.yaml key (same key set as organic-scout's config-template.md)
+│   ├── install.sh                    # adapter selector
+│   ├── check-skill-budgets.sh        # SKILL.md ≤ 250 lines, cards ≤ 60
+│   └── tests/                        # unittest suites: machine, hooks, design parser, receipt calibration, hook merge
+└── config/                           # .ai-team/config.yaml reference and annotated template
 ```
 
 ## Installation
@@ -108,7 +85,9 @@ ai-team/
 ./scripts/install.sh --adapter=claude-code
 ```
 
-Copies skills to `~/.claude/skills/`, agent files to `~/.claude/agents/`, and injects a lightweight orchestrator stub into `~/.claude/CLAUDE.md` between `<!-- ai-team:orchestrator -->` markers.
+Copies skills to `~/.claude/skills/`, agents to `~/.claude/agents/`, registers the two hooks in
+`~/.claude/settings.json` (backup first, foreign hooks untouched, idempotent) and injects a
+short stub into `~/.claude/CLAUDE.md` between `<!-- ai-team:orchestrator -->` markers.
 
 ### OpenCode
 
@@ -116,92 +95,29 @@ Copies skills to `~/.claude/skills/`, agent files to `~/.claude/agents/`, and in
 ./scripts/install.sh --adapter=opencode
 ```
 
-Requires `jq`. Copies skills to `~/.config/opencode/skills/`, installs `AGENTS.md`, and merges agent definitions into `opencode.json`.
+Requires `jq`. Same skills and machine; no hooks (the discipline stays in `AGENTS.md` prose).
 
-### Both adapters
+## A session, in short
 
-```bash
-./scripts/install.sh --adapter=both
+```
+~/.claude/skills/_shared/scripts/ai-team status        # what exists, what is allowed now, which card to read
+ai-team new <slug> --kind bounded|large
+ai-team design approve <path>                          # after your yes
+ai-team plan generate [--scope <report> | --scope-skipped "<why>"]   # or --objective/--decision/--check/--file for bounded
+ai-team phase extract <n> · acquire implementer --phase <n> · settle <ticket> --outcome … --model … --tokens … --tool-uses … --duration …
+ai-team tier <0|1|2> --phase <n> --reason … · acquire reviewer --phase <n> · settle <ticket> … --report <report.md>
+ai-team commit-check --phase <n> · phase done <n> --commit <hash> · close
 ```
 
-### Interactive prompt
-
-```bash
-./scripts/install.sh          # prompts if no adapter specified
-```
-
-Re-run after pulling updates to refresh skills and adapter templates.
-
-## Choosing an Adapter
-
-Each adapter installs an independent copy of the framework into its tool's config directory. Multi-adapter install is supported via `--adapter=both`. Adapters do not share installed files — `~/.claude/` and `~/.config/opencode/` are completely separate. Both adapters use the same `domain/skills/` source, so the delegation logic is identical regardless of which tool you use.
-
-## Adapters
-
-| Adapter | Status | Install target |
-|---------|--------|----------------|
-| Claude Code | Done | `~/.claude/` |
-| OpenCode | Done | `~/.config/opencode/` |
-
-Contributions for other tools welcome — see `adapters/claude-code/` or `adapters/opencode/` as reference implementations.
-
-## No pipeline entry commands
-
-There is no multi-phase pipeline and no slash-command entry point. Delegation is
-conversational: describe the change, the orchestrator classifies it, and everything after
-that follows the model above.
+Full contract: `domain/skills/_shared/machine.md`. Tests: `bash scripts/tests/run-script-tests.sh`.
+Evals (cost tokens): `python3 evals/run.py`.
 
 ## Persistence
 
-Every delegated worker is stateless: it reads its skill file and the delegation prompt, writes
-the files its brief declares, and returns one bounded result envelope (the scope-amendment
-channel's `paused` envelope is the sole non-terminal, mid-delegation exception — see
-`domain/skills/_shared/orchestrator-protocol.md` → "Synchronous delegation — no live-agent
-continuation"). There is still no
-`state.yaml` — phase tracking now lives in the orchestrator's Brief File checkboxes
-(see `domain/skills/_shared/orchestrator-protocol.md` → "Task Brief" → "Brief File (durable
-copy)"). A project accumulates these filesystem artifacts:
-
-- `.ai-team/config.yaml` — project stack, conventions, structure, architecture, and
-  `commit_strategy` (default `auto`), written once by `organic-scout` on first bootstrap, then
-  read by every worker. Optional keys (`strict_tdd`, `test_commands`, `review_gates`,
-  `model_overrides`, `rules`, `retro`) are not written by bootstrap — they default safely when
-  absent, and are added later by hand or via the orchestrator's Config Refresh Check.
-- `.ai-team/skill-registry.md` and `.ai-team/.skill-registry.cache` — the stack/convention
-  skill index and its freshness fingerprint, refreshed once per session (see the orchestrator
-  protocol's Session Init → "Skill Registry Refresh").
-- `.ai-team/briefs/` — one durable Brief File per task, orchestrator-authored only: audit
-  trail, cost ledger, and pause/resume state. Session Init → "Brief Resume Check" offers to
-  resume any `active`/`paused` brief at the start of the next session.
-- `.ai-team/tech-debt.md` — queued/deferred findings ledger, orchestrator-authored only: a
-  pre-existing or out-of-group CRITICAL/MAJOR finding routed here instead of in-task
-  remediation (format: `domain/skills/_shared/orchestrator-protocol.md`).
-- `.ai-team/retros/` — per-task retrospectives, written by `organic-retro` (mode: `retro`) at
-  an orchestrator-injected `report_destination` when a task's Brief File closes (format:
-  `domain/skills/organic-retro/references/retro-format.md`). Delegated per the `retro:`
-  config key (`always | on-signal | off`, safe-absent default `on-signal`) — see the
-  orchestrator protocol's "Retro trigger".
-- An on-disk report copy, only when a reviewer or security pass runs with a
-  `report_destination` injected.
-
-## Model Routing
-
-Read `domain/skills/_shared/orchestrator-protocol.md` → "Model Routing" for the default model
-per worker and the project-level `model_overrides` override mechanism.
-
-## Skills
-
-| Skill | Role |
-|-------|------|
-| `organic-implementer` | Task Brief → code, bounded by declared edit roots |
-| `organic-reviewer` | Correctness + verification review gate (tier ≥ 1) |
-| `organic-security` | Threat-model and code-audit security lens (tier 2, or standalone) |
-| `organic-scout` | Bootstrap `config.yaml`, or run pre-brief discovery |
-| `organic-retro` | Post-task retrospective + convention-capture proposals, from durable evidence |
-
-Commit creation is not a delegated skill — the orchestrator creates one atomic commit per
-objective inline, gated fail-closed for tier ≥ 1 by its own receipt-gate re-run (see
-"Evidence-tiered review" above).
+Everything lives under the project's `.ai-team/` (`domain/skills/_shared/persistence-contract.md`):
+`tasks/` (the machine's JSON), `designs/`, `plans/`, `explorations/`, `reviews/`, `retros/`,
+`tech-debt.md`, `config.yaml`. Engram, when installed, receives a mirror of approvals, closes
+and deferrals — never read back to decide.
 
 ## License
 

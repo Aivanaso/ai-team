@@ -40,7 +40,7 @@ conventions:
 
 commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits at each objective's
                        # close without pausing; manual = presents the staged file set and waits for
-                       # user confirmation before committing (orchestrator-protocol.md -> "Commit creation")
+                       # user confirmation before committing (_shared/cards/commit.md)
 
 # strict_tdd: true
 #   Optional, safe-absent default: false. The orchestrator appends the
@@ -50,7 +50,7 @@ commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits
 #   declared runner can exercise (never prose/docs/config/templates/skill
 #   definitions). strict_tdd: true with test_commands.unit absent sends no
 #   directive -- the orchestrator tells the user and records the gap in the
-#   Brief File, never inventing a runner command. organic-implementer then
+#   task's design notes, never inventing a runner command. organic-implementer then
 #   returns tdd_cycles evidence for each red -> green cycle
 #   (red -> green -> triangulate -> refactor).
 
@@ -69,7 +69,7 @@ commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits
 
 # retro: on-signal
 #   Optional, safe-absent default: on-signal. always | on-signal | off — controls whether the
-#   orchestrator delegates organic-retro when a task's Brief File flips to status: done. See
+#   orchestrator delegates organic-retro when `ai-team close` flips a task to done. See
 #   domain/skills/organic-scout/references/config-template.md for full semantics.
 
 structure:
@@ -98,7 +98,7 @@ architecture:
 # Override the default model per delegated worker, for cost control or
 # experimentation. Values: any model alias your adapter recognises (e.g.
 # sonnet, opus, haiku). Defaults and rationale: see
-# domain/skills/_shared/orchestrator-protocol.md -> "Model Routing".
+# adapters/claude-code/templates/agents/*.md (model + effort per worker) and _shared/cards/delegate.md.
 #
 # model_overrides:
 #   organic-reviewer: opus      # Deeper reviews for a high-stakes surface

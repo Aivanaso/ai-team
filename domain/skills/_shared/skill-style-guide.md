@@ -17,7 +17,7 @@ Every SKILL.md must contain exactly these six `##` sections, in this order:
 5. **Output Contract** — what the envelope looks like, required fields, mandatory grep-contracts. No envelope examples inline (those go to `references/envelope-examples.md`).
 6. **References** — list of `references/` files with a one-line "load when" annotation each. Empty section is fine if no references exist yet.
 
-The six sections above are the complete and fixed structure. Additional sections go in `references/` files; reordering breaks the section-order assumption every SKILL.md author and reviewer relies on when locating a rule by section name (the framework's JSON structural validator, `_shared/scripts/check-receipt.py`, parses the Review Receipt and ledger objects only, wherever they are stored — it has no dependency on SKILL.md section order).
+The six sections above are the complete and fixed structure. Additional sections go in `references/` files; reordering breaks the section-order assumption every SKILL.md author and reviewer relies on when locating a rule by section name (the framework's structural validator, `ai-team receipt check`, parses a report's final json block only — it has no dependency on SKILL.md section order).
 
 ---
 
@@ -68,8 +68,7 @@ One verb, one action. If a step requires more than two sentences to describe, it
 ## Prompt Composition Rules
 
 Authoring rules for how a SKILL.md itself instructs the model, distinct from the section
-structure above (see `orchestrator-protocol.md` → "Prompt composition practices" for the
-orchestrator-side counterpart):
+structure above (the orchestrator-side counterpart is `_shared/cards/delegate.md`):
 
 - **Explicit quantifiers.** State a rule's exact range ("every finding", "only the files in
   `group_files`") — a scope word left implicit ("relevant", "important") is read literally, not

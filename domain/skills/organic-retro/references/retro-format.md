@@ -1,158 +1,120 @@
 # Retro Format
 
 The template `organic-retro` (`retro` mode) fills in when composing the retro file at the
-injected `report_destination` — convention `.ai-team/retros/YYYY-MM-DD-<slug>.md`, the same
-slug as the task's Brief File at `.ai-team/briefs/YYYY-MM-DD-<slug>.md`. Every section is
-evidence, not memory: a claim with no citable source (Brief File section, receipt/report
-path, or `file:line`) does not go in.
+injected `report_destination` — convention `.ai-team/retros/<task>.md`, the same task id as
+`.ai-team/tasks/<task>.json`. Every section is evidence, not memory: a claim with no citable
+source (a task JSON field, a design decision, a report path and finding id, or `file:line`)
+does not go in.
 
 ## Header
 
 ```markdown
-# Retro — {task title, from the Brief File frontmatter's `task:`}
+# Retro — {task id} — {design title, or the plan's title for a bounded task}
 
 **Date**: {current_iso_utc date}
-**Route**: {Brief File frontmatter `mode:` gear — normal | fast-forward | unattended}
-**Result**: {status: done | PROVISIONAL — task not yet closed} — {one-line outcome, from the
-Brief File's `## Close` section: commit hash(es), totals}
+**Kind**: {bounded | large} · **Phases**: {N} · **Attempts**: {sum of phases[].attempts}
+**Result**: {done | PROVISIONAL — task not yet closed} — {commits, one per phase; the balance line}
 ```
 
-When the Brief File's frontmatter `status` is not `done` (Decision Gates warning row), prefix
-**Result** with `PROVISIONAL — task not yet closed` instead of reading `## Close` (it is not
-written yet).
+When the task JSON's `status` is not `done` (Decision Gates warning row), the Result line reads
+`PROVISIONAL — task not yet closed` and no commit list is claimed.
 
 ## What worked
 
-- One item per grounded win — an envelope outcome, a receipt verdict, a specific catch (a
-  scope-large gate that stopped a bad write, a review finding closed pre-commit, a
-  construction-site sweep that found a live caller before it broke).
-- 1 short paragraph each, citing its evidence: `Cost Ledger row N`, `.ai-team/reviews/<file>
-  finding F-N`, or a named Task Brief element.
-- No adjective without a citation — "worked well" is not a claim, "review-clear on the first
-  pass, Cost Ledger row 3" is.
+- One item per grounded win — a reviewer verdict on the first attempt, a hook denial that
+  redirected a launch, a scout gotcha that became a decision, a threat-model requirement the
+  audit later found implemented.
+- One short paragraph each, citing its evidence: `tickets[t3].verdict`, `.ai-team/reviews/<file>
+  finding F-N`, a design decision quoted, `file:line`.
+- No adjective without a citation — "worked well" is not a claim; "review-clear on attempt 1,
+  `tickets[t3]`" is.
 
 ## Frictions
 
-- **Equal or more space than "What worked" — never a token afterthought.** This section is
-  where the retro earns its keep.
-- Numbered (F1, F2, ...) so "Watch-items" can reference them.
-- Each friction: what happened (cited to a Cost Ledger row, a receipt finding id, or
-  `file:line`) → why it cost time or quality → one concrete proposal (a protocol change, a
-  config default, a convention entry).
+- **Equal or more space than "What worked".** This section is where the retro earns its keep.
+- Numbered (F1, F2, …) so Watch-items can reference them.
+- Each friction: what happened (cited) → **the mechanism** — which rule, artifact or moment
+  let it happen (a decision that was really a mechanism, a scope pass skipped, a check that
+  could not fail, findings that did not decrease) → one concrete proposal. Attempts are the
+  first place to look: every attempt beyond the first has a cause, and the cause is either the
+  design (the constraint was wrong or missing), the plan (a file or check was missing) or the
+  worker.
 
 ## Metrics
 
-- Reproduce the Brief File's `## Cost Ledger` table **verbatim** — same columns (`#, agent,
-  model, tokens, tool_uses, duration, outcome`). Never recompute or estimate a figure the
-  ledger did not already record. When the Brief File carries a `## Ledger` block, source these
-  figures from its `ledger`/`close` fields instead — the machine-validated copy
-  (`_shared/result-envelope.md` → "Brief File Ledger block") — and render them into this same
-  table shape; a Brief File written before that block existed may hold the same object in a
-  separate same-slug `.json` file next to it, read the same way; with neither, fall back to
-  reading the `.md` table directly, unchanged from before.
-- **Re-brief count**: count `outcome` cells that are a re-delegation for the same objective
-  (a fresh `organic-implementer` row following a `review-blocked`/`needs_input`/`blocked`
-  row), grouped by cause (review-blocked finding, needs_input, blocked/scope-large, infra-death, amendment
-  request).
-- **Inline-closure count**: source this figure from `close.inline_closures` (its entry count —
-  `_shared/result-envelope.md` → "Brief File Ledger block") in the Brief File's `## Ledger`
-  block, or in the separate same-slug `.json` file when the Brief File predates that block — the
-  same machine-validated field the Metrics table above draws from. When neither records it (a
-  Brief File written before this field existed), render the figure as "inline closures: not
-  recorded in the ledger" and nothing else — never estimate it by counting mentions in the
-  `.md` Brief File's `## Amendments` prose.
-  `## Close` never prescribed recording inline closures, and neither did any protocol
-  section, so a legacy Brief File's `## Amendments` narrative is prose, not a ledger figure —
-  `organic-retro/SKILL.md`'s own rule against estimating applies here exactly as everywhere
-  else in this file.
-- **Plan size and completion**: when the ledger object carries `plan`
-  (`_shared/result-envelope.md` → Brief File Ledger block) — in the `## Ledger` block, or in the
-  separate same-slug `.json` file for a Brief File that predates it — render "plan: N briefs, M
-  done" from its entries; when that object has no `plan`, or no such object exists, render
-  "plan: not recorded in the ledger" and nothing else — never estimate it from the `.md`
-  `## Plan` prose.
-- **Totals**: sum only the ledger's own token/duration/agent-count columns.
+Copied from the task JSON — never recomputed beyond sums of its columns, never estimated.
+
+- **Tickets** — one row per settled ticket, verbatim:
+
+  | id | kind | phase | attempt | model | tokens | tool uses | duration | outcome / verdict |
+  |---|---|---|---|---|---|---|---|---|
+
+- **Attempts per phase** — `phases[].attempts`, and for each attempt beyond 1 the reviewer's
+  finding count, so the trend is visible (decreasing / not).
+- **Rulings** — `rulings[]`, each with its finding and cost-if-wrong quoted.
+- **Deferred** — every `tickets[].deferred` id, with its `tech-debt.md` row.
+- **Amendments** — `phases[].amendments[]`, each reason quoted: these are plan defects.
+- **Totals** — tokens, tool uses, duration summed over the settled tickets; commits per phase.
+
+A figure the JSON does not hold (e.g. an `infra-death` ticket's tokens) is written "not
+recorded", never guessed.
 
 ## Watch-items for the next task
 
-- One line per item, phrased as a question the *next* retro should answer — mirrors "did F3
-  happen again?" rather than a flat statement. Tie back to a friction number when applicable.
-- Example: `"F2 — did the citation audit run this time, or did the reviewer return
-  artifacts: [] again?"`
-
-## Conventions proposed (drafted by `retro` mode when a friction yields a candidate)
-
-One entry per candidate, same shape `conventions_proposed` returns in the envelope:
-
-```markdown
-### Proposed: {rule, one line}
-
-**Why**: {one line — the friction or cost this closes}
-**Good**: {evidence-cited example — a `file:line` or a hypothetical the project's own
-conventions would produce}
-**Bad**: {evidence-cited counter-example — what actually happened, cited to the friction}
-**Target**: {file}#{section} — where this rule should land (e.g. `CLAUDE.md#Git`,
-`AGENTS.md#Testing`)
-```
-
-Omit this section entirely when no friction yielded a reusable-convention candidate this run
-(Decision Gates: `conventions_proposed: []`).
-
----
-
-## Compact example
-
-```markdown
-# Retro — billing-export endpoint
-
-**Date**: 2026-08-19
-**Route**: normal
-**Result**: done — commit a1b2c3d (orchestrator commit creation — not a delegation, no Cost Ledger row)
-
-## What worked
-
-**1. The scope-large gate caught a cross-module leak before it landed.** The first
-`organic-implementer` pass (Cost Ledger row 1) returned `status: blocked`,
-`scope_report.kind: scope-large` when the export objective needed the tax module's rounding
-helper — a file `expected_files` never declared. The orchestrator widened the brief instead of
-letting the worker improvise (Cost Ledger row 1, `scope_report.target:
-services/billing/tax.py`).
-
-## Frictions
-
-**F1 — the tier-1 review re-ran a check the acceptance_checks already covered.**
-`organic-reviewer` (Cost Ledger row 3, 88,000 tokens) re-ran the full test suite even though
-`acceptance_checks` already declared the same command — a redundant verification step folded
-into that pass's own token count, not a separate delegation.
-**Proposal**: `organic-reviewer`'s verification step should skip a re-run when
-`acceptance_checks` already covers the same command verbatim (see
-`organic-reviewer/SKILL.md` Step 4).
-
-## Metrics
-
-| # | agent | model | tokens | tool_uses | duration | outcome |
-|---|---|---|---|---|---|---|
-| 1 | organic-implementer | opus | 95,000 | 30 | 5m10s | blocked — scope-large |
-| 2 | organic-implementer (re-brief) | opus | 110,000 | 38 | 6m40s | ok — 4 files, 2/2 checks |
-| 3 | organic-reviewer (tier 1) | sonnet | 88,000 | 22 | 7m05s | review-clear — 0 findings |
-
-Re-brief count: 1 (cause: scope-large, F1 not implicated). Commit a1b2c3d was created inline by
-the orchestrator (not a delegation — no Cost Ledger row, `orchestrator-protocol.md` → "Commit
-creation").
-
-## Watch-items for the next task
-
-1. Does `organic-reviewer` still re-run a check `acceptance_checks` already covered (F1)?
+- One line per item, phrased as a question the *next* retro should answer, tied to a friction
+  number: `"F2 — did the scope pass name the construction sites this time?"`.
 
 ## Conventions proposed
 
-### Proposed: declare cross-module dependencies in the objective, not just expected_files
+Present only when a friction yields a reusable rule. Per entry (mirrors the envelope's
+`conventions_proposed` shape):
 
-**Why**: the tax-module dependency was knowable at brief-authoring time (the export endpoint
-always rounds via the shared helper) but only surfaced as a scope-large gate mid-run.
-**Good**: `objective: "...export totals, rounding via services/billing/tax.py's shared
-helper"` names the dependency up front.
-**Bad**: the original brief's `objective` named only the endpoint; the rounding dependency
-surfaced only in `scope_report.target` (Cost Ledger row 1).
-**Target**: `orchestrator-protocol.md#Task Brief` — note under the objective element.
+```markdown
+### C1 — {rule, one line}
+**Why**: {one line, cites the friction}
+**Good**: {an example from this task, cited}
+**Bad**: {the counter-example from this task, cited}
+**Target**: {file#section — a card, a skill, a protocol}
+**RED**: {the eval scenario under evals/ that would catch a recurrence}
+```
+
+## Compact worked example
+
+```markdown
+# Retro — 2026-09-05-billing-export — Billing export endpoint
+
+**Date**: 2026-09-05
+**Kind**: large · **Phases**: 2 · **Attempts**: 3
+**Result**: done — a1b2c3d (phase 1), d4e5f6a (phase 2) · 5 tickets · 312,000 tokens
+
+## What worked
+- The scope pass named `services/billing/tax.py` as a construction site
+  (`.ai-team/explorations/…-scope.md` phase 1), so the implementer never blocked on it
+  (`tickets[t2].outcome: ok`).
+
+## Frictions
+1. **F1 — attempt 2 on phase 2 for a constraint that was a mechanism.** The design's decision
+   "totals are rounded with `Tax::round`" named a helper, not an invariant; the implementer used
+   it, the reviewer flagged a rounding defect in a path the helper never covered
+   (`…-phase-2-attempt-1-reviewer.md` F-1, CRITICAL). Mechanism: the decision test (card:
+   classify) was not applied at approval. Proposal: the design card's self-review names the
+   decision test explicitly.
+
+## Metrics
+| id | kind | phase | attempt | model | tokens | tool uses | duration | outcome / verdict |
+|---|---|---|---|---|---|---|---|---|
+| t1 | scout-scope | – | – | sonnet | 40,000 | 22 | 180s | ok |
+| t2 | implementer | 1 | 1 | sonnet | 90,000 | 31 | 400s | ok |
+| t3 | reviewer | 1 | 1 | sonnet | 52,000 | 18 | 210s | ok / review-clear |
+| … | | | | | | | | |
+
+Attempts per phase: phase 1 → 1; phase 2 → 2 (findings 3 → 0).
+
+## Watch-items
+- F1 — did every approved decision pass the rewrite test this time?
+
+## Conventions proposed
+### C1 — A decision that names a function is a mechanism; rewrite it as the invariant it protects
+**Why**: F1. **Good**: "an empty batch exports zero rows and exits 0". **Bad**: "totals use `Tax::round`".
+**Target**: `_shared/cards/design.md#2`. **RED**: `evals/cases/design-mechanism-as-decision`.
 ```

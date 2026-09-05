@@ -146,18 +146,13 @@ chmod +x "$CLAUDE_DIR/skills/_shared/scripts/ai-team" "$CLAUDE_DIR/skills/_share
 verify_install "$CLAUDE_DIR/skills"
 
 # Rewrite skill paths for the installed location, across every .md file of the
-# skills THIS installer ships (the same set the copy loop above wrote) — not
-# just orchestrator-protocol.md, and never third-party skills under ~/.claude/skills. Two invocation prefixes need
-# the rewrite: `bash skills/_shared/...` (refresh-skill-registry.sh) and
-# `python3 skills/_shared/scripts/check-receipt.py` (the review-plane's
-# BLOCKING structural gate, invoked verbatim from organic-reviewer/SKILL.md,
-# organic-security/SKILL.md, and orchestrator-protocol.md alike). Anchored
-# patterns are idempotent by construction — after one rewrite the pattern no
-# longer matches — and they leave `{install_dir}/skills/...` references and
-# prose mentioning skill roots untouched.
-# (The old broad guard `grep -q '~/.claude/skills/'` skipped the whole sed once
-# the source protocol legitimately mentioned that path in prose, leaving
-# command lines unrewritten; the per-file idempotent anchors below replace it.)
+# skills THIS installer ships (the same set the copy loop above wrote), never
+# third-party skills under ~/.claude/skills. Three invocation prefixes need the
+# rewrite: `bash skills/_shared/...` (refresh-skill-registry.sh), `python3
+# skills/_shared/...`, and the machine `skills/_shared/scripts/ai-team` (anchored
+# on a non-slash predecessor so a rewritten path is never rewritten again).
+# Idempotent by construction; `{install_dir}/skills/...` references and prose
+# mentioning skill roots are left untouched.
 while IFS= read -r -d '' md_file; do
   if grep -qE 'bash skills/_shared/|python3 skills/_shared/|(^|[^/])skills/_shared/scripts/ai-team' "$md_file"; then
     sed -i -E \

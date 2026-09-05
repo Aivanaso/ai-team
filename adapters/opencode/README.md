@@ -5,8 +5,7 @@ Installs the ai-team organic evidence-tiered delegation framework into OpenCode 
 ## Prerequisites
 
 - [OpenCode](https://opencode.ai/) installed
-- `python3` on PATH — used by `skills/_shared/scripts/check-receipt.py`, the review-plane's
-  BLOCKING structural gate; never used for the merge below
+- `python3` on PATH — runs the `ai-team` machine (`skills/_shared/scripts/ai-team`); never used for the merge below
 - [`jq`](https://jqlang.github.io/jq/) installed (`brew install jq` / `apt install jq`) — used
   only for the `opencode.json` deep-merge
 
@@ -32,7 +31,9 @@ Installs the ai-team organic evidence-tiered delegation framework into OpenCode 
 ## Usage
 
 1. Select the **`orchestrator`** agent in OpenCode
-2. Talk to it directly — there are no slash commands. It classifies every feature/change request (Small/Medium/Large), delegates implementation to `organic-implementer`, and gates review and commit by evidence tier (see `~/.config/opencode/skills/_shared/orchestrator-protocol.md` for the full model)
+2. Talk to it directly — there are no slash commands. It classifies every request aloud (question · bounded · large), designs large changes with you, runs the `ai-team` machine (`~/.config/opencode/skills/_shared/scripts/ai-team`) and delegates each phase (cards: `~/.config/opencode/skills/_shared/cards/`).
+
+**Not covered on OpenCode:** the two Claude Code hooks (a launch without a ticket is denied; `status` printed at session start). On OpenCode the machine is the same but the discipline of calling it stays in `AGENTS.md` prose — see `.ai-team/tech-debt.md` in this repo for the pending OpenCode pass.
 
 ## opencode.json Merge Behavior
 

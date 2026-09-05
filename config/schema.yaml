@@ -14,7 +14,7 @@
 # step) but organic-scout does not itself write.
 #
 # Model routing defaults and rationale are NOT duplicated here — read
-# domain/skills/_shared/orchestrator-protocol.md -> "Model Routing" (a
+# adapters/claude-code/templates/agents/*.md and _shared/cards/delegate.md (a
 # stale duplicate of that table here previously caused contract drift
 # between adapters; see adapters/opencode/templates/AGENTS.md for the same
 # discipline applied to the OpenCode adapter).
@@ -30,7 +30,7 @@
 #   orchestrator at its own inline commit-creation step (default: auto if
 #   absent): auto commits at the objective's close without pausing; manual
 #   presents the staged file set and waits for user confirmation
-#   (orchestrator-protocol.md -> "Commit creation").
+#   (_shared/cards/commit.md).
 
 # model_overrides:
 #   {worker-name}: {model-alias}
@@ -38,13 +38,13 @@
 #   model_overrides:
 #     organic-reviewer: opus     # upgrade from the sonnet default
 #   Project-level override of the Model Routing table's per-worker
-#   defaults. Read by the orchestrator (orchestrator-protocol.md ->
+#   defaults. Read by the orchestrator (_shared/cards/delegate.md ->
 #   "Model Routing" -> "Project Override"). Worker names: organic-implementer
 #   | organic-reviewer | organic-security | organic-scout | organic-retro.
 
 # strict_tdd: true | false
 #   Read by the orchestrator before delegating organic-implementer
-#   (orchestrator-protocol.md -> "Sub-Agent Delegation" step 5). The STRICT TDD
+#   (_shared/cards/delegate.md). The STRICT TDD
 #   MODE directive is appended only when three conditions hold together:
 #   strict_tdd: true, test_commands.unit is declared below, and the objective
 #   changes behavior in a testable artifact the declared runner can exercise
@@ -60,15 +60,15 @@
 #                            # code-audit mode (organic-security/SKILL.md step 3);
 #                            # absent -> "Dependency auditor: not configured (skipped)"
 #   Additional project-declared build/lint commands are re-run by
-#   organic-reviewer's verification lens when the Task Brief's
+#   organic-reviewer's verification lens when the phase's
 #   acceptance_checks do not already cover them.
 
 # review_gates:
 #   - name: "<gate-id>"
 #     command: "<command>"   # exit 0 = pass; threshold lives inside the command / project config
 #     blocking: true          # optional, default true
-#   Optional, safe-absent. Read by organic-reviewer (SKILL.md Step 4) alongside the Task
-#   Brief's acceptance_checks re-run. Each gate command executes as an objective assertion —
+#   Optional, safe-absent. Read by organic-reviewer (SKILL.md Step 4) alongside the phase's
+#   acceptance_checks re-run. Each gate command executes as an objective assertion —
 #   exit code only. A failing gate lands in `lenses.correctness.findings[]`; its `file`/`line`
 #   cite this gate's own `name:`/`command:` declaration above — always resolvable. Findings
 #   carry their own per-finding `confidence`; the orchestrator's downstream triage is the
@@ -84,11 +84,11 @@
 #   as the canonical, annotated source; read the calibration note there.
 
 # retro: always | on-signal | off
-#   Optional, safe-absent default: on-signal. Read by the orchestrator when a task's Brief File
-#   flips to `status: done` (domain/skills/_shared/orchestrator-protocol.md -> "Retro trigger"):
+#   Optional, safe-absent default: on-signal. Read by the orchestrator when `ai-team close` flips a task to
+#   `done` (domain/skills/_shared/cards/close.md):
 #   always delegates organic-retro (mode: retro) unconditionally; on-signal delegates only when
-#   the task raised >=1 signal (a re-brief, an infra-death, a red blocking review_gates gate, or
-#   a single delegation reporting >300k tokens); off never delegates it. Canonical annotated
+#   the task raised >=1 signal (>=2 attempts on a phase, an infra-death, a review-blocked
+#   verdict, or a single ticket above 300k tokens); off never delegates it. Canonical annotated
 #   source: domain/skills/organic-scout/references/config-template.md.
 
 # rules:

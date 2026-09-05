@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# check-skill-budgets.sh -- Check that each skill's SKILL.md stays within the 250-line budget.
+# check-skill-budgets.sh -- Check that each skill's SKILL.md stays within the 250-line budget
+# and each orchestrator card (domain/skills/_shared/cards/*.md) within 60 lines.
 #
 # Usage:
 #   ./scripts/check-skill-budgets.sh
@@ -15,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 BUDGET=250
+CARD_BUDGET=60
 over=0
 total=0
 
@@ -40,10 +42,24 @@ for f in "${files[@]}"; do
   fi
 done
 
+shopt -s nullglob
+cards=("$REPO_ROOT"/domain/skills/_shared/cards/*.md)
+shopt -u nullglob
+for f in "${cards[@]}"; do
+  lines=$(wc -l < "$f")
+  total=$((total + 1))
+  if (( lines > CARD_BUDGET )); then
+    echo "OVER BUDGET: $f -- $lines lines (limit: $CARD_BUDGET)" >&2
+    over=$((over + 1))
+  else
+    echo "OK: $f -- $lines lines"
+  fi
+done
+
 if (( over > 0 )); then
   echo "check-skill-budgets: $over file(s) over budget." >&2
   exit 1
 else
-  echo "check-skill-budgets: all $total files within budget (<= $BUDGET lines)."
+  echo "check-skill-budgets: all $total files within budget (skills <= $BUDGET lines, cards <= $CARD_BUDGET)."
   exit 0
 fi

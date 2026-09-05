@@ -6,7 +6,7 @@
 > ONE file per report: the report's last content is a `## Receipt` heading followed by a single
 > fenced ```json block carrying that same Review Receipt object verbatim (same field names, no
 > additions). That block — never the prose around it — is what the orchestrator's BLOCKING
-> Citation audit validates (`_shared/scripts/check-receipt.py`, `orchestrator-protocol.md` →
+> machine validates at `ai-team settle --report` and `ai-team commit-check` (`ai_team/receipt.py`,
 > Evidence-Tier Review). No separate receipt file is written next to the report.
 >
 > **Exactly one ```json block per report.** A second one anywhere in the file — a JSON excerpt
@@ -62,7 +62,7 @@ table; the gap is noted in the envelope's `risks` instead — for an unrunnable 
 
 | Command | Exit Code | Violations fixed before return |
 |---------|-----------|--------------------------------|
-| python3 skills/_shared/scripts/check-receipt.py receipt {report_destination} . | {int} | none / {one line per VIOLATION fixed} |
+| skills/_shared/scripts/ai-team receipt check {report_destination} . | {int} | none / {one line per VIOLATION fixed} |
 
 ## Receipt
 
@@ -107,7 +107,7 @@ row in after the run never invalidates what the run observed.
 
 Expand each finding inside its lens section using this structure. `file` and `line` are two
 separate fields — the Review Receipt (`_shared/result-envelope.md` → Review Receipt) carries them
-split, and `check-receipt.py` validates them split (a joined `path:line` string would not resolve
+split, and `ai-team receipt check` validates them split (a joined `path:line` string would not resolve
 as either field). This `.md` narrative MAY still print them joined as `path:line` for a human
 reader; that rendering choice never changes what the receipt block carries.
 
@@ -122,7 +122,7 @@ reader; that rendering choice never changes what the receipt block carries.
 | `evidence` | `executed` \| `read` — `executed` = a command, mutation probe, scenario, or measurement against real data demonstrated the defect; `read` = the finding rests on code reading alone; for a `gate` finding this is always `executed` |
 | `trigger` | One line naming the concrete input/command/state that reaches the cited line and produces the defect. Optional in general; REQUIRED when `severity` is MAJOR or CRITICAL and `evidence` is `read` — a `read` finding with no `trigger` is emitted at MINOR as maximum (see SKILL.md Hard Rules) |
 | `description` | 1–3 sentences: the defect. A code or data excerpt here is fenced as ```text or indented — never as ```json, which would add a second block and fail the report's own gate |
-| `recommendation` | One paragraph or fix sketch — an unverified hypothesis: the lens verified the defect, not this fix; the orchestrator re-derives the edge case before acting on it (`orchestrator-protocol.md` → Recommendation ingestion) |
+| `recommendation` | One paragraph or fix sketch — an unverified hypothesis: the lens verified the defect, not this fix; the orchestrator re-derives the edge case before acting on it (`_shared/cards/review.md`: name the case, never paste the patch) |
 | `confidence_rationale` | One sentence: why this confidence level. For a `gate` finding: N/A — objective evidence (command + exit code), not a judgment call. |
 
 All five lens sections are always present in the output report ("No findings" if clean for
@@ -175,7 +175,7 @@ reason: "already clean in the prior pass" | "outside the delta scope"}
 
 | Command | Exit Code | Violations fixed before return |
 |---------|-----------|--------------------------------|
-| python3 skills/_shared/scripts/check-receipt.py receipt {report_destination} . | {int} | none / {one line per VIOLATION fixed} |
+| skills/_shared/scripts/ai-team receipt check {report_destination} . | {int} | none / {one line per VIOLATION fixed} |
 
 ## Receipt
 
