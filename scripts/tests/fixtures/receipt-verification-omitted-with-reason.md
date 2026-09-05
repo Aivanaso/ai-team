@@ -1,0 +1,31 @@
+# Review Report — fixture `receipt-verification-omitted-with-reason`
+
+Inherited from check-receipt.py's calibration suite; the prose is never parsed, only the single fenced json block below.
+
+## Receipt
+
+```json
+{
+  "tier": 1,
+  "tier_reason": "tier 1: standard code change",
+  "verdict": "review-clear",
+  "lenses": {
+    "correctness": {
+      "status": "findings",
+      "findings": [
+        {
+          "id": "F-1",
+          "severity": "MINOR",
+          "confidence": "medium",
+          "evidence": "read",
+          "file": "README.md",
+          "line": 1,
+          "claim": "README.md:1 documents the project name"
+        }
+      ]
+    }
+  },
+  "verification": [],
+  "verification_omitted_reason": "no candidate changes to review (group_files empty)"
+}
+```

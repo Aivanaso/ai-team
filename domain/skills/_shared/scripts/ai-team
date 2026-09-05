@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# ai-team -- launcher for the task state machine (Python stdlib; see ../machine.md).
+# Resolves symlinks so the package is found next to the real file.
+here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+exec python3 "$here/ai_team/cli.py" "$@"
