@@ -19,7 +19,8 @@ change needs a 4th file to understand, it was large: say so and switch.
 2. Write the four lines in chat, in the user's language:
    **objective** (the observable result) · **decisions** (invariants in plain words, each with
    how it is demonstrated) · **check** (a runnable command) · **out of scope**.
-3. Wait for the yes. Then, verbatim:
+3. Wait for the yes. An explicit advance approval in the request ("apruebo de antemano",
+   "no me preguntes", "sin confirmar") IS the yes: write the four lines aloud and go on. Then, verbatim:
    ```
    ai-team new <slug> --kind bounded
    ai-team plan generate --objective "…" --decision "…" [--decision "…"] --check "…" [--check "…"] --out-of-scope "…" --file <path> [--file <path>]
