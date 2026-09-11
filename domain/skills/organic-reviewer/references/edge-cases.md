@@ -95,11 +95,21 @@ when the failure surfaces a stack trace or assertion message — the `file:line`
 This is a discrepancy in verified behavior, not a style disagreement; never reconcile it
 silently (Decision Gates).
 
+## Prior Report Is `none`
+
+**Condition:** `attempt` ≥ 2 and the orchestrator injects `prior_report: none` — `ai-team acquire
+reviewer` said so because no reviewer report exists for an earlier attempt of this phase (the
+earlier implementer settled `needs_input` or `blocked`, so no lens ever ran).
+
+**Behavior:** Run the full pass exactly as attempt 1 would, and omit `verdict_history` and
+`not_reverified` from the receipt. There is nothing to chain from; a block here would ask the
+orchestrator for a report that cannot exist (ECO-1267 retro F3).
+
 ## Prior Report Unreadable or Delta Scope Absent
 
-**Condition:** `prior_report` is injected but cannot be read on disk (missing, moved, permission
-error), or no `delta_scope` accompanies it, or `delta_scope.findings_to_verify` is an empty
-list.
+**Condition:** `prior_report` names a path but it cannot be read on disk (missing, moved,
+permission error), or no `delta_scope` accompanies it, or `delta_scope.findings_to_verify` is an
+empty list.
 
 **Behavior:** Return `status: blocked`, `failure_class: review`, naming the unreachable path or
 the missing field. Do NOT fall back to a bounded pass with an empty closure list — a `verdict:

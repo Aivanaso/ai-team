@@ -240,7 +240,7 @@ def cmd_acquire(args):
     if ticket["phase"] is not None:
         line += " phase %d attempt %s" % (ticket["phase"], ticket["attempt"])
     print(line)
-    hint = machine.attempt_hint(ticket["kind"], ticket["attempt"])
+    hint = machine.attempt_hint(task, ticket)
     if hint:
         print(hint)
     print("settle with: ai-team settle %s --outcome <ok|warning|needs_input|blocked|failed|infra-death> --model <m> --tokens <n> --tool-uses <n> --duration <s>%s"

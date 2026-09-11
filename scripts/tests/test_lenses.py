@@ -44,6 +44,44 @@ class OneLensAtATime(LensCase):
         self.assertIn("t2 (security-audit) is open", err)
 
 
+class PriorReportHint(ProjectCase):
+    """Attempt ≥ 2 of a lens: the machine says whether an earlier report exists, so the
+    reviewer runs a delta pass over it or a full pass with `prior_report: none` -- and never
+    blocks on a path nobody could have injected (ECO-1267 retro F3)."""
+
+    def setUp(self):
+        super().setUp()
+        self.ai("new", "demo", "--kind", "bounded")
+        self.ai("plan", "generate", "--objective", "x", "--file", "src/app.py", "--check", "true",
+                "--failure", "never green when the shell is broken")
+
+    def implement(self, outcome):
+        _, out, _ = self.ai("acquire", "implementer", "--phase", "1")
+        self.ai("settle", out.split()[1], "--outcome", outcome, "--model", "sonnet", "--tokens", "1", "--tool-uses", "1", "--duration", "1")
+
+    def test_first_attempt_never_reached_review_so_the_second_is_a_full_pass(self):
+        self.implement("needs_input")
+        self.implement("ok")
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        self.assertIn("attempt 2: full pass", out)
+        self.assertIn("attempt 1 settled needs_input", out)
+        self.assertIn("prior_report: none", out)
+
+    def test_an_earlier_report_makes_the_second_attempt_a_delta_pass(self):
+        self.implement("ok")
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        self.assertNotIn("attempt 1:", out)  # a first lens pass carries no hint
+        report = self.write(".ai-team/reviews/t2.md", receipt_block(full_receipt(
+            [{"id": "F-1", "severity": "CRITICAL", "confidence": "high", "evidence": "executed", "file": "src/app.py", "line": 1, "claim": "c"}])))
+        self.ai("settle", "t2", "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1", "--duration", "1", "--report", report)
+        self.implement("ok")
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        self.assertIn("attempt 2: delta pass", out)
+        self.assertIn(".ai-team/reviews/t2.md", out)
+
+
 class LedgerNotIgnored(LensCase):
     """A project that does not gitignore .ai-team/: the machine's own writes between two
     settles (task JSON, tier, the lens report) are never counted as a moved tree."""

@@ -77,9 +77,16 @@ structure above (the orchestrator-side counterpart is `_shared/cards/delegate.md
   Contract checks) exactly once. Never add a generic "verify your work" / "double-check before
   returning" line on top of them — stacked re-check instructions waste tokens without a quality
   gain.
+- **Positive rules.** A rule states what the agent does and which field carries it: "a check is
+  `pass` only when executed in this cycle and its exit code observed" instead of "never infer a
+  check". A negation leaves the model to guess the alternative and is processed less reliably
+  than an instruction; a rule that matters is a gate or a field the machine validates, and the
+  prose names the gate. "never" survives only where no positive form exists, and then names the
+  action to take instead.
 - **Positive exemplars for style.** To shape a report's or summary's shape, show the wanted form
-  (a worked example in `references/`) rather than listing prohibited forms. Reserve "MUST NOT" /
-  "never" prohibitions for Hard Rules — contract constraints, not style guidance.
+  (a worked example in `references/`) rather than listing prohibited forms.
+- **English.** SKILL.md, references and every artifact an agent writes for another agent are in
+  English (`common-rules.md` → Principle 7); quotes from the user stay in the user's language.
 - **Coverage over self-filtering.** A lens skill (`organic-reviewer`, `organic-security`) never
   suppresses a finding by confidence — it reports every finding with its own `confidence` field
   and lets the orchestrator's downstream triage filter (see `result-envelope.md` → Review

@@ -25,8 +25,8 @@ itself and records what it saw.
 ```
 ai-team plan generate            # uses the recorded scope report
 ```
-Objective → objective; Decisiones (+ Seguridad measures) → constraints, verbatim; Fuera de
-alcance → out of scope; each phase's scenarios and calibrated checks → acceptance checks; a
+Objective → objective; Decisions (+ Security measures) → constraints, verbatim; Out of
+scope → out of scope; each phase's scenarios and calibrated checks → acceptance checks; a
 check the scout could not run → an open question; the scout's files → expected files and
 edit roots.
 

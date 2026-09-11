@@ -258,14 +258,31 @@ class Machine:
         self.store.save(task)
         return ticket
 
-    def attempt_hint(self, kind, attempt):
-        if kind != "implementer" or attempt is None:
+    def attempt_hint(self, task, ticket):
+        """The line printed under an issued ticket: how this attempt is launched."""
+        kind, attempt = ticket["kind"], ticket["attempt"]
+        if attempt is None:
             return None
-        if attempt in RESUME_ATTEMPTS:
-            return "attempt %d: resume the attempt-1 implementer (SendMessage) with the findings" % attempt
-        if attempt in FRESH_STRONGER_ATTEMPTS:
-            return "attempt %d: fresh implementer on the stronger model (opus)" % attempt
-        return "attempt 1: fresh implementer (sonnet)"
+        if kind == "implementer":
+            if attempt in RESUME_ATTEMPTS:
+                return "attempt %d: resume the attempt-1 implementer (SendMessage) with the findings" % attempt
+            if attempt in FRESH_STRONGER_ATTEMPTS:
+                return "attempt %d: fresh implementer on the stronger model (opus)" % attempt
+            return "attempt 1: fresh implementer (sonnet)"
+        if kind in LENS_KINDS and attempt >= 2:
+            return self._lens_prior_hint(task, kind, ticket["phase"], attempt)
+        return None
+
+    def _lens_prior_hint(self, task, kind, phase_n, attempt):
+        """Attempt ≥ 2 of a lens is a delta pass over the earlier report -- when one exists. An
+        earlier attempt that settled before reaching review left none, and the lens runs a full
+        pass with `prior_report: none` instead of deducing that from an absent path."""
+        earlier = [t for t in self.tickets(task, kind, phase_n, settled=True) if t["attempt"] < attempt and t.get("report")]
+        if earlier:
+            return "attempt %d: delta pass -- inject prior_report %s and its delta_scope" % (attempt, earlier[-1]["report"])
+        impls = [t for t in self.tickets(task, "implementer", phase_n, settled=True) if t["attempt"] < attempt]
+        why = "; ".join("attempt %d settled %s" % (t["attempt"], t["outcome"]) for t in impls) or "no earlier attempt reached review"
+        return "attempt %d: full pass -- no earlier %s report exists for this phase (%s); inject prior_report: none" % (attempt, kind, why)
 
     def settle(self, task, ticket_id, outcome, model=None, tokens=None, tool_uses=None,
                duration_s=None, report=None, defer=()):
@@ -511,8 +528,10 @@ class Machine:
                 denied.append((label, missing[0]))
             else:
                 hint = ""
-                if kind == "implementer" and current is not None:
-                    hint = " (%s)" % self.attempt_hint(kind, current["attempts"] + 1)
+                if current is not None and (kind == "implementer" or kind in LENS_KINDS):
+                    attempt = current["attempts"] + (1 if kind == "implementer" else 0)
+                    line = self.attempt_hint(task, {"kind": kind, "attempt": attempt, "phase": current["n"]})
+                    hint = " (%s)" % line if line else ""
                 allowed.append("acquire %s%s" % (label, hint))
         for ticket in self.open_tickets(task):
             allowed.append("settle %s" % ticket["id"])

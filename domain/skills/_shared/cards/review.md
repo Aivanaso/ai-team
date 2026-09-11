@@ -28,7 +28,9 @@ touched). Run security even when the reviewer blocked: attempt 2 fixes both list
 Inject: `design` (or none), `phase_file`, `group_files` (expected files ∪ artifacts),
 `tier`, `tier_reason`, `attempt`, the implementer's `check_results` and `decisions_taken`,
 `report_destination: .ai-team/reviews/<task>-phase-<n>-attempt-<k>-<lens>.md`; from attempt 2,
-`prior_report` and `delta_scope {findings_to_verify, changed_files, prior_verdict_history}`.
+what `acquire` printed: `prior_report <path>` plus `delta_scope {findings_to_verify, changed_files,
+prior_verdict_history}` for a delta pass, or `prior_report: none` for a full pass (the earlier
+attempt settled before any lens ran).
 The reviewer checks **conformity** (every decision and every scenario of the phase met,
 nothing missing, nothing extra) and correctness, and re-runs the checks. Security at tier 2
 verifies the `## Seguridad` measures are implemented.

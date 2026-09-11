@@ -18,9 +18,12 @@ change needs a 4th file to understand, it was large: say so and switch.
 1. Read the 1–3 files yourself. Ask the questions that matter, one message.
 2. Write the four lines in chat, in the user's language:
    **objective** (the observable result) · **decisions** (invariants in plain words, each with
-   how it is demonstrated) · **check** (a runnable command) · **out of scope**.
+   how it is demonstrated) · **check** (a runnable command) · **out of scope**. A decision that
+   classifies an external system's response carries the sample body verbatim, or says "no
+   sample available" so the implementer asks for one.
 3. Wait for the yes. An explicit advance approval in the request ("apruebo de antemano",
-   "no me preguntes", "sin confirmar") IS the yes: write the four lines aloud and go on. Then, verbatim:
+   "no me preguntes", "sin confirmar") IS the yes: write the four lines aloud and go on. Then pass
+   them to the machine in English — the plan is what the implementer reads (`_shared/common-rules.md` → Principle 7):
    ```
    ai-team new <slug> --kind bounded
    ai-team plan generate --objective "…" --decision "…" [--decision "…"] --check "…" --failure "…" [--check "…" --failure "…"] --out-of-scope "…" --file <path> [--file <path>]

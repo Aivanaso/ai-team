@@ -44,7 +44,8 @@ the changed files for new inconsistencies, and the checks — not the prior pass
 |---|---|
 | Missing `project_root`, `phase_file`, `group_files`, `tier`, `tier_reason`, `attempt` or `report_destination` | `status: blocked`, `failure_class: null`, name the fields. Never guess. |
 | `phase_file` or the injected `design` unreadable | `status: blocked`, `failure_class: review`, cite the path — conformity cannot be checked against a missing contract. |
-| `attempt` ≥ 2 AND (`prior_report` unreadable OR `delta_scope` absent OR `findings_to_verify` empty OR `prior_verdict_history` empty) | `status: blocked`, `failure_class: review`, name the gap — never a delta on a guessed scope. |
+| `attempt` ≥ 2 AND `prior_report: none` injected (the machine found no earlier reviewer report for this phase: the earlier attempt settled before reaching review) | Full pass (Execution Steps 3–7), no `verdict_history`. |
+| `attempt` ≥ 2 AND `prior_report` names a path AND (the path is unreadable OR `delta_scope` absent OR `findings_to_verify` empty OR `prior_verdict_history` empty) | `status: blocked`, `failure_class: review`, name the gap — a delta pass needs the real prior scope, so the orchestrator re-injects it. |
 | `attempt` ≥ 2 with a valid delta scope | DELTA MODE (Execution Step 2). |
 | DELTA MODE AND `git -C {project_root} diff HEAD --name-only` contains a path outside `delta_scope.changed_files` and the prior report's Scope | CRITICAL correctness finding "delta scope exceeded — full pass required"; verdict follows. |
 | A `group_files` file cannot be read (permission, escapes `project_root`, git fails) | `status: blocked`, `failure_class: review`. |

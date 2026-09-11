@@ -17,8 +17,8 @@ Open questions → questions to the user. Gotchas and conditions → surfaces th
 
 ## 2. Brainstorm, then write the file
 
-Two or three approaches, the chosen one and why. YAGNI. Then the file, in this shape
-(frontmatter keys in English; section names Spanish or English):
+Two or three approaches, the chosen one and why. YAGNI. Then the file, in English (the
+scout, the implementer and the lenses read it; the conversation stays in the user's language):
 
 ```
 ---
@@ -28,28 +28,31 @@ status: draft
 map_report: ".ai-team/explorations/<task>-map.md"
 security: pending | not-needed
 ---
-## Objetivo · ## Contexto · ## Preguntas y respuestas · ## Enfoques considerados
-## Diseño  (### Componentes y flujo · ### Errores y casos límite · ### Superficies nombradas  · ### Condiciones externas a conservar)
-## Decisiones · ## Seguridad · ## Fuera de alcance · ## Fases
+## Objective · ## Context · ## Questions and answers · ## Approaches considered
+## Design  (### Components and flow · ### Errors and edge cases · ### Named surfaces · ### External conditions to preserve)
+## Decisions · ## Security · ## Out of scope · ## Phases
 ```
 
-- **Superficies nombradas**: one bullet per file, `path:line` or `path (nueva)`.
-- **Decisiones**: bullets; invariants, never mechanisms (the rewrite test, card: classify).
-- **Fases**: `### Fase N — Title`, then `Entrega:`, `Escenarios:` (bullets, given/when/then),
+- **Named surfaces**: one bullet per file, `path:line` or `path (new)`, relative to this
+  task's repository root. A change that spans repositories is one task per repository.
+- **Decisions**: bullets; each an invariant in plain words plus how it is demonstrated (the
+  rewrite test, card: classify). A "follows the precedent of X" names the axis X must share
+  with the new case (same module, same fetch count, same response shape) and cites it.
+- **Phases**: `### Phase N — Title`, then `Delivers:`, `Scenarios:` (bullets, given/when/then),
   `Check:` with the command in backticks. The first phase is visible or runnable on its own.
-- No placeholders. Self-review for contradictions, ambiguity, scope before asking for the yes.
+- Every field filled. Self-review for contradictions, ambiguity, scope before asking for the yes.
 
 ## 3. Security gate (only when the design touches a tier-2 surface)
 
 Auth, crypto, secrets, payments, PII, migrations/deletion, untrusted-input parsing, permission
 checks, public contracts, a blocking gate of the review plane → `security: pending`, then
 `ai-team acquire security-threat-model` (sonnet, high) over the design FILE. Its MUST/SHOULD
-requirements are copied into `## Seguridad` as decisions. Otherwise `security: not-needed`
-with the reason in `## Seguridad`.
+requirements are copied into `## Security` as decisions. Otherwise `security: not-needed`
+with the reason in `## Security`.
 
 ## 4. Approval
 
-Walk the user through **Decisiones** one by one, in their language, before asking. Then:
+Walk the user through **Decisions** one by one, in their language, before asking. Then:
 ```
 ai-team design approve .ai-team/designs/<task>.md
 ```
