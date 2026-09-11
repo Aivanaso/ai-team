@@ -10,25 +10,25 @@ user-invocable: false
 Two moments, two modes. **threat-model** (before the design is approved): the input is the
 design FILE (`.ai-team/designs/<task>.md`, one page, no diff); read its objective, surfaces,
 external conditions and decisions, walk the touchpoints, and return MUST/SHOULD security
-requirements the orchestrator copies into the design's `## Seguridad` as decisions. **code-audit**
+requirements the orchestrator copies into the design's `## Security` as decisions. **code-audit**
 (tier 2, after an implementer attempt): the input is the phase candidate (`group_files`), the
-phase file and the design's `## Seguridad`; verify that every security measure the design
+phase file and the design's `## Security`; verify that every security measure the design
 decided is implemented, then audit the diff with the five categories; the report's final
 fenced ```json block is a security-fragment receipt the machine validates at settle time.
-Read application code to find vulnerabilities; never modify it.
+Application code is read to find vulnerabilities; the report is the only file written.
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority, English — see `_shared/common-rules.md`.
 - Writes only the report at the injected `report_destination` (a FILE path ending in `.md`).
 - Every finding cites `file:line` (Rule 1); in threat-model mode a requirement cites the design line or surface it protects. Uncited candidates are dropped and named in `risks`.
-- Report every finding, uncertain or minor included, each with `confidence` and `severity`; in code-audit also `evidence: executed | read` and a `trigger` when `read` and MAJOR/CRITICAL (else MINOR at most). Low confidence never lowers a severity.
-- Code-audit: a `## Seguridad` measure not implemented is a CRITICAL finding (`read`, trigger = the measure text); a measure implemented differently from what the design decided is a MAJOR. -- because the threat-model's measures entered the design as decisions the user approved.
+- Report every finding, uncertain or minor included, each with `confidence` and `severity`; in code-audit also `evidence: executed | read` and a `trigger` when `read` and MAJOR/CRITICAL (else MINOR at most). Severity follows the evidence; confidence travels beside it.
+- Code-audit: a `## Security` measure missing from the candidate is a CRITICAL finding (`read`, trigger = the measure text); a measure implemented differently from what the design decided is a MAJOR. -- because the threat-model's measures entered the design as decisions the user approved.
 - Threat-model: a fragile invariant ("safe today because a cleanup happens to run") becomes a MUST/SHOULD requirement so the design owns a structural guard, or the user accepts the risk explicitly.
 - The nine touchpoint slugs (verbatim): `auth/authz`, `crypto`, `deserialization`, `file-io-uploads`, `network-ssrf`, `db-direct-input`, `new-dependencies`, `env-secrets`, `regex-external-input`.
-- No commit-blocking verdict of its own: the fragment carries no `verdict`; the machine derives blocked from any CRITICAL in `lenses.security` at commit-check.
+- The fragment carries no `verdict`: the machine derives blocked from any CRITICAL in `lenses.security` at commit-check.
 - Receipt self-validation in code-audit, every pass: `skills/_shared/scripts/ai-team receipt check {report_destination} .`; fix every VIOLATION; record command, exit code and fixes in `## Receipt Self-Validation`.
-- One report, one block (code-audit): every other JSON excerpt is fenced ```text. Threat-model writes no json block at all.
+- One report, one block (code-audit): every other JSON excerpt is fenced ```text. Threat-model is prose only.
 - Git is for inspection only (`diff`, `log`, `show`, `status`); the tree you settle on is the tree you were given — a probe that mutates a file restores it byte for byte and says so in the report (`_shared/common-rules.md` → Mutation probe).
 
 ## Decision Gates
@@ -51,19 +51,19 @@ Read application code to find vulnerabilities; never modify it.
 ### Mode threat-model
 
 1. Read `_shared/context-protocol.md`, `_shared/persistence-contract.md`. Validate `mode`, `project_root`, `design`, `report_destination`, optional `security_touchpoints`.
-2. Read the design: `## Objetivo`, `### Superficies nombradas`, `### Condiciones externas a conservar`, `## Decisiones`, `## Fases`. For each surface, read the file at the cited line and its 1-hop callers.
+2. Read the design: `## Objective`, `### Named surfaces`, `### External conditions to preserve`, `## Decisions`, `## Phases`. For each surface, read the file at the cited line and its 1-hop callers.
 3. For each triggered touchpoint apply the five categories (input validation / auth+authz / crypto+secrets / injection+RCE / data exposure — [references/worked-examples.md](references/worked-examples.md)).
 4. Temporal Invariant Sweep: temporal fields the design or its schemas name; rejection semantic per field; every read path; a read path deciding auth/access/state without the check is a finding.
 5. Seam & Failure Sweep: failure mode per call site, interleaving per mutated field, crash window per multi-store sequence.
-6. Write the report at `report_destination` per [references/threat-model-template.md](references/threat-model-template.md): summary, touchpoints, findings, both sweeps, and `## Security requirements` — one MUST/SHOULD line each, phrased as an invariant the design can adopt verbatim, with the surface it protects. No json block; a one-line "no receipt block in this mode".
+6. Write the report at `report_destination` per [references/threat-model-template.md](references/threat-model-template.md): summary, touchpoints, findings, both sweeps, and `## Security requirements` — one MUST/SHOULD line each, phrased as an invariant the design can adopt verbatim, with the surface it protects. Prose only, closed by the one-line note "no receipt block in this mode".
 7. Return the envelope.
 
 ### Mode code-audit
 
 1. Read the protocols. Validate `mode`, `project_root`, `design`, `phase_file`, `group_files`, `tier`, `tier_reason`, `report_destination`.
-2. Read the design's `## Seguridad` (the measures) and the phase file; resolve and read every `group_files` file in full plus up to 10 1-hop callers; `git -C {project_root}` for any inspection.
+2. Read the design's `## Security` (the measures) and the phase file; resolve and read every `group_files` file in full plus up to 10 1-hop callers; `git -C {project_root}` for any inspection.
 3. Read `config.yaml`; run `test_commands.security` if declared, else note "not configured (skipped)".
-4. Measures first: for each `## Seguridad` bullet, find its implementation in the candidate (`file:line`) or record the CRITICAL/MAJOR finding the Hard Rules prescribe.
+4. Measures first: for each `## Security` bullet, find its implementation in the candidate (`file:line`) or record the CRITICAL/MAJOR finding the Hard Rules prescribe.
 5. The five categories on `group_files`; the enforcement-wiring check (every new guard ships its executor).
 6. Write the report per [references/audit-report-template.md](references/audit-report-template.md): the six category sections, `## Security measures` (implemented / missing), `## Receipt Self-Validation`, and `## Receipt` with the single ```json block `{ "kind": "security-fragment", "tier", "tier_reason", "lenses": { "security": { "status", "findings" } } }`. Self-check with `skills/_shared/scripts/ai-team receipt check {report_destination} .` until exit 0.
 7. Return the envelope.

@@ -6,7 +6,7 @@
 
 Each SKILL.md Hard Rules section MUST contain exactly one reference line as the FIRST bullet:
 
-    - Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
+    - Follows common rules: read-only on app code, write-scope, envelope-always, seniority, English — see `_shared/common-rules.md`.
 
 Skill-specific rules follow this bullet. Verbatim reproduction of the principles below is a violation.
 

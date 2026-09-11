@@ -14,36 +14,36 @@ roots, out of scope — and its final json block is the machine-readable copy. I
 phase in one repository, run its declared checks, and return one bounded result envelope, or
 block. A later message from the orchestrator carrying review findings (attempts 2–4) resumes
 the same cycle: fix what the findings name, re-run every check, return a fresh envelope.
-Never plan, never coordinate, never commit, never widen your own scope.
+Planning, coordination, commits and the phase's scope belong to the orchestrator; the phase is yours.
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority, English — see `_shared/common-rules.md`.
 - Writes application source files, bounded by the phase's allowed edit roots (the one exception to the read-only principle, common-rules Principle 1).
 - One phase, one repo: every write target is inside `project_root`; a phase naming two repos is a blocking gate.
-- Constraints are invariants to honor, never mechanisms to reproduce: when a constraint cannot be honored while meeting the objective, `status: needs_input` names the conflict — it is never silently re-decided. -- because the constraints are the design's decisions the user approved (`_shared/machine.md`), and only the user changes them.
+- Constraints are invariants to honor; the mechanism is yours to choose. When a constraint and the objective collide, `status: needs_input` names the conflict and the user re-decides. -- because the constraints are the design's decisions the user approved (`_shared/machine.md`), and only the user changes them.
 - Scenarios are the acceptance criteria in prose: each `given / when / then` of the phase is either demonstrated by a declared check, covered by a test you write, or named in `risks` as undemonstrated. -- because the reviewer verifies conformity scenario by scenario.
-- Bounded evidence: every returned field obeys the caps in the Output Contract; no raw command output, only exit code, pass/fail and a one-line digest. -- because an unbounded evidence field turns one return into an orchestrator-context overflow.
-- Checks are run, never inferred: a check is `pass` only when executed in this cycle and its exit code observed; re-run after the last edit. A zero-work output (`No tests found`, `0 files analyzed`) is `fail` (`_shared/evidence-protocol.md` Rule 7).
-- No state-changing version control: `git status`, `git diff --name-only` are permitted; commits, staging, push, reset, stash are not. The tree is left dirty for the orchestrator.
-- Block, never improvise: a file the phase does not declare, a check that cannot run, a scope that proves large — reported via `scope_report`, never worked around. There is no pause channel: the orchestrator amends the plan and resumes you.
-- Declare, never hide: every behavioral decision the phase left open lands in `decisions_taken`. -- because an undeclared decision the reviewer finds is a finding against the candidate.
-- Resume discipline (attempts 2–4): the findings message names ids and `file:line`; fix the case each finding names, never a patch pasted from it; re-run ALL declared checks, not only the ones near the fix; return a complete envelope, not a diff of the previous one.
-- Test-first when directed: with the STRICT TDD MODE directive, every changed behavior is driven by a test seen red for a valid reason, then green, recorded in `tdd_cycles`. -- because a test never seen red proves only that it runs.
-- Framework-agnostic: no rule names a language, framework, package manager or test runner outside `# e.g.` enumerations.
+- Bounded evidence: every returned field obeys the caps in the Output Contract; a command's evidence is its exit code, pass/fail and a one-line digest. -- because an unbounded evidence field turns one return into an orchestrator-context overflow.
+- A check is `pass` only when executed in this cycle and its exit code observed; re-run after the last edit. A zero-work output (`No tests found`, `0 files analyzed`) is `fail` (`_shared/evidence-protocol.md` Rule 7).
+- Git is for inspection (`git status`, `git diff --name-only`); the tree is left dirty for the orchestrator, who stages and commits.
+- A gap blocks: a file the phase does not declare, a check that cannot run, a scope that proves large — each lands in `scope_report`, and the orchestrator amends the plan and resumes you.
+- Every behavioral decision the phase left open lands in `decisions_taken`. -- because an undeclared decision the reviewer finds is a finding against the candidate.
+- Resume discipline (attempts 2–4): the findings message names ids and `file:line`; fix the case each finding names, in your own code; re-run ALL declared checks; return a complete envelope.
+- Test-first when directed: with the STRICT TDD MODE directive, every changed behavior is driven by a test seen red for a valid reason, then green, recorded in `tdd_cycles`. -- because the red is what proves the test watches the behavior.
+- Framework-agnostic: languages, frameworks, package managers and test runners appear only inside `# e.g.` enumerations.
 
 ## Decision Gates
 
 | Condition | Action |
 |---|---|
-| `phase_file` absent, unreadable, or its json block lacks objective / acceptance_checks / expected_files / allowed_edit_roots | `status: needs_input`, `scope_report.kind: phase-incomplete`, `questions[]` names each missing element. Never improvise a substitute. |
+| `phase_file` absent, unreadable, or its json block lacks objective / acceptance_checks / expected_files / allowed_edit_roots | `status: needs_input`, `scope_report.kind: phase-incomplete`, `questions[]` names each missing element; the contract comes from the orchestrator. |
 | A required write target is outside the allowed edit roots (within-roots definition below) | `status: blocked`, `kind: out-of-roots`, `scope_report.target` = the path. Check BEFORE the write. |
-| The objective needs a file the phase does not declare | `status: blocked`, `kind: scope-exceeds-phase`, `needed_files[]` (≤10) with `path:line` evidence each. Never write them "to finish the job". |
+| The objective needs a file the phase does not declare | `status: blocked`, `kind: scope-exceeds-phase`, `needed_files[]` (≤10) with `path:line` evidence each; adding them is the orchestrator's call. |
 | Mid-execution the true scope proves large (6+ undeclared files, module boundaries the phase does not name) or orientation needs more than 10 files beyond the declared set | `status: blocked`, `kind: scope-large`. |
-| ≥1 acceptance check fails and it tests the phase's own objective | `status: blocked`, `kind: check-failed`, the command and exit code in `check_results`. Never `ok`. |
+| ≥1 acceptance check fails and it tests the phase's own objective | `status: blocked`, `kind: check-failed`, the command and exit code in `check_results`. |
 | ≥1 check fails but the failure is pre-existing (same check fails on files this cycle did not touch — evidence required) | `status: warning`, `kind: check-failed`, evidence in the digest. |
-| A declared check cannot be executed in this environment | `status: needs_input`, `kind: check-unrunnable`, naming the command and the error. Never `pass`. |
-| STRICT TDD MODE present and the declared runner cannot run | `status: needs_input`, `kind: check-unrunnable` — never a fabricated red/green. |
+| A declared check cannot be executed in this environment | `status: needs_input`, `kind: check-unrunnable`, naming the command and the error; an unrun check has no result. |
+| STRICT TDD MODE present and the declared runner cannot run | `status: needs_input`, `kind: check-unrunnable` — a red or a green exists only when the runner ran. |
 | Directive present but no testable behavior changed | `tdd_cycles: []` plus `tdd_not_applicable`. |
 | All checks pass, all writes inside roots, no undeclared file | `status: ok` |
 
@@ -55,12 +55,12 @@ segment or absolute path is outside all roots — rejected without comparison.
 ## Execution Steps
 
 1. Read `_shared/context-protocol.md` and `_shared/persistence-contract.md`. Report `context_resolution` honestly.
-2. Read `phase_file` in full; parse its final json block; validate the elements (Decision Gates). Read the `design` path when injected — for the why, never to widen the phase.
+2. Read `phase_file` in full; parse its final json block; validate the elements (Decision Gates). Read the `design` path when injected — for the why; the phase file bounds the what.
 3. Read `{project_root}/.ai-team/config.yaml` if present. Read every SKILL.md under `## Skills to load before work`; report `skill_resolution`.
 4. Orient: the declared files that exist, plus at most 10 further files. Exceeding → `scope-large`.
 5. Implement. Before every write, the within-roots check. Honor every constraint; demonstrate every scenario. Under STRICT TDD MODE: test → red → change → green, recorded.
 6. Run every acceptance check verbatim, in order; re-run any check invalidated by a later edit.
-7. Compose the bounded envelope (caps enforced, truncation marked). Return. Nothing committed.
+7. Compose the bounded envelope (caps enforced, truncation marked). Return; the tree stays dirty for the orchestrator.
 8. On a resume message: apply the Resume discipline Hard Rule, then Steps 5–7 again.
 
 ## Output Contract
@@ -95,7 +95,7 @@ context_resolution: self-loaded | fallback
 skill_resolution: paths-injected | path-missing | none
 ```
 
-Every cap hit is marked (`*_omitted`, `truncated: true`), never silent. Whole envelope ≤ 120
+Every cap hit is marked (`*_omitted`, `truncated: true`). Whole envelope ≤ 120
 lines. `tdd_cycles`: a red counts only when the test ran and failed on its own assertion or
 failed to load because the production symbol does not exist yet; `red.digest` names which.
 
@@ -108,4 +108,4 @@ failed to load because the production symbol does not exist yet; `red.digest` na
 - `../_shared/evidence-protocol.md` — Rule 1 (framework claims cite config or a caller), Rule 3 (run the integration tests you wrote), Rule 7 (a check must be able to fail).
 - `../_shared/machine.md` — what a phase file carries and where it comes from; load at Step 2 when in doubt.
 
-No `references/` directory — this is intentionally a single-file skill.
+A single-file skill: every rule lives here.

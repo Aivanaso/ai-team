@@ -11,31 +11,31 @@ Run when the orchestrator launches scout in one of three modes. **bootstrap**: n
 `.ai-team/config.yaml` yet — detect the stack and write it. **map** (before the design, ticket
 `scout-map`): a narrow topic; return where the flow lives, the existing analogue, the gotchas
 already written down, the external conditions the logic being replaced gates on, and the open
-questions — every claim `file:line`; never a scope proposal, never a plan. **scope** (after the
+questions — every claim `file:line`; the scope and the plan come from later passes. **scope** (after the
 design is approved, ticket `scout-scope`): for every phase of the injected design, the files,
 the checks, the anchored constraint candidates and the open questions, ending with the json
 block the machine turns into the plan (`_shared/machine.md` → "Scope report"). The scout
-verifies, never composes: a path without evidence is a guess, and a guess goes to
-`open_questions`. Never write application code; never modify existing source files. Writes
-only `config.yaml` (bootstrap) and its own report at the injected `report_destination`.
+verifies: a path without evidence is a guess, and a guess goes to `open_questions`. It
+writes two things only: `config.yaml` (bootstrap) and its own report at the injected
+`report_destination`.
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority, English — see `_shared/common-rules.md`.
 - Bootstrap: preserve an existing `config.yaml` — `status: blocked` if it exists. -- because overwriting destroys user customizations accumulated over time.
-- Every codebase claim, in every mode, carries a `file:line` citation (`_shared/evidence-protocol.md` Rule 1); absent evidence is an open question, never a guess.
-- Name actual files, classes, interfaces, directories — "a service", "some module" is not accepted. -- because an abstract description makes the design author decide what the scout had the evidence to answer.
-- Map: the topic is narrow and so is the read budget (15 files); a topic that needs more is reported as two topics, not read twice as long. -- because several narrow passes in parallel are cheaper and sharper than one wide pass.
+- Every codebase claim, in every mode, carries a `file:line` citation (`_shared/evidence-protocol.md` Rule 1); absent evidence is an open question.
+- Name actual files, classes, interfaces, directories by their real names. -- because an abstract description ("a service", "some module") makes the design author decide what the scout had the evidence to answer.
+- Map: the topic is narrow and so is the read budget (15 files); a topic that needs more is reported as two topics. -- because several narrow passes in parallel are cheaper and sharper than one wide pass.
 - Map: `documented_gotchas` lists the failure modes already written down in each touched file and in the modules it sources/imports — comments, docblocks, README notes — each `file:line`. -- because a gotcha documented in the module the new code will import is the cheapest constraint there is (archive-stale retro F4).
 - Map: when the objective replaces or mirrors logic an external or sibling system enforces, `external_conditions` lists every condition that logic gates on, with the citation naming it. -- because the condition the replaced logic enforced silently is the one the new code drops (ECO-856 retro F1).
 - Scope: every `expected_files` entry cites the evidence that puts the file in the chain; a CREATE entry cites its insertion site (the caller, route table, config entry or import that will reference it). -- because a file that does not exist yet has no body to cite, only a site that will call it.
-- Scope: before closing a phase's files, sweep construction sites of every touched type — object literals, builders, stubs, factories that BUILD it, not only files that mention it. -- because a type gaining a required member breaks its constructors first.
+- Scope: before closing a phase's files, sweep construction sites of every touched type — object literals, builders, stubs, factories that BUILD it, beyond the files that mention it. -- because a type gaining a required member breaks its constructors first.
 - Scope: every acceptance check carries its `calibration`: run the command on the current tree and record `exit_code` and a `digest` of its output; when it is green today add `failure_signature` (how a known failure of the same command shows), when it is red today add `red_reason` (why it fails now and that the phase turns it green). A command you could not run is reported as `{"executed": false, "target": "file:line", "reason": "…"}` with no `expect` -- the machine turns it into an open question for the orchestrator, who has the budget to run it. A linter or analyzer is proposed when its own configuration scope covers a file of the phase. The machine refuses a report whose check lacks its calibration, whose green digest shows zero work (`No tests found`, `0 files analyzed`) or whose `expect` is not `exit N` (`_shared/evidence-protocol.md` Rule 7). -- because a green that has been seen red is the only green that protects anything (ECO-856 retro F3, ECO-1281 retro F1).
-- Scope: a `constraints_candidates` entry carries a `file:line` anchor or it is not proposed; it is a candidate — the design's decisions are the constraints, and only the user's yes promotes a candidate.
+- Scope: a `constraints_candidates` entry carries a `file:line` anchor (an unanchored idea goes to `open_questions`); it is a candidate — the design's decisions are the constraints, and only the user's yes promotes a candidate.
 - Scope: every phase of the design appears in the json block, in the design's order; a phase the scout cannot scope with evidence still appears, with the gap in its `open_questions`. -- because `ai-team plan generate` refuses a report missing a phase.
-- Scope: when the repo has nothing runnable, say so in `open_questions` — never invent a command, never write config outside bootstrap.
+- Scope: when the repo has nothing runnable, `open_questions` says so; config is written in bootstrap mode only.
 - One report, one block: the json block is the report's only fenced ```json block; any other JSON excerpt is fenced ```text.
-- Framework-agnostic: no rule names a language, framework, package manager or test runner outside `# e.g.` enumerations.
+- Framework-agnostic: languages, frameworks, package managers and test runners appear only inside `# e.g.` enumerations.
 
 ## Decision Gates
 
@@ -57,7 +57,7 @@ only `config.yaml` (bootstrap) and its own report at the injected `report_destin
 
 1. Read `_shared/context-protocol.md` (startup) and `_shared/persistence-contract.md` (write rules). Identify `mode`, `project_root`, `report_destination`, and per mode: `topic` (map) or `design` + `map_reports` (scope).
 2. Glob project root for stack markers (`package.json`, `composer.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `Gemfile`, workspace files). Grep architecture signals under `src/` (`domain/`, `application/`, `infrastructure/`, `controllers/`, `services/`).
-3. Map: grep the `topic` keywords to locate the flow's files. Scope: read the design's `### Superficies nombradas` and each phase's `Entrega`/`Escenarios`; grep every named surface and every type the scenarios mention.
+3. Map: grep the `topic` keywords to locate the flow's files. Scope: read the design's `### Named surfaces` and each phase's `Delivers`/`Scenarios`; grep every named surface and every type the scenarios mention.
 
 ### Phase B — Selective reads (budgeted)
 
@@ -68,7 +68,7 @@ only `config.yaml` (bootstrap) and its own report at the injected `report_destin
 ### Compose
 
 7. Bootstrap: write `.ai-team/config.yaml` per the template, `commit_strategy: auto` at the root.
-8. Map: write the report at `report_destination` — Where it lives · Analogue · Documented gotchas · External conditions · Open questions — every line `file:line`. No json block.
+8. Map: write the report at `report_destination` — Where it lives · Analogue · Documented gotchas · External conditions · Open questions — every line `file:line`. Prose only: the json block belongs to the scope report.
 9. Scope: write the report at `report_destination` — one section per phase (files with evidence, checks with their calibration, candidates, questions) — and END it with the machine block:
    ```text
    {"kind": "scope-report", "phases": [{"n": 1, "expected_files": [{"action": "CREATE|MODIFY|REMOVE", "path": "…", "evidence": "file:line"}],

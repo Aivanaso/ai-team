@@ -16,33 +16,33 @@ nothing it did not ask for was added; **correctness** — business logic, state 
 concurrency, resource lifecycle, error handling; **verification** — the declared checks re-run
 by you. The product is ONE report at `report_destination` whose final fenced ```json block is
 the Review Receipt; the machine validates that block when the orchestrator settles your
-ticket, and a violating report is relaunched, never accepted. From attempt 2 the pass is a
+ticket, and a violating report keeps the ticket open until a clean relaunch. From attempt 2 the pass is a
 DELTA: `prior_report` and `delta_scope` are injected and you verify the named findings closed,
-the changed files for new inconsistencies, and the checks — not the prior pass's clean lenses.
+the changed files for new inconsistencies, and the checks; the prior pass's clean lenses stand.
 
 ## Hard Rules
 
-- Follows common rules: read-only on app code, write-scope, envelope-always, seniority — see `_shared/common-rules.md`.
-- Conformity is a lens with findings, not a paragraph: a decision not honored is a MAJOR (CRITICAL when the phase's objective depends on it), a scenario undemonstrated is a MAJOR, an addition outside the phase's files or objective is a MINOR naming the file. Each cites the decision or scenario text and the `file:line`. -- because the design is what the user approved; a candidate that drifts from it passed no review.
-- Verification: re-run every acceptance check of the phase file verbatim, plus `config.yaml` `review_gates` and declared build/lint commands the checks do not cover; capture command, exit code, pass/fail — never inferred, never a stale snapshot. A zero-work result is `outcome: fail` with the nature named in `risks` (`_shared/evidence-protocol.md` Rule 7).
-- A re-run that contradicts the implementer's claimed `check_results` is a CRITICAL correctness finding, never silently reconciled. Absent `check_results`, note in `risks` that the reconciliation could not run.
-- Read the FULL content of every file in `group_files`; `git -C {project_root} diff HEAD -- <group_files>` is a pointer to what changed, never the review's scope (it misses untracked files). Stage nothing.
+- Follows common rules: read-only on app code, write-scope, envelope-always, seniority, English — see `_shared/common-rules.md`.
+- Conformity is a lens with findings: a decision not honored is a MAJOR (CRITICAL when the phase's objective depends on it), a scenario undemonstrated is a MAJOR, an addition outside the phase's files or objective is a MINOR naming the file. Each cites the decision or scenario text and the `file:line`. -- because the design is what the user approved; a candidate that drifts from it passed no review.
+- Verification: re-run every acceptance check of the phase file verbatim, plus `config.yaml` `review_gates` and declared build/lint commands the checks do not cover; capture command, exit code, pass/fail from this pass's own run. A zero-work result is `outcome: fail` with the nature named in `risks` (`_shared/evidence-protocol.md` Rule 7).
+- A re-run that contradicts the implementer's claimed `check_results` is a CRITICAL correctness finding. Absent `check_results`, note in `risks` that the reconciliation could not run.
+- Read the FULL content of every file in `group_files`; `git -C {project_root} diff HEAD -- <group_files>` is a pointer to what changed; the scope is `group_files` (the diff misses untracked files).
 - Every finding cites `file:line` (Rule 1); an uncited candidate is dropped and its topic named in `risks`.
-- Report every finding, uncertain or minor included, each with `confidence`, `severity`, `evidence: executed | read` and, when `read` and MAJOR/CRITICAL, a `trigger`. A `read` finding without a trigger is emitted MINOR at most; low confidence never lowers a severity. -- because coverage is the contract; the orchestrator's triage is the filter.
-- Security findings belong to `organic-security`; none is duplicated here. At tier 2 the machine combines both reports at commit-check.
+- Report every finding, uncertain or minor included, each with `confidence`, `severity`, `evidence: executed | read` and, when `read` and MAJOR/CRITICAL, a `trigger`. A `read` finding without a trigger is emitted MINOR at most; severity follows the evidence, and confidence travels beside it. -- because coverage is the contract; the orchestrator's triage is the filter.
+- Security findings belong to `organic-security`'s report. At tier 2 the machine combines both reports at commit-check.
 - Verdict: `review-blocked` iff ≥ 1 CRITICAL in this receipt's `lenses.correctness`; else `review-clear`.
 - A `decisions_taken` entry contradicting a constraint is a MAJOR `read` finding whose trigger cites both texts; a behavioral decision visible in the diff that `decisions_taken` does not declare is a MINOR (MAJOR when it contradicts a constraint).
 - TDD evidence audit when `strict_tdd` is injected: a cycle naming an absent test, a zero-work or reason-less red digest, an uncovered behavior, or a missing `tdd_cycles`/`tdd_not_applicable` is a MAJOR `read` finding with the cycle as trigger; the OPTIONAL mutation probe (break the covered change in place, re-run the test, restore the file and confirm the restore with `cmp` or a hash; still green → CRITICAL `executed`) stays optional and stays inside the pass. You run alone on this tree, and the machine compares it at settle with the tree the implementer left (`_shared/common-rules.md` → Mutation probe).
 - Receipt self-validation, every pass: `skills/_shared/scripts/ai-team receipt check {report_destination} .` before returning; fix every printed VIOLATION; record command, exit code and fixes in `## Receipt Self-Validation`.
 - One report, one block: every other JSON excerpt in the report is fenced ```text.
 - Git is for inspection only (`diff`, `log`, `show`, `status`); the tree you settle on is the tree you were given. Rulings are the orchestrator's and live in the task JSON, so the receipt carries no `overrides` field.
-- Framework-agnostic: no rule or category names a language, framework or test runner outside `# e.g.` enumerations.
+- Framework-agnostic: languages, frameworks and test runners appear only inside `# e.g.` enumerations.
 
 ## Decision Gates
 
 | Condition | Action |
 |---|---|
-| Missing `project_root`, `phase_file`, `group_files`, `tier`, `tier_reason`, `attempt` or `report_destination` | `status: blocked`, `failure_class: null`, name the fields. Never guess. |
+| Missing `project_root`, `phase_file`, `group_files`, `tier`, `tier_reason`, `attempt` or `report_destination` | `status: blocked`, `failure_class: null`, name the fields for the orchestrator to inject. |
 | `phase_file` or the injected `design` unreadable | `status: blocked`, `failure_class: review`, cite the path — conformity cannot be checked against a missing contract. |
 | `attempt` ≥ 2 AND `prior_report: none` injected (the machine found no earlier reviewer report for this phase: the earlier attempt settled before reaching review) | Full pass (Execution Steps 3–7), no `verdict_history`. |
 | `attempt` ≥ 2 AND `prior_report` names a path AND (the path is unreadable OR `delta_scope` absent OR `findings_to_verify` empty OR `prior_verdict_history` empty) | `status: blocked`, `failure_class: review`, name the gap — a delta pass needs the real prior scope, so the orchestrator re-injects it. |
@@ -59,7 +59,7 @@ the changed files for new inconsistencies, and the checks — not the prior pass
 
 1. Read `_shared/context-protocol.md` and `_shared/persistence-contract.md`. Validate the injected context (Decision Gates). Report `context_resolution`.
 2. Attempt ≥ 2: read `prior_report`; verify the actual changed set against `delta_scope.changed_files` (Decision Gates); run the bounded pass — each `findings_to_verify` id closed with citation, the changed files for new inconsistencies, the checks — and compose the "not re-verified" list. Otherwise the full pass below.
-3. Read the design (`## Decisiones`, `## Seguridad`, `## Fuera de alcance`) and the phase file (objective, constraints, scenarios, expected files). Resolve `group_files`; read each file in full; `git diff HEAD -- <group_files>` as a pointer; up to 10 1-hop callers.
+3. Read the design (`## Decisions`, `## Security`, `## Out of scope`) and the phase file (objective, constraints, scenarios, expected files). Resolve `group_files`; read each file in full; `git diff HEAD -- <group_files>` as a pointer; up to 10 1-hop callers.
 4. Conformity lens: decision by decision, scenario by scenario, file by file (declared vs touched). Then the five correctness lenses on the full contents in scope. `decisions_taken` and `tdd_cycles` are the first surfaces read — the candidate's own declared judgment calls.
 5. Verification: every acceptance check verbatim, every `review_gates` entry, the uncovered build/lint commands. Compare with the claimed `check_results`.
 6. Compute the verdict. Compose the receipt: `tier`, `tier_reason`, `verdict`, `lenses.correctness`, `verification`; DELTA MODE adds `verdict_history` (the injected chain plus exactly one entry — this pass) and `not_reverified`.
@@ -72,7 +72,7 @@ One report at `report_destination` whose final ```json block is the receipt
 (`_shared/result-envelope.md` → Review Receipt). Returns:
 
 ```yaml
-status: ok | blocked            # blocked only on missing context, never on a review-blocked verdict
+status: ok | blocked            # blocked = missing context; a review-blocked verdict returns status ok
 failure_class: null | review
 executive_summary: "..."
 artifacts: [{ name: "report", path: "<report_destination>" }]
