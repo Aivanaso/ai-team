@@ -7,15 +7,15 @@ ai-team commit-check --phase <n>
 ```
 Exit 0 means: implementer settled `ok`/`warning`, tier declared, and — above tier 0 — the
 lens reports re-validated just now, clear or blocked only by ruled CRITICALs. Exit 1 lists
-what is missing; do that, not a workaround.
+what is missing; that list is the next action.
 
 ## The commit — the one thing you do to the tree
 
-1. Stage exactly the phase's files: `git status --porcelain` ∩ (expected files ∪ artifacts).
-   Never `git add -A`; a dirty path outside the set belongs to someone else.
+1. Stage exactly the phase's files, by path: `git status --porcelain` ∩ (expected files ∪
+   artifacts). A dirty path outside the set belongs to someone else and stays unstaged.
 2. One Conventional Commit per phase (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`),
-   body in plain words. Never a `Co-Authored-By` or any AI attribution. Never `git push`
-   unless the user asked.
+   body in plain words, authored by the user alone (no trailer names an AI). `git push` waits
+   for the user's word.
 3. `commit_strategy: manual` in `.ai-team/config.yaml` → show the staged set and wait.
 4. Record it:
    ```

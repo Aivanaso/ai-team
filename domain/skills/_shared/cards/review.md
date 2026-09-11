@@ -2,7 +2,7 @@
 
 > Read when: the implementer of the current attempt settled `ok`/`warning` and the phase is not committable yet.
 
-## 1. Tier — from the diff, never from size or memory
+## 1. Tier — read from the diff
 
 ```
 ai-team tier <0|1|2> --phase <n> --reason "<one line>"
@@ -13,7 +13,7 @@ ai-team tier <0|1|2> --phase <n> --reason "<one line>"
 | 1 | any other code change | `organic-reviewer` |
 | 2 | auth/authz, crypto, secrets, payments, PII, migrations or deletion, untrusted-input parsing, permission checks, public contracts, a blocking gate of the review plane | reviewer + `organic-security` (mode `code-audit`) |
 
-Escalate, never de-escalate: a worker envelope with failed checks, skipped verification or
+Tiers only rise: a worker envelope with failed checks, skipped verification or
 self-declared uncertainty adds one tier.
 
 ## 2. Lenses (sonnet · high; one after the other — reviewer, then security)
@@ -42,12 +42,12 @@ ticket open — relaunch the lens with the printed lines.
 
 - `review-clear` (no CRITICAL) → card: commit.
 - `review-blocked` → next attempt with the findings (card: delegate). Attempts 2–4 resume the
-  same implementer; findings that do not decrease between attempts mean the fix class is
-  wrong: reopen the design, not another attempt.
+  same implementer; findings that hold steady between attempts mean the fix class is
+  wrong: the next step is the design (the machine denies a 7th attempt anyway).
 - After the 6th attempt: rule each open CRITICAL or stop.
   `ai-team ruling <ticket> --finding F-n --text "<why>" --cost-if-wrong "<what>"`
 - Pre-existing or out-of-phase CRITICAL/MAJOR findings: `--defer F-n,…` at settle time
   (they land in `.ai-team/tech-debt.md`); fixing one inside this task needs the user's yes.
-- MINOR by reading with no trigger: report as one line, no re-engage.
+- MINOR by reading with no trigger: one line in the report; the attempt stands.
 
-You never touch code yourself; a small fix is still an attempt.
+A small fix is an attempt too: it goes through the implementer.

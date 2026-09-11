@@ -7,8 +7,8 @@ disk, before any plan exists: `.ai-team/designs/<task>.md`.
 
 ## 1. Map pass (scout, mode `map`)
 
-`ai-team acquire scout-map` — one ticket per zone; several may run in parallel. Narrow topic,
-no scope proposal. It returns where the flow lives, the existing analogue, documented gotchas,
+`ai-team acquire scout-map` — one ticket per zone; several may run in parallel. Narrow topic;
+the scope pass comes later. It returns where the flow lives, the existing analogue, documented gotchas,
 external conditions the replaced logic gates on, and open questions — every claim `file:line`.
 Report: `.ai-team/explorations/<task>-map[-<zone>].md`. Model sonnet, effort medium.
 Settle each ticket with the harness figures (card: ingest).

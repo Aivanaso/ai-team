@@ -2,7 +2,7 @@
 
 > Read when: a ticket is open and the sub-agent has returned.
 
-An envelope is a **claim**, not proof. Before settling:
+An envelope is a **claim**; the tree is the proof. Before settling:
 
 - `ok` / `warning`: confirm each `artifacts` path exists under the project root; `git status
   --porcelain` shows only expected files (a stray path is scope creep to name).
@@ -14,7 +14,7 @@ An envelope is a **claim**, not proof. Before settling:
 ai-team settle <ticket> --outcome <ok|warning|needs_input|blocked|failed|infra-death> \
   --model <alias> --tokens <n> --tool-uses <n> --duration <seconds> [--report <path.md>]
 ```
-The `Agent` tool result reports tokens, tool uses and duration — copy them, never estimate.
+The `Agent` tool result reports tokens, tool uses and duration — copy them from the tool result.
 A death without an envelope is `infra-death` (no figures; it does not count as an attempt):
 verify the tree with `git status`, then relaunch the same prompt.
 
@@ -35,4 +35,4 @@ verify the tree with `git status`, then relaunch the same prompt.
 3. Two or three options at most, each with a cost, one recommendation stated as such.
 4. The complete record stays in the reports and the task JSON; the message summarises.
 
-A worker's vocabulary (`review-blocked`, `evidence: executed`) is translated, never pasted.
+A worker's vocabulary (`review-blocked`, `evidence: executed`) is translated into plain words.

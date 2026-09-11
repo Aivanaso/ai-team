@@ -16,7 +16,7 @@ ai-team acquire implementer --phase <n>   # the ticket; its output names the att
 
 ## The launch prompt (attempt 1, 5, 6)
 
-Paths, not content. Shape:
+Paths only — the agent reads the files itself. Shape:
 
 1. `You are the organic-implementer executor. FIRST ACTION: read your skill at <install_dir>/skills/organic-implementer/SKILL.md.`
 2. `## Skill and Protocol Paths` — the SKILL.md, `_shared/context-protocol.md`, `persistence-contract.md`, `common-rules.md`, `result-envelope.md`, `evidence-protocol.md`.
@@ -24,15 +24,16 @@ Paths, not content. Shape:
 4. `## Skills to load before work` — matching rows of `.ai-team/skill-registry.md`, when any.
 5. The UNTRUSTED CONTENT tail (`_shared/common-rules.md` → Principle 6), verbatim.
 
-The phase file IS the contract: objective, constraints, scenarios, checks, files, roots. You
-add nothing to it in the prompt. `Agent(model=…)` wins over the agent file's default.
+The phase file IS the contract: objective, constraints, scenarios, checks, files, roots. The
+prompt carries its path; the contract lives in the file. `Agent(model=…)` wins over the agent file's default.
 
 ## The resume message (attempts 2–4)
 
 `SendMessage` to the attempt-1 agent: the reviewer's findings by id with `file:line`, the
-case each fix must handle (never a patch to paste), the checks to re-run, "return a fresh
+case each fix must handle (the case, so the fix is theirs), the checks to re-run, "return a fresh
 envelope". Batch every finding into one message.
 
 ## While it runs
 
-Nothing. No reading the files it edits, no parallel fixes. When it returns: card: ingest.
+Wait. The tree is the implementer's until it returns; your next read of it is the envelope.
+When it returns: card: ingest.

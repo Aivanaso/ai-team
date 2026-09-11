@@ -11,7 +11,7 @@ Refused while a ticket is open or a phase is not committed — finish those firs
 
 `ai-team status --json` before closing, or the `close` output: tickets, tokens, tool uses,
 duration, attempts per phase, commits. Plain words, the user's language. This balance is the
-instrument that tells whether fewer rules worked better — do not summarise it away.
+instrument that tells whether fewer rules worked better; every figure reaches the user.
 
 ## Retro
 
@@ -24,8 +24,8 @@ instrument that tells whether fewer rules worked better — do not summarise it 
 | `off` | none |
 
 Inject: `task_json` (`.ai-team/tasks/<task>.json`), `design`, `plan`, every report path the
-tickets recorded, `report_destination: .ai-team/retros/<task>.md`. The retro reads the JSON's
-figures verbatim, never recomputes. Its `conventions_proposed` are proposals: the user or you
+tickets recorded, `report_destination: .ai-team/retros/<task>.md`. The retro copies the JSON's
+figures verbatim. Its `conventions_proposed` are proposals: the user or you
 apply one as a trivial edit, or leave it.
 
 ## Deferred findings

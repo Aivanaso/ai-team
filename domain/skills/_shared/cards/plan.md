@@ -2,8 +2,8 @@
 
 > Read when: the design is `approved` and `ai-team status` shows no plan.
 
-The plan is **generated**, never written by you. Its inputs are the approved design and the
-scout's scope pass.
+The plan is **generated** by the machine from two inputs: the approved design and the scout's
+scope pass.
 
 ## 1. Scope pass (scout, mode `scope`)
 
@@ -43,7 +43,7 @@ Then:
 - Every link of the flow the design describes has a file in some phase, or an open question.
 - Every scout constraint candidate is either a design decision already, or a question to
   the user — adopted or dropped in the open, with the user's word.
-- The plan names no mechanism the design did not decide.
+- Every mechanism the plan names traces to a design decision.
 
 Present the phase order to the user once, in their language. Their yes opens phase 1.
 

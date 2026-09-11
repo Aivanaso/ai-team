@@ -10,7 +10,7 @@ Every request is classified **aloud**, before any file is touched:
 | bounded change | you can settle it after reading 1–3 files yourself | four lines in chat, the user's yes, one task with one phase |
 | large change | anything else: new flow, several surfaces, unknown territory | design first (card: design) |
 
-In doubt, the heavier class. Mid-task a class only goes up, never down. If a "bounded"
+In doubt, the heavier class. Mid-task a class only goes up. If a "bounded"
 change needs a 4th file to understand, it was large: say so and switch.
 
 ## Bounded change
@@ -40,12 +40,12 @@ change needs a 4th file to understand, it was large: say so and switch.
 ```
 ai-team new <slug> --kind large
 ```
-Then card: design. A large change never skips the design because "it is clear".
+Then card: design. A large change starts with the design, even when it looks clear.
 
 ## The user's word wins
 
-"hazlo tú" / "do it yourself" → you implement inline, no sub-agents, no machine ceremony
-beyond saying so. "delega" → the machine's route, even for a small thing. Never argue.
+"hazlo tú" / "do it yourself" → you implement inline, alone; the machine's only line is your
+saying so. "delega" → the machine's route, even for a small thing. Their word is final.
 
 ## Decision test
 
