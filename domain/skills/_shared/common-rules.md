@@ -12,13 +12,19 @@ Skill-specific rules follow this bullet. Verbatim reproduction of the principles
 
 ## Principle 1 — Read-only on application code
 
-Read application code, never modify it. Source files are read to verify design assumptions,
-gather evidence, or orient the current task. If a bug or improvement is found, surface it as a
-finding or a risk — never fix it in place.
+Application code is read: to verify design assumptions, gather evidence, or orient the current
+task. A bug or improvement found on the way becomes a finding or a risk in the report; the fix
+belongs to the implementer of the next attempt.
 
-**Exception: organic-implementer** writes application source files by design, bounded by the
-phase's `allowed_edit_roots`. It is the only exception; `organic-reviewer`, `organic-security`,
-`organic-scout` and `organic-retro` stay fully read-only.
+**organic-implementer** writes application source files by design, bounded by the phase's
+`allowed_edit_roots`. `organic-scout` and `organic-retro` only read.
+
+**Mutation probe (organic-reviewer, organic-security).** To prove a test protects a change, a
+lens may break the change in place, run the test, and restore the file byte for byte — the
+lenses run one at a time, so nobody else sees the broken state. The probe is disclosed in the
+report's Verification (what was mutated, the red observed, the restore check), and the
+machine confirms the restore at settle: a working tree that differs from the implementer's
+keeps the lens ticket open until it is restored.
 
 ## Principle 2 — Write-scope
 
@@ -49,7 +55,7 @@ separation-of-duties failures (an executor cannot audit itself; an auditor canno
 | **The machine** (`ai-team`) | Conditions, timestamps, attempts, receipt validation, the balance | `tasks/<task>.json`, `plans/`, `tech-debt.md` rows | Protects from forgetting, not from sabotage; decides nothing that needs judgment |
 | **Scout** (`organic-scout`) | Bootstrap config; map a zone before the design; scope an approved design phase by phase | `config.yaml`; map and scope reports (the scope report's json block feeds the plan) | Read-only; verifies, never composes; a guess is an open question |
 | **Implementer** (`organic-implementer`) | Implement one phase in one repo; run its checks; declare its decisions; block on any gap | Application files inside the roots; the bounded envelope | No commits; no widening; no pause channel — `blocked` with a `scope_report` and the orchestrator resumes it |
-| **Auditors** (`organic-reviewer`, `organic-security`) | Conformity to the design and the phase, correctness, verification; security threat-model and code-audit | Reports whose final json block is the receipt / fragment | Read-only; no state-changing git; never edit a receipt after writing it |
+| **Auditors** (`organic-reviewer`, `organic-security`) | Conformity to the design and the phase, correctness, verification; security threat-model and code-audit | Reports whose final json block is the receipt / fragment | Leave the tree as the implementer settled it (a mutation probe restores what it touched); read-only git; a receipt is final once written |
 | **Retro** (`organic-retro`) | Explain the task from durable evidence; propose conventions with their RED | The retro file; `conventions_proposed` | Reads the task JSON, design, plan, reports; writes only its retro; never config |
 
 ## Principle 5 — Startup sequence

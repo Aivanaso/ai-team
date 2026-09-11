@@ -188,7 +188,7 @@ class LargeFlow(ProjectCase):
         self._review(1, full_receipt([critical, finding("F-2"), finding("F-3")]))
         _, out, _ = self.ai("status")
         self.assertIn("findings did not decrease", out)
-        # security-audit at tier 2 may run alongside; its CRITICAL also blocks
+        # security-audit at tier 2 runs after the reviewer settled; its CRITICAL also blocks
         _, out, _ = self.ai("acquire", "security-audit", "--phase", "1")
         sec = out.split()[1]
         sec_report = self.write(".ai-team/reviews/sec.md", receipt_block(fragment([finding("S-1", "CRITICAL", evidence="executed")])))

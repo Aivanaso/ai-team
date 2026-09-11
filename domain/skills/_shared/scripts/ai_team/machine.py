@@ -5,7 +5,7 @@ orchestrator; what must always happen lives here (design note §8, §10, §13, �
 import os
 import subprocess
 
-from ai_team import debt, engram
+from ai_team import debt, engram, worktree
 from ai_team.design import load_design, set_frontmatter
 from ai_team.plan import load_plan, load_scope_report, phase_of
 from ai_team.receipt import derived_verdict, findings_of, validate_report
@@ -100,9 +100,9 @@ class Machine:
         opens = self.open_tickets(task)
         if kind == "scout-map":
             blocking = [t for t in opens if t["kind"] != "scout-map"]
-        elif kind in LENS_KINDS:
-            blocking = [t for t in opens if not (t["kind"] in LENS_KINDS and t["kind"] != kind and t["phase"] == phase_n)]
         else:
+            # one ticket at a time -- the two review lenses included: they audit one working
+            # tree, and a mutation probe by one is a phantom defect for the other
             blocking = opens
         for ticket in blocking:
             missing.append("ticket %s (%s) is open -- settle it first" % (ticket["id"], ticket["kind"]))
@@ -201,6 +201,21 @@ class Machine:
     def _latest(tickets):
         return tickets[-1] if tickets else None
 
+    def _tree_unchanged_since_implementer(self, task, ticket, tree):
+        """A lens settles on the tree the implementer settled: the fingerprint recorded on the
+        implementer ticket of the same attempt must match the tree now."""
+        impl = self._latest(self.tickets(task, "implementer", ticket["phase"], ticket["attempt"], settled=True))
+        if impl is None or not impl.get("tree") or tree is None or impl["tree"] == tree:
+            return
+        changed = worktree.changed_between(self.store.root, impl["tree"], tree)
+        restore = worktree.restore_commands(impl["tree"], changed)
+        raise MachineError(
+            "the working tree changed while ticket %s was open -- %s. A lens leaves the tree exactly as the "
+            "implementer settled it (a mutation probe ends with a byte-for-byte restore). The ticket stays open; "
+            "restore, then settle again:\n  %s"
+            % (ticket["id"], "; ".join(changed) if changed else "paths unknown",
+               "\n  ".join(restore) if restore else "(git could not name the paths: compare against `git status`)"))
+
     # --- verbs ---------------------------------------------------------------------
     def acquire(self, task, kind, phase_n):
         if kind in ("scout-map", "security-threat-model", "scout-scope", "retro"):
@@ -237,6 +252,7 @@ class Machine:
             "verdict": None,
             "findings": None,
             "deferred": [],
+            "tree": None,
         }
         task["tickets"].append(ticket)
         self.store.save(task)
@@ -274,6 +290,11 @@ class Machine:
                 raise MachineError("--report %s must be an existing file inside the project" % report_rel)
         elif kind in LENS_KINDS + ("scout-scope",) and outcome in GOOD:
             raise MachineError("a %s ticket settled %s needs --report <path.md>" % (kind, outcome))
+        tree = None
+        if kind == "implementer" or kind in LENS_KINDS:
+            tree = worktree.fingerprint(self.store.root)
+        if kind in LENS_KINDS:
+            self._tree_unchanged_since_implementer(task, ticket, tree)
         if kind in LENS_KINDS and report_rel:
             code, out, err, data = validate_report(self.store.abs(report_rel), self.store.root)
             if code != 0:
@@ -302,7 +323,7 @@ class Machine:
             notes.append("infra-death does not count as an attempt")
         ticket.update({
             "settled_at": utc_now(), "outcome": outcome, "model": model, "tokens": tokens,
-            "tool_uses": tool_uses, "duration_s": duration_s, "report": report_rel,
+            "tool_uses": tool_uses, "duration_s": duration_s, "report": report_rel, "tree": tree,
         })
         if defer:
             if not ticket["findings"]:

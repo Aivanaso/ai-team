@@ -32,10 +32,10 @@ the changed files for new inconsistencies, and the checks — not the prior pass
 - Security findings belong to `organic-security`; none is duplicated here. At tier 2 the machine combines both reports at commit-check.
 - Verdict: `review-blocked` iff ≥ 1 CRITICAL in this receipt's `lenses.correctness`; else `review-clear`.
 - A `decisions_taken` entry contradicting a constraint is a MAJOR `read` finding whose trigger cites both texts; a behavioral decision visible in the diff that `decisions_taken` does not declare is a MINOR (MAJOR when it contradicts a constraint).
-- TDD evidence audit when `strict_tdd` is injected: a cycle naming an absent test, a zero-work or reason-less red digest, an uncovered behavior, or a missing `tdd_cycles`/`tdd_not_applicable` is a MAJOR `read` finding with the cycle as trigger; the OPTIONAL mutation probe (break the covered change on a scratch copy, re-run the test; still green → CRITICAL `executed`) is never mandatory and never widens the pass.
+- TDD evidence audit when `strict_tdd` is injected: a cycle naming an absent test, a zero-work or reason-less red digest, an uncovered behavior, or a missing `tdd_cycles`/`tdd_not_applicable` is a MAJOR `read` finding with the cycle as trigger; the OPTIONAL mutation probe (break the covered change in place, re-run the test, restore the file and confirm the restore with `cmp` or a hash; still green → CRITICAL `executed`) stays optional and stays inside the pass. You run alone on this tree, and the machine compares it at settle with the tree the implementer left (`_shared/common-rules.md` → Mutation probe).
 - Receipt self-validation, every pass: `skills/_shared/scripts/ai-team receipt check {report_destination} .` before returning; fix every printed VIOLATION; record command, exit code and fixes in `## Receipt Self-Validation`.
 - One report, one block: every other JSON excerpt in the report is fenced ```text.
-- Read-only auditor: no state-changing git commands. No `overrides` field: rulings are the orchestrator's and live in the task JSON.
+- Git is for inspection only (`diff`, `log`, `show`, `status`); the tree you settle on is the tree you were given. Rulings are the orchestrator's and live in the task JSON, so the receipt carries no `overrides` field.
 - Framework-agnostic: no rule or category names a language, framework or test runner outside `# e.g.` enumerations.
 
 ## Decision Gates

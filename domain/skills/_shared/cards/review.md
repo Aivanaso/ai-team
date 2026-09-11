@@ -16,11 +16,15 @@ ai-team tier <0|1|2> --phase <n> --reason "<one line>"
 Escalate, never de-escalate: a worker envelope with failed checks, skipped verification or
 self-declared uncertainty adds one tier.
 
-## 2. Lenses (sonnet · high; the two may run together)
+## 2. Lenses (sonnet · high; one after the other — reviewer, then security)
 
 ```
-ai-team acquire reviewer --phase <n>        [ai-team acquire security-audit --phase <n>]
+ai-team acquire reviewer --phase <n>        # settle it, then at tier 2:
+ai-team acquire security-audit --phase <n>
 ```
+Both audit the same working tree, so the machine issues one lens ticket at a time and
+checks at settle that the tree is the one the implementer left (a probe restores what it
+touched). Run security even when the reviewer blocked: attempt 2 fixes both lists at once.
 Inject: `design` (or none), `phase_file`, `group_files` (expected files ∪ artifacts),
 `tier`, `tier_reason`, `attempt`, the implementer's `check_results` and `decisions_taken`,
 `report_destination: .ai-team/reviews/<task>-phase-<n>-attempt-<k>-<lens>.md`; from attempt 2,

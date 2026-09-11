@@ -33,7 +33,7 @@ the working directory). Python 3 standard library only. Installed copy:
 | `phase extract <n>` | writes `.ai-team/plans/<task>/phase-<n>.md`, the implementer's input |
 | `tier --phase n <0\|1\|2> --reason "<one line>"` | the evidence tier of the phase's diff, decided after the candidate exists |
 | `acquire <kind> [--phase n]` | checks the conditions below and issues a ticket, or refuses saying what is missing |
-| `settle <ticket> --outcome … [--model … --tokens … --tool-uses … --duration …] [--report <path>] [--defer F-1,…]` | closes the ticket with the harness figures. Reviewer / security-audit: validates the report's receipt block first; scout-scope: validates every check's calibration first; a violating report does not settle. |
+| `settle <ticket> --outcome … [--model … --tokens … --tool-uses … --duration …] [--report <path>] [--defer F-1,…]` | closes the ticket with the harness figures. Reviewer / security-audit: validates the report's receipt block first; scout-scope: validates every check's calibration first; a violating report does not settle. Implementer: records the tree fingerprint; lens: the tree must match the implementer's, else the ticket stays open |
 | `ruling <ticket> --finding <id> --text "<why>" --cost-if-wrong "<what>"` | adjudicates one open finding of a settled lens ticket |
 | `commit-check --phase n` | exit 0 when the phase may be committed (tier 0 with a clean implementer, or the lens receipts re-validated and clear, or blocked only by ruled CRITICALs) |
 | `phase done <n> --commit <hash>` | records the commit and flips the phase to `committed` (runs `commit-check` first) |
@@ -57,7 +57,9 @@ Outcomes: `ok | warning | needs_input | blocked | failed | infra-death`. `infra-
 | security-audit | as reviewer, tier 2 |
 | retro | task `done` |
 
-One ticket open at a time, with two exceptions: several `scout-map` tickets may be open together, and `reviewer` + `security-audit` may be open together for the same attempt.
+One ticket open at a time, with one exception: several `scout-map` tickets may be open together. The two review lenses run one after the other (`reviewer`, then `security-audit`): they audit one working tree, and a mutation probe by one would be a phantom defect for the other.
+
+**Tree fingerprint.** `settle` of an implementer records the working tree's git tree id on the ticket (`tree`: tracked changes and untracked files, minus what the project ignores). `settle` of a lens computes it again and compares with the implementer ticket of the same attempt: a tree that moved names the paths and keeps the lens ticket open -- a mutation probe ends with a byte-for-byte restore.
 
 ## Task JSON
 
@@ -71,7 +73,7 @@ One ticket open at a time, with two exceptions: several `scout-map` tickets may 
   "phases": [ { "n": 1, "title": "…", "status": "pending", "attempts": 0, "tier": null, "tier_reason": null, "commit": null, "amendments": [] } ],
   "tickets": [ { "id": "t1", "kind": "implementer", "phase": 1, "attempt": 1, "issued_at": "…Z", "settled_at": null,
                  "outcome": null, "model": null, "tokens": null, "tool_uses": null, "duration_s": null,
-                 "report": null, "verdict": null, "findings": null, "deferred": [] } ],
+                 "report": null, "verdict": null, "findings": null, "deferred": [], "tree": null } ],
   "rulings": [ { "at": "…Z", "ticket": "t7", "finding": "F-2", "text": "…", "cost_if_wrong": "…" } ]
 }
 ```

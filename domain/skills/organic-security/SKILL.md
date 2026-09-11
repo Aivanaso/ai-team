@@ -29,7 +29,7 @@ Read application code to find vulnerabilities; never modify it.
 - No commit-blocking verdict of its own: the fragment carries no `verdict`; the machine derives blocked from any CRITICAL in `lenses.security` at commit-check.
 - Receipt self-validation in code-audit, every pass: `skills/_shared/scripts/ai-team receipt check {report_destination} .`; fix every VIOLATION; record command, exit code and fixes in `## Receipt Self-Validation`.
 - One report, one block (code-audit): every other JSON excerpt is fenced ```text. Threat-model writes no json block at all.
-- Read-only auditor: no state-changing git commands.
+- Git is for inspection only (`diff`, `log`, `show`, `status`); the tree you settle on is the tree you were given — a probe that mutates a file restores it byte for byte and says so in the report (`_shared/common-rules.md` → Mutation probe).
 
 ## Decision Gates
 
