@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Sub-agents are launched with **fresh context windows**. The orchestrator passes PATHS — the skill, shared protocols, artifacts — plus one inline `## Injected Context` YAML block; it does not inline instructions. The sub-agent reads everything else from disk, just-in-time.
+Sub-agents are launched with **fresh context windows**. The orchestrator passes PATHS — the skill, shared protocols, artifacts — plus one inline `## Injected Context` YAML block; the instructions live on disk. The sub-agent reads everything else from disk, just-in-time.
 
 ## Startup Sequence
 
@@ -12,7 +12,7 @@ Every sub-agent MUST execute these steps in order:
 
 ### Step 0 — Read your SKILL.md (FIRST ACTION)
 
-Read the skill path given under `## Skill and Protocol Paths` in your delegation prompt. It is your primary instruction set. If the path does not exist, return `status: blocked` with `risks: ["SKILL.md not found at {path}"]` — you cannot proceed without primary instructions.
+Read the skill path given under `## Skill and Protocol Paths` in your delegation prompt. It is your primary instruction set. If the path does not exist, return `status: blocked` with `risks: ["SKILL.md not found at {path}"]` — the primary instructions are the precondition of everything else.
 
 ### Step 1 — Load Project Config
 
@@ -31,7 +31,7 @@ When the prompt carries a `## Skills to load before work` block (organic-impleme
 
 ### Step 3 — Load Shared Protocols JIT
 
-Read each `_shared/` protocol from the paths in your delegation prompt when the SKILL.md step that needs it begins (per your References section) — not all upfront. `_shared/cards/` and `_shared/machine.md` are the orchestrator's; a worker reads `machine.md` only when its SKILL.md points at it (the shape of a phase file, of a scope report's json block). This keeps each protocol fresh in context at the step that uses it. If a protocol path does not exist: continue with loaded instructions, report `context_resolution: fallback`, and list the missing protocol in `risks`.
+Read each `_shared/` protocol from the paths in your delegation prompt when the SKILL.md step that needs it begins (per your References section), each at its step. `_shared/cards/` and `_shared/machine.md` are the orchestrator's; a worker reads `machine.md` only when its SKILL.md points at it (the shape of a phase file, of a scope report's json block). This keeps each protocol fresh in context at the step that uses it. If a protocol path does not exist: continue with loaded instructions, report `context_resolution: fallback`, and list the missing protocol in `risks`.
 
 ### Step 4 — Begin Work
 
@@ -42,8 +42,8 @@ Execute your Execution Steps. Report `context_resolution` honestly in the envelo
 | Rule | Description |
 |------|-------------|
 | **Minimal context** | Read only the paths your delegation prompt and your SKILL.md References section declare. |
-| **No exploration** | Skip `.ai-team/` content not referenced in the prompt (other tasks, other reports, other runs' `report_destination` outputs). |
-| **No orchestrator state** | You have NO access to the orchestrator's conversation history. |
+| **Named paths only** | `.ai-team/` content the prompt names is read; other tasks, other reports and other runs' `report_destination` outputs stay unread. |
+| **Fresh context** | The delegation prompt and the disk are your whole context; the orchestrator's conversation stays with the orchestrator. |
 | **Prompt-assigned skills only** | Read the SKILL.md assigned in your prompt plus every path under its `## Skills to load before work` block — both arrive via the delegation prompt. Skills beyond the prompt stay unread (hunting defeats least-privilege and the prompt-injection defense). |
 | **Fail fast** | If a referenced artifact doesn't exist, return `status: blocked` immediately. |
 | **Honest canary** | If you recovered something the orchestrator should have injected, report `context_resolution: fallback` and list it in `risks` — silent fallback defeats the compaction canary. |

@@ -1,6 +1,6 @@
 # Evidence Protocol
 
-> How sub-agents ground their claims in the actual project, not in generic framework knowledge.
+> How sub-agents ground their claims in the actual project: a citation, a caller, a run.
 
 ## Purpose
 
@@ -32,17 +32,17 @@ When a change renames, modifies, or removes a method on a **public interface** (
 1. Grep the old method name across `src/`, `tests/`, `config/`, and any custom directories
 2. Enumerate implementors (`implements <InterfaceName>`) including test doubles, mocks, fakes, stubs
 3. List every caller of the old name
-4. Include all of them in the task scope — not just the "obvious" callers in `src/`
+4. Include all of them in the task scope — test doubles and config included
 
 Test doubles in `tests/Double/`, `tests/Mock/`, `tests/Fixture/` are invisible to a `src/`-only scope and WILL cause fatal runtime errors when tests boot.
 
 **Output requirement:** a phase that touches an interface carries a check or a `decisions_taken` entry named "Implementors sweep for <InterfaceName>" with the grep commands run and the resulting file list.
 
-**Schema/contract fields — same principle, markdown form:** a change to a serialized contract structure (envelope field, receipt schema, config key) sweeps every site that renders that structure — SKILL.md Output Contract blocks, `references/*.md` exemplars, templates, envelope examples. The sweep is owned like any acceptance check: the phase (or the worker's own `check_results`) carries the grep as a runnable check, and the reviewer re-runs it in its verification section. **The sweep grep is always an executed row** — a `check_results` entry or a `verification[]` row (command + output digest) — never a sentence in `decisions_taken` or in the design; an asserted sweep is the recurrent failure (G4b-A retro: one new field, three passes to converge, "single root: incomplete sweep of the new field"). A correct schema beside a lagging exemplar teaches the pre-change shape to every reader who loads the example (organic-v2 retro: recurred across 4 phases).
+**Schema/contract fields — same principle, markdown form:** a change to a serialized contract structure (envelope field, receipt schema, config key) sweeps every site that renders that structure — SKILL.md Output Contract blocks, `references/*.md` exemplars, templates, envelope examples. The sweep is owned like any acceptance check: the phase (or the worker's own `check_results`) carries the grep as a runnable check, and the reviewer re-runs it in its verification section. **The sweep grep is always an executed row** — a `check_results` entry or a `verification[]` row (command + output digest); a sweep asserted in prose (`decisions_taken`, the design) is the recurrent failure (G4b-A retro: one new field, three passes to converge, "single root: incomplete sweep of the new field"). A correct schema beside a lagging exemplar teaches the pre-change shape to every reader who loads the example (organic-v2 retro: recurred across 4 phases).
 
 ## Rule 3 — Test Adequacy Before Declaring Apply Done
 
-A sub-agent that generates integration tests MUST execute those specific integration tests before reporting `status: ok`. Unit-only execution is NOT sufficient when the same phase also produced integration tests.
+A sub-agent that generates integration tests MUST execute those specific integration tests before reporting `status: ok`: when the phase produced integration tests, those run too.
 
 Rationale: mocking a framework boundary (e.g., `MessageBusInterface` as a spy) makes the test green regardless of actual routing. Real smoke of the test you just wrote is the only way to catch:
 
@@ -50,9 +50,9 @@ Rationale: mocking a framework boundary (e.g., `MessageBusInterface` as a spy) m
 - Entity manager / ORM lifecycle errors (the `em->clear()` bug)
 - Fatal errors in doubles that implement renamed interfaces
 
-**Scope:** only the integration tests the phase itself created or modified — not the full suite. They are few and fast.
+**Scope:** the integration tests the phase itself created or modified — few and fast; the full suite is the reviewer's.
 
-**Exception:** if the project's test infrastructure genuinely cannot run an integration test locally (e.g., requires external services not available in the sandbox), report it as a risk in the envelope rather than silently skipping (the orchestrator decides whether to defer or override).
+**Exception:** if the project's test infrastructure genuinely cannot run an integration test locally (e.g., requires external services not available in the sandbox), report it as a risk in the envelope (the orchestrator decides whether to defer or override).
 
 Under the STRICT TDD MODE directive the same discipline covers each test's red run: a red is evidence only when it is a valid red per `organic-implementer`'s Output Contract (`tdd_cycles`) — Rule 7 item 3 applies to a red exactly as to a green.
 
@@ -85,15 +85,16 @@ If none of these appear, stay within the exploration budget declared in the dele
 
 **Out of scope for this rule**: framework-behavior claims (Rule 1 covers them), interface-signature and schema/contract-field sweeps (Rule 2), test execution (Rule 3). Rule 4 is specifically about invariants the design or report *itself* asserts as currently true.
 
-## Rule 5 — Cross-Repo Pattern Transplant Check
+## Rule 5 — Pattern Transplant Check (across repositories, and within one)
 
-When a design, scout report, or review finding cites a pattern from a **sibling/sister repository** as evidence (not the current repo), the agent MUST verify that the pattern's structural prerequisites also hold in the target repo before recommending the transplant.
+When a design, scout report, implementer decision or review finding cites a pattern as evidence — from a **sibling repository**, or from a **sibling within the same repository** (the neighbouring CI step, the service "whose precedent we follow", the sibling caller of the same external endpoint) — the agent MUST verify that the pattern's structural prerequisites also hold where the pattern lands before recommending the transplant.
 
-Rule 1 covers framework behavior in the current repo. This rule covers the gap: "we'll do it like `corev3` does" is NOT sufficient evidence — `corev3`'s pattern depends on `corev3`'s topology, which may not match.
+Rule 1 covers framework behavior in the current repo. This rule covers the gap: "we'll do it like `corev3` does" and "like `guard-master` does, two steps above" are claims to verify — the source pattern depends on its own topology, which may differ one step away (ECO-1267 retro F1: a CI step copied its sibling's credential lifetime and shell form, and the sibling fetched once where the copy fetched twice; ECO-1268 retro F1: a design cited a same-module precedent for a cross-module consumer).
 
 **Trigger** — this rule activates when the agent writes one of these phrases (or their Spanish equivalents):
 
 - "mirror of {repo}", "same pattern as {repo}", "replicate from {repo}", "como hace {repo}"
+- "follows the precedent of {X}", "modeled on {X}", "same as the sibling {step, service, caller}" within the repo
 - A path that crosses repos (e.g., `../{other-repo}/...`, `~/Proyectos/{other-repo}/...`)
 - An evidence citation pointing outside the current project root
 
@@ -112,6 +113,9 @@ If none of these appear, the artifact stays as-is (skip the check — running it
    | Framework version | the version + minor; whether the cited behavior exists in the target's version |
    | Runtime topology | shared network / volumes / DNS namespace with other services |
    | Environment scope | does the pattern run identically in local / CI / PRE / PRO |
+   | Module boundary | same module or a different one; is the injected symbol visible where the copy lives |
+   | Call shape | fetch count, credential lifetime relative to the remaining reads, expansion form (`$VAR` vs `${VAR}`) |
+   | Response shape | does the sibling caller unwrap an envelope (`data[0]`) the copy assumes flat, or the reverse |
 
 4. **Verify each axis** in the target repo with a `grep` or `read` of the equivalent file.
 5. **Decide**:
@@ -152,30 +156,31 @@ Pattern transplant: {one-line description}
 
 **Out of scope for this rule**: claims about the framework that ARE backed by the current repo's config (Rule 1 covers those); patterns invented from scratch (no transplant happening); patterns cited from generic docs/blog posts (cite the docs as evidence per Rule 1 instead).
 
-## Rule 6 — Sub-Agent Envelope Is a Declaration, Not a Verification
+## Rule 6 — Sub-Agent Envelope Is a Declaration; the Tree Is the Verification
 
 Sub-agent result envelopes are self-reports. The orchestrator treats them as claims: it
 confirms every `artifacts` path exists under the project root and that `git status` shows only
 the phase's files before settling a ticket, and the reviewer re-runs every declared check
-rather than trusting the implementer's `check_results` (a contradiction is a CRITICAL
-finding). The orchestrator's side of this rule lives in `_shared/cards/ingest.md`; the
+(a contradiction with the implementer's `check_results` is a CRITICAL finding). The orchestrator's side of this rule lives in `_shared/cards/ingest.md`; the
 reviewer's side in `organic-reviewer/SKILL.md` → Hard Rules. Rule 3 covers what the
 implementer must do *internally* before composing its envelope; this rule covers what happens
 to that envelope afterwards.
 
 ## Rule 7 — Declared Checks Must Be Able to Fail
 
-A check declared in a design phase's `Check:` line, an `organic-scout` scope report's `acceptance_checks`, a generated phase file, or a `.ai-team/config.yaml` `review_gates`/`test_commands` entry MUST be calibrated against a known positive before its green counts as evidence — the pre-change state that should fail, or (when no pre-change failing state exists yet) a synthetic failing fixture built for exactly that purpose. A check that has never been observed to fail is not verified to test anything; it is only verified to run.
+A check declared in a design phase's `Check:` line, an `organic-scout` scope report's `acceptance_checks`, a generated phase file, or a `.ai-team/config.yaml` `review_gates`/`test_commands` entry MUST be calibrated against a known positive before its green counts as evidence — the pre-change state that should fail, or (when no pre-change failing state exists yet) a synthetic failing fixture built for exactly that purpose. A check that has been seen failing is verified to test something; a check only ever seen green is verified to run.
+
+The machine enforces this at declaration time: a scope-report check carries its `calibration` (executed on the current tree, with its failure signature or the reason it is red today), a check declared by CLI is run by `ai-team plan generate` / `plan amend` and recorded, and a phase with no calibrated check reaches no implementer (`machine.md` → Calibration).
 
 **Calibration checklist:**
 
 1. **Run against a known failure first.** Before trusting a green result, confirm the same check fails against the pre-change state, or against a synthetic fixture built to trigger the failure the check exists to catch.
 2. **Run twice to expose cache hits.** A test runner, linter, or static analyzer that reports green because it cached a prior (possibly stale) result looks identical to a green result from actually re-running the check — running twice in a row, and confirming both runs actually executed work, surfaces a silent cache hit that a single run cannot.
-3. **Reject zero-work outputs as green.** `No files analyzed`, `No tests found`, `0 suites`, `0 findings checked`, and equivalent zero-work digests are never accepted as a passing result — they are indistinguishable from "the check never ran against real content". A zero-work result has exactly ONE disposition, canonical across every consumer of this rule: it DID execute, so it is recorded as `outcome: fail` in the verification/check-results evidence (fail closed — a fail contradicting a worker's claimed `pass` is then the existing discrepancy finding, which is the intended consequence), with the zero-work nature named in `risks`. Never omitted from the evidence, never recorded as `pass`, and never conflated with a check that genuinely could not be run at all (missing tool, unreachable command) — that distinct, separately-named failure mode is handled elsewhere in each consuming skill's own gates.
+3. **A zero-work output is a fail.** `No files analyzed`, `No tests found`, `0 suites`, `0 findings checked`, and equivalent zero-work digests are indistinguishable from "the check never ran against real content". A zero-work result has exactly ONE disposition, canonical across every consumer of this rule: it DID execute, so it is recorded as `outcome: fail` in the verification/check-results evidence (fail closed — a fail contradicting a worker's claimed `pass` is then the existing discrepancy finding, which is the intended consequence), with the zero-work nature named in `risks`. It stays in the evidence as that fail, distinct from a check that could not run at all (missing tool, unreachable command), which each consuming skill's own gates name separately.
 
-**Relationship to Rules 3 and 6:** Rule 3 requires `organic-implementer` to execute the integration tests it wrote before declaring `status: ok`; Rule 6 makes the reviewer re-run them. Rule 7 generalizes both: it is not limited to test execution, and it applies at the moment a check is DECLARED (the design's `Check:` line, the scope report, `config.yaml` bootstrap or hand-edit) rather than only at the moment it is later re-run.
+**Relationship to Rules 3 and 6:** Rule 3 requires `organic-implementer` to execute the integration tests it wrote before declaring `status: ok`; Rule 6 makes the reviewer re-run them. Rule 7 generalizes both: it covers every kind of check, and it applies at the moment a check is DECLARED (the design's `Check:` line, the scope report, `config.yaml` bootstrap or hand-edit) rather than only at the moment it is later re-run.
 
-**Why this exists**: three separate repositories produced four checks that could report green without ever having the capacity to fail — a static analyzer accepting `No files analyzed` as a clean pass, a test command matching zero test files while reporting success, and a cached linter run reporting a stale green after the underlying rule was already broken (eco-1066 retro F2, inputbag retro F3, deep-link retro F2). A check nobody has watched fail is a check nobody has verified.
+**Why this exists**: three separate repositories produced four checks that could report green without ever having the capacity to fail — a static analyzer accepting `No files analyzed` as a clean pass, a test command matching zero test files while reporting success, and a cached linter run reporting a stale green after the underlying rule was already broken (eco-1066 retro F2, inputbag retro F3, deep-link retro F2). A check somebody has watched fail is a check somebody has verified.
 
 ## Recording Evidence in Artifacts
 
@@ -183,8 +188,8 @@ When composing a design, a result envelope, a Review Receipt, or a scout report:
 
 - Inline citations are cheap: `messenger.yaml:75`, `RunWorkerAsyncCommand:42`
 - Use footnote-style references for reused evidence
-- Never write "Symfony works this way" or "Doctrine handles this" — always cite
+- Every framework claim carries its citation: "Symfony works this way" becomes "`messenger.yaml:22` routes …"
 
 ## When Evidence Conflicts With the Phase
 
-If the cited evidence contradicts the phase file, the design or a prior scout report, surface the conflict instead of silently reconciling. Example: if the design assumes `toPrimitives()` is the project's serialization convention but the project's existing async pattern uses raw arrays, report it as a `risk` in the returned envelope (or a `question` under `status: needs_input` when it blocks progress) and let the orchestrator/user decide.
+If the cited evidence contradicts the phase file, the design or a prior scout report, surface the conflict. Example: if the design assumes `toPrimitives()` is the project's serialization convention but the project's existing async pattern uses raw arrays, report it as a `risk` in the returned envelope (or a `question` under `status: needs_input` when it blocks progress) and let the orchestrator/user decide.

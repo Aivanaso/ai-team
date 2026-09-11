@@ -4,9 +4,8 @@
 
 ## Purpose
 
-All state and artifacts live on the filesystem. No external services, no databases. Engram is
-a mirror the machine writes to as a side effect (`machine.md` → "Engram mirror"), never a
-store anything reads to decide. Everything is human-readable, version-controllable
+All state and artifacts live on the filesystem. Engram is a mirror the machine writes to as a
+side effect (`machine.md` → "Engram mirror"); every decision reads the files. Everything is human-readable, version-controllable
 (`.ai-team/` is the project's to commit or ignore), and debuggable.
 
 ## What's on disk
@@ -28,7 +27,7 @@ store anything reads to decide. Everything is human-readable, version-controllab
 |---|---|---|
 | `tasks/<task>.json` | the machine only (`new`, `acquire`, `settle`, `tier`, `phase done`, `close`, …) | the orchestrator via `ai-team status`; organic-retro (retro mode) |
 | `designs/<task>.md` | the orchestrator, in conversation with the user; `ai-team design approve` flips the frontmatter | organic-scout (scope), organic-security (threat-model), organic-reviewer, organic-retro, the machine (`plan generate`) |
-| `plans/<task>.md`, `plans/<task>/phase-<n>.md` | the machine only (`plan generate`, `plan amend`, `phase extract`) — never edited by hand | organic-implementer (its contract), organic-reviewer, organic-security (code-audit), organic-retro |
+| `plans/<task>.md`, `plans/<task>/phase-<n>.md` | the machine only (`plan generate`, `plan amend`, `phase extract`) | organic-implementer (its contract), organic-reviewer, organic-security (code-audit), organic-retro |
 | `explorations/*.md` | organic-scout | the orchestrator; the machine reads the scope report's json block |
 | `reviews/*.md` | organic-reviewer, organic-security | the machine (`settle --report`, `commit-check`), organic-reviewer (delta passes), organic-retro |
 | `retros/*.md` | organic-retro | humans |
@@ -44,17 +43,17 @@ commit-check` (cards → commit).
 
 | Rule | Description |
 |------|-------------|
-| **Atomic writes** | Write complete files, not partial updates. |
+| **Atomic writes** | Write complete files in one write. |
 | **Timestamps** | The machine stamps its own records. Sub-agents use the `current_iso_utc` value injected by the orchestrator for any timestamp field they write; if absent, surface a `risk:` and use `date -u +%Y-%m-%dT%H:%M:%SZ`. Format: ISO 8601 `YYYY-MM-DDTHH:MM:SSZ`. |
 | **UTF-8 only** | All files MUST be UTF-8 encoded, LF line endings. |
 | **Report destination** | A worker writes its report exactly at the injected `report_destination` (a file path ending in `.md`), creating the parent directory if needed, and nothing beside it. |
 | **One block** | A report the machine reads (scope report, review report) carries exactly one fenced ```json block, the last content of the file; any other JSON excerpt is fenced ```text. |
-| **Never the machine's files** | No sub-agent writes under `tasks/` or `plans/`; the orchestrator does not either. |
+| **The machine's files** | `tasks/` and `plans/` are written by the machine's verbs alone; sub-agents and the orchestrator read them. |
 
 ### Reading
 
 | Rule | Description |
 |------|-------------|
 | **Config first** | Read `.ai-team/config.yaml` (if present) before orienting on the target repo. |
-| **Only what the prompt names** | A sub-agent reads the paths its delegation prompt and its SKILL.md name — not other tasks, not other reports. |
-| **No assumptions** | Never assume a declared file exists — verify. |
+| **Only what the prompt names** | A sub-agent reads the paths its delegation prompt and its SKILL.md name; other tasks and other reports stay unread. |
+| **Verify existence** | A declared file is read, and its absence reported, before anything depends on it. |

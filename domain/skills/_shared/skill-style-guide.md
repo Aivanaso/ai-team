@@ -10,8 +10,8 @@ SKILL.md is a **runtime contract for the sub-agent**, not human documentation. T
 
 Every SKILL.md must contain exactly these six `##` sections, in this order:
 
-1. **Activation Contract** — when the orchestrator invokes this skill (trigger conditions, never-run conditions). One paragraph or a short bulleted list. Decides whether to run at all.
-2. **Hard Rules** — numbered, absolute constraints the agent must never violate. No prose. If a rule needs explanation, the explanation goes in `references/`.
+1. **Activation Contract** — when the orchestrator invokes this skill (trigger conditions and exclusions). One paragraph or a short bulleted list. Decides whether to run at all.
+2. **Hard Rules** — numbered, absolute constraints, each stated as the action it requires. Rules only, no prose. If a rule needs explanation, the explanation goes in `references/`.
 3. **Decision Gates** — blocking checks before execution begins. Format: `IF <condition> THEN <action>`. Explicit exit conditions only.
 4. **Execution Steps** — ordered numbered list. Imperative voice. One step = one action. Sub-steps allowed. Nest with sub-steps (a., b., c.) for multi-action steps; prose paragraphs within steps reduce scannability and belong in references/.
 5. **Output Contract** — what the envelope looks like, required fields, mandatory grep-contracts. No envelope examples inline (those go to `references/envelope-examples.md`).
@@ -74,9 +74,8 @@ structure above (the orchestrator-side counterpart is `_shared/cards/delegate.md
   `group_files`") — a scope word left implicit ("relevant", "important") is read literally, not
   generalized, and produces a narrower result than intended.
 - **No redundant re-check scaffolding.** Enumerate a skill's gates (Decision Gates, Output
-  Contract checks) exactly once. Never add a generic "verify your work" / "double-check before
-  returning" line on top of them — stacked re-check instructions waste tokens without a quality
-  gain.
+  Contract checks) exactly once; the gates are the check. A generic "verify your work" /
+  "double-check before returning" line on top of them costs tokens without a quality gain.
 - **Positive rules.** A rule states what the agent does and which field carries it: "a check is
   `pass` only when executed in this cycle and its exit code observed" instead of "never infer a
   check". A negation leaves the model to guess the alternative and is processed less reliably
@@ -87,12 +86,11 @@ structure above (the orchestrator-side counterpart is `_shared/cards/delegate.md
   (a worked example in `references/`) rather than listing prohibited forms.
 - **English.** SKILL.md, references and every artifact an agent writes for another agent are in
   English (`common-rules.md` → Principle 7); quotes from the user stay in the user's language.
-- **Coverage over self-filtering.** A lens skill (`organic-reviewer`, `organic-security`) never
-  suppresses a finding by confidence — it reports every finding with its own `confidence` field
-  and lets the orchestrator's downstream triage filter (see `result-envelope.md` → Review
-  Receipt). The evidence axis (`evidence: executed | read`, `result-envelope.md` → Review
-  Receipt) never narrows this either — it governs the SEVERITY a `read`-only finding may carry
-  (MINOR as maximum without a named `trigger`), never whether the finding is reported.
+- **Coverage over self-filtering.** A lens skill (`organic-reviewer`, `organic-security`) reports
+  every finding with its own `confidence` field and lets the orchestrator's downstream triage
+  filter (see `result-envelope.md` → Review Receipt). The evidence axis (`evidence: executed |
+  read`, `result-envelope.md` → Review Receipt) governs the SEVERITY a `read`-only finding may
+  carry (MINOR as maximum without a named `trigger`); the finding is reported either way.
 
 ---
 

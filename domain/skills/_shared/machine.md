@@ -19,7 +19,7 @@ the working directory). Python 3 standard library only. Installed copy:
 | ticket | permission for one sub-agent launch; `kind: scout-map \| security-threat-model \| scout-scope \| implementer \| reviewer \| security-audit \| retro` |
 | attempt | implementer cycle inside a phase; 1 = fresh; 2-4 = resume the same implementer with the findings (`SendMessage`); 5-6 = fresh implementer, stronger model; 7 = denied, reopen the design |
 | ruling | the orchestrator's recorded adjudication of one open finding after the attempts are spent |
-| balance | the settled tickets: tokens, tool uses, duration, outcome — computed, never stored as totals |
+| balance | the settled tickets: tokens, tool uses, duration, outcome — computed on demand from the tickets |
 
 ## Verbs
 
@@ -78,7 +78,7 @@ One ticket open at a time, with one exception: several `scout-map` tickets may b
 }
 ```
 
-Timestamps are written by the machine, never by the orchestrator.
+Timestamps are the machine's.
 
 ## Inputs the machine parses
 
