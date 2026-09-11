@@ -44,6 +44,8 @@ class ProjectCase(unittest.TestCase):
         subprocess.run(git + ["-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"], check=True)
         subprocess.run(git + ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], check=True)
         self.head = subprocess.run(git + ["rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        with open(os.path.join(self.root, ".git", "info", "exclude"), "a") as handle:
+            handle.write(".ai-team/\n.bin/\n__pycache__/\n")  # as a real project's .gitignore does
         # A PATH with python3 and git but no engram: the mirror must degrade to one warning.
         bindir = os.path.join(self.root, ".bin")
         os.makedirs(bindir)
@@ -167,10 +169,14 @@ prose
 ```json
 {"kind": "scope-report", "phases": [
   {"n": 1, "expected_files": [{"action": "CREATE", "path": "src/flags.py", "evidence": "src/app.py:1"}],
-   "acceptance_checks": [{"command": "python3 -c 'import src.flags'", "verified": "fails today: module missing", "expect": "exit 0"}],
+   "acceptance_checks": [{"command": "python3 -c 'import src.flags'", "expect": "exit 0",
+                          "calibration": {"executed": true, "exit_code": 1, "digest": "ModuleNotFoundError: No module named 'src.flags'",
+                                          "red_reason": "src/flags.py is this phase's CREATE file"}}],
    "constraints_candidates": ["src/app.py:1 -- VALUE is read at import time"], "open_questions": []},
   {"n": 2, "expected_files": [{"action": "MODIFY", "path": "src/app.py", "evidence": "src/app.py:1"}],
-   "acceptance_checks": [{"command": "python3 -c 'import src.app'", "verified": "executed read-only", "expect": "exit 0"}],
+   "acceptance_checks": [{"command": "python3 -c 'import src.app'", "expect": "exit 0",
+                          "calibration": {"executed": true, "exit_code": 0, "digest": "(no output)",
+                                          "failure_signature": "ModuleNotFoundError when src/app.py is missing"}}],
    "constraints_candidates": [], "open_questions": []}
 ]}
 ```

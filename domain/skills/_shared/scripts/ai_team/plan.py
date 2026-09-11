@@ -6,6 +6,7 @@ implementer's input from that object.
 
 import os
 
+from ai_team.calibration import check_line, demotion_question, is_calibrated, state_note, validate_check, validate_scope_checks
 from ai_team.fenced import load_json_block, render_json_block
 from ai_team.store import MachineError, atomic_write, utc_now
 
@@ -34,48 +35,87 @@ def load_scope_report(path):
         if not isinstance(entry, dict) or not isinstance(entry.get("n"), int):
             raise MachineError("scope report %s: phases[%d] must be an object with an integer n" % (path, i))
         by_n[entry["n"]] = entry
+    violations = validate_scope_checks(by_n)
+    if violations:
+        raise MachineError("scope report %s does not validate:\n  - %s" % (path, "\n  - ".join(violations)))
     return by_n
 
 
-def _check_entries(commands):
-    return [{"command": c, "expect": "exit 0", "verified": "from the design"} for c in commands]
+def _run_checks(runner, checks, phase_n, source):
+    """Calibrate CLI-declared checks by running them: `checks` is a list of (command, failure)."""
+    entries, notes = [], []
+    for command, failure in checks:
+        entry = runner(command, failure)
+        entries.append(entry)
+        note = state_note(entry, phase_n, source)
+        if note:
+            notes.append(note)
+    return entries, notes
 
 
-def build_plan(task, design, design_rel, scope=None, scope_rel=None, scope_skipped=None):
+def _scoped_checks(scoped, phase_n):
+    """The scout's calibrated checks, plus the open question each un-run check becomes."""
+    entries, questions, notes = [], [], []
+    for i, raw in enumerate(scoped.get("acceptance_checks") or []):
+        check, violations = validate_check(raw, "phase %d acceptance_checks[%d]" % (phase_n, i))
+        if violations:
+            raise MachineError("scope report phase %d does not validate:\n  - %s" % (phase_n, "\n  - ".join(violations)))
+        if is_calibrated(check):
+            entries.append(check)
+            note = state_note(check, phase_n, "scout")
+            if note:
+                notes.append(note)
+        else:
+            question = demotion_question(check, phase_n)
+            questions.append(question)
+            notes.append("phase %d: %s" % (phase_n, question))
+    return entries, questions, notes
+
+
+def build_plan(task, design, design_rel, scope=None, scope_rel=None, scope_skipped=None, runner=None):
+    """The plan object plus the lines `plan generate` prints (red-today checks, demoted checks).
+    With a scope report the scout's calibrations are used; without one (`--scope-skipped`) the
+    machine runs the design's checks through `runner(command, failure)`."""
     constraints = list(design["decisions"]) + ["security: %s" % m for m in design["security_measures"]]
-    phases = []
+    phases, notes = [], []
     for phase in design["phases"]:
         entry = {
             "n": phase["n"],
             "title": phase["title"],
             "objective": phase["delivers"] or phase["title"],
             "scenarios": list(phase["scenarios"]),
-            "acceptance_checks": _check_entries(phase["checks"]),
+            "acceptance_checks": [],
             "expected_files": list(design["surfaces"]),
             "scout_notes": [],
             "open_questions": [],
             "amendments": [],
         }
-        if scope is not None:
+        if scope is None:
+            entry["acceptance_checks"], phase_notes = _run_checks(runner, [(c, None) for c in phase["checks"]], phase["n"], "design")
+            notes += phase_notes
+        else:
             scoped = scope.get(phase["n"])
             if scoped is None:
                 raise MachineError("scope report has no entry for phase %d -- every design phase must appear" % phase["n"])
             files = scoped.get("expected_files") or []
-            checks = scoped.get("acceptance_checks") or []
-            if not isinstance(files, list) or not isinstance(checks, list):
+            if not isinstance(files, list) or not isinstance(scoped.get("acceptance_checks") or [], list):
                 raise MachineError("scope report phase %d: expected_files and acceptance_checks must be lists" % phase["n"])
             if files:
                 entry["expected_files"] = [
                     {"action": f.get("action", "MODIFY"), "path": f.get("path"), "evidence": f.get("evidence", "")}
                     for f in files if isinstance(f, dict) and f.get("path")
                 ]
-            if checks:
-                entry["acceptance_checks"] = [
-                    {"command": c.get("command"), "expect": c.get("expect", "exit 0"), "verified": c.get("verified", "")}
-                    for c in checks if isinstance(c, dict) and c.get("command")
-                ]
             entry["scout_notes"] = [str(c) for c in scoped.get("constraints_candidates") or []]
             entry["open_questions"] = [str(q) for q in scoped.get("open_questions") or []]
+            checks, questions, phase_notes = _scoped_checks(scoped, phase["n"])
+            if phase["checks"] and not checks and not questions and not entry["open_questions"]:
+                raise MachineError(
+                    "scope report phase %d: the design's checks (%s) were neither calibrated nor questioned -- "
+                    "the scout calibrates each one or lists the gap in open_questions"
+                    % (phase["n"], ", ".join("`%s`" % c for c in phase["checks"])))
+            entry["acceptance_checks"] = checks
+            entry["open_questions"] += questions
+            notes += phase_notes
         entry["allowed_edit_roots"] = compute_roots([f["path"] for f in entry["expected_files"]])
         phases.append(entry)
     return {
@@ -90,13 +130,15 @@ def build_plan(task, design, design_rel, scope=None, scope_rel=None, scope_skipp
         "constraints": constraints,
         "out_of_scope": list(design["out_of_scope"]),
         "phases": phases,
-    }
+    }, notes
 
 
-def build_inline_plan(task, objective, decisions, checks, out_of_scope, files):
+def build_inline_plan(task, objective, decisions, checks, out_of_scope, files, runner):
+    """The bounded plan plus its notes; `checks` is a list of (command, failure) the machine runs."""
     if not objective or not checks:
         raise MachineError("a bounded plan needs --objective and at least one --check")
     expected = [{"action": "MODIFY", "path": f, "evidence": "user-approved in chat"} for f in files]
+    entries, notes = _run_checks(runner, checks, 1, "orchestrator")
     return {
         "kind": "plan",
         "task": task["task"],
@@ -113,14 +155,14 @@ def build_inline_plan(task, objective, decisions, checks, out_of_scope, files):
             "title": objective,
             "objective": objective,
             "scenarios": [],
-            "acceptance_checks": _check_entries(checks),
+            "acceptance_checks": entries,
             "expected_files": expected,
             "allowed_edit_roots": compute_roots(files),
             "scout_notes": [],
             "open_questions": [],
             "amendments": [],
         }],
-    }
+    }, notes
 
 
 def _bullets(items, empty="- (none)"):
@@ -165,7 +207,7 @@ def render_plan(plan):
             "",
             "**Acceptance checks**",
             "",
-            _bullets(["`%s` — %s" % (c["command"], c["expect"]) for c in phase["acceptance_checks"]]),
+            _bullets([check_line(c) for c in phase["acceptance_checks"]]),
             "",
             "**Expected files**",
             "",
@@ -200,17 +242,19 @@ def phase_of(plan, n):
     raise MachineError("plan has no phase %d (phases: 1..%d)" % (n, len(plan["phases"])))
 
 
-def amend(plan, n, reason, files, checks):
+def amend(plan, n, reason, files, checks, runner):
+    """Widen a phase; `checks` is a list of (command, failure) the machine runs before the
+    plan changes, so a check that times out or does zero work leaves the plan untouched."""
     phase = phase_of(plan, n)
+    entries, notes = _run_checks(runner, checks, n, "orchestrator")
     known = {f["path"] for f in phase["expected_files"]}
     for path in files:
         if path not in known:
             phase["expected_files"].append({"action": "MODIFY", "path": path, "evidence": "amendment: %s" % reason})
-    for command in checks:
-        phase["acceptance_checks"].append({"command": command, "expect": "exit 0", "verified": "amendment: %s" % reason})
+    phase["acceptance_checks"] += entries
     phase["allowed_edit_roots"] = compute_roots([f["path"] for f in phase["expected_files"]])
-    phase["amendments"].append({"at": utc_now(), "reason": reason, "files": list(files), "checks": list(checks)})
-    return phase
+    phase["amendments"].append({"at": utc_now(), "reason": reason, "files": list(files), "checks": [c for c, _ in checks]})
+    return phase, notes
 
 
 def render_phase(plan, n, plan_rel):
@@ -255,7 +299,9 @@ def render_phase(plan, n, plan_rel):
         "",
         "## Acceptance checks (run verbatim, in order)",
         "",
-        _bullets(["`%s` — %s" % (c["command"], c["expect"]) for c in phase["acceptance_checks"]]),
+        "Each line records what the command did BEFORE this phase (its calibration) and, after the dash, what it must do when the phase is done (`expect`). A check red today is this phase's own gap to close.",
+        "",
+        _bullets([check_line(c) for c in phase["acceptance_checks"]]),
         "",
         "## Expected files",
         "",

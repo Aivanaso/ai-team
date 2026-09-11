@@ -73,7 +73,7 @@ ai-team/
 ├── scripts/
 │   ├── install.sh                    # adapter selector
 │   ├── check-skill-budgets.sh        # SKILL.md ≤ 250 lines, cards ≤ 60
-│   └── tests/                        # unittest suites: machine, hooks, design parser, receipt calibration, hook merge
+│   └── tests/                        # unittest suites: machine, hooks, design parser, receipt calibration, check calibration, hook merge
 └── config/                           # .ai-team/config.yaml reference and annotated template
 ```
 

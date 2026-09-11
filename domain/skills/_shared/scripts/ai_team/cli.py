@@ -16,6 +16,7 @@ from ai_team import engram, hook  # noqa: E402
 from ai_team.debt import fix as debt_fix  # noqa: E402
 from ai_team.design import approve as approve_design, design_problems, load_design  # noqa: E402
 from ai_team.machine import Machine, TICKET_KINDS  # noqa: E402
+from ai_team.calibration import DEFAULT_TIMEOUT_S, calibrate_by_running  # noqa: E402
 from ai_team.plan import (  # noqa: E402
     amend, build_inline_plan, build_plan, load_plan, load_scope_report, render_phase, render_plan, write_text,
 )
@@ -96,7 +97,7 @@ def cmd_new(args):
     if args.kind == "large":
         print("next: scout-map pass → brainstorm → write .ai-team/designs/%s.md → `ai-team design approve <path>`" % task["task"])
     else:
-        print("next: four approved lines → `ai-team plan generate --objective ... --decision ... --check ... --file ...`")
+        print("next: four approved lines → `ai-team plan generate --objective ... --decision ... --check ... --failure ... --file ...`")
     return 0
 
 
@@ -119,16 +120,35 @@ def cmd_design_approve(args):
     return 0
 
 
+def _paired_checks(args):
+    """Each `--check` pairs with one `--failure`: how the check fails -- the signature of a
+    known failure when it is green today, why it is red today otherwise."""
+    checks = args.check or []
+    failures = args.failure or []
+    if len(checks) != len(failures):
+        raise MachineError(
+            "each --check pairs with one --failure \"<how it fails: a known failure's signature if it is green today, "
+            "why it is red today otherwise>\" (got %d --check, %d --failure)" % (len(checks), len(failures)), 2)
+    return list(zip(checks, failures))
+
+
+def _runner(store, args):
+    timeout_s = getattr(args, "check_timeout", None) or DEFAULT_TIMEOUT_S
+    return lambda command, failure: calibrate_by_running(command, failure, store.root, timeout_s)
+
+
 def cmd_plan_generate(args):
     store = Store(_root(args))
     task = _task(store)
     machine = Machine(store)
     if machine.open_tickets(task):
         raise MachineError("settle the open tickets before regenerating the plan")
+    runner = _runner(store, args)
     if task["kind"] == "bounded" or args.objective:
         if task["kind"] == "large":
             raise MachineError("a large task generates its plan from the approved design, not from --objective")
-        plan = build_inline_plan(task, args.objective, args.decision or [], args.check or [], args.out_of_scope or [], args.file or [])
+        plan, notes = build_inline_plan(task, args.objective, args.decision or [], _paired_checks(args),
+                                        args.out_of_scope or [], args.file or [], runner)
         task["scope_report"] = None
         task["scope_skipped"] = plan["scope_skipped"]
     else:
@@ -148,7 +168,8 @@ def cmd_plan_generate(args):
             scope = load_scope_report(store.abs(scope_rel))
         elif not skipped:
             raise MachineError("large task: pass --scope <scout report.md> (its final json block) or --scope-skipped \"<why the map pass already covers every file>\"")
-        plan = build_plan(task, design, design_rel, scope=scope, scope_rel=scope_rel if scope else None, scope_skipped=None if scope else skipped)
+        plan, notes = build_plan(task, design, design_rel, scope=scope, scope_rel=scope_rel if scope else None,
+                                 scope_skipped=None if scope else skipped, runner=runner)
         task["scope_report"] = scope_rel if scope else None
         task["scope_skipped"] = None if scope else skipped
     plan_rel = os.path.join(AI_TEAM_DIR, "plans", task["task"] + ".md")
@@ -158,7 +179,11 @@ def cmd_plan_generate(args):
     store.save(task)
     print("plan written: %s (%d phase%s)" % (plan_rel, len(plan["phases"]), "" if len(plan["phases"]) == 1 else "s"))
     for phase in plan["phases"]:
-        print("  phase %d — %s: %d files, %d checks" % (phase["n"], phase["title"], len(phase["expected_files"]), len(phase["acceptance_checks"])))
+        print("  phase %d — %s: %d files, %d calibrated check%s" % (
+            phase["n"], phase["title"], len(phase["expected_files"]), len(phase["acceptance_checks"]),
+            "" if len(phase["acceptance_checks"]) == 1 else "s"))
+    for note in notes:
+        print("  ! " + note)
     return 0
 
 
@@ -168,11 +193,13 @@ def cmd_plan_amend(args):
     if not task.get("plan"):
         raise MachineError("no plan to amend")
     plan = load_plan(store.abs(task["plan"]))
-    amend(plan, args.phase, args.reason, args.file or [], args.check or [])
+    phase, notes = amend(plan, args.phase, args.reason, args.file or [], _paired_checks(args), _runner(store, args))
     write_text(store.abs(task["plan"]), render_plan(plan))
-    Machine(store).phase(task, args.phase)["amendments"].append({"at": plan["phases"][args.phase - 1]["amendments"][-1]["at"], "reason": args.reason})
+    Machine(store).phase(task, args.phase)["amendments"].append({"at": phase["amendments"][-1]["at"], "reason": args.reason})
     store.save(task)
     print("phase %d amended: %s (re-run `ai-team phase extract %d`)" % (args.phase, args.reason, args.phase))
+    for note in notes:
+        print("  ! " + note)
     return 0
 
 
@@ -337,7 +364,9 @@ def build_parser():
     p.add_argument("--scope-skipped", help="why the scope pass is skipped")
     p.add_argument("--objective")
     p.add_argument("--decision", action="append")
-    p.add_argument("--check", action="append")
+    p.add_argument("--check", action="append", help="a command the machine runs now and records as calibrated; pairs with one --failure")
+    p.add_argument("--failure", action="append", help="how the paired --check fails: a known failure's signature if it is green today, why it is red today otherwise")
+    p.add_argument("--check-timeout", type=int, default=DEFAULT_TIMEOUT_S, help="seconds per --check run (default %d)" % DEFAULT_TIMEOUT_S)
     p.add_argument("--out-of-scope", action="append")
     p.add_argument("--file", action="append")
     p.set_defaults(func=cmd_plan_generate)
@@ -345,7 +374,9 @@ def build_parser():
     p.add_argument("--phase", type=int, required=True)
     p.add_argument("--reason", required=True)
     p.add_argument("--file", action="append")
-    p.add_argument("--check", action="append")
+    p.add_argument("--check", action="append", help="a command the machine runs now and records as calibrated; pairs with one --failure")
+    p.add_argument("--failure", action="append", help="how the paired --check fails: a known failure's signature if it is green today, why it is red today otherwise")
+    p.add_argument("--check-timeout", type=int, default=DEFAULT_TIMEOUT_S, help="seconds per --check run (default %d)" % DEFAULT_TIMEOUT_S)
     p.set_defaults(func=cmd_plan_amend)
 
     phase = sub.add_parser("phase", help="phase verbs").add_subparsers(dest="phase_verb", required=True)

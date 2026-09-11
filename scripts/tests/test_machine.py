@@ -31,7 +31,8 @@ class BoundedFlow(ProjectCase):
         _, _, err = self.ai("acquire", "implementer", expect=1)
         self.assertIn("no plan yet", err)
         self.ai("plan", "generate", "--objective", "Add a flag", "--decision", "off by default",
-                "--check", "python3 -c 'import src.app'", "--file", "src/app.py", "--out-of-scope", "docs")
+                "--check", "python3 -c 'import src.app'", "--failure", "ModuleNotFoundError when src/app.py is missing",
+                "--file", "src/app.py", "--out-of-scope", "docs")
         plan = self.read(".ai-team/plans/%s.md" % self.task()["task"])
         self.assertIn("off by default", plan)
         self.assertIn('"kind": "plan"', plan)
@@ -62,7 +63,7 @@ class BoundedFlow(ProjectCase):
 
     def test_tier_needs_a_settled_implementer(self):
         self.ai("new", "demo", "--kind", "bounded")
-        self.ai("plan", "generate", "--objective", "x", "--check", "true", "--file", "README.md")
+        self.ai("plan", "generate", "--objective", "x", "--check", "true", "--failure", "never green when the shell is broken", "--file", "README.md")
         _, _, err = self.ai("tier", "1", "--phase", "1", "--reason", "code", expect=1)
         self.assertIn("settle the implementer", err)
 
@@ -261,7 +262,7 @@ class Hooks(ProjectCase):
         self.assertEqual(decision["permissionDecision"], "deny")
         self.assertIn("ai-team new", decision["permissionDecisionReason"])
         self.ai("new", "demo", "--kind", "bounded")
-        self.ai("plan", "generate", "--objective", "x", "--check", "true", "--file", "src/app.py")
+        self.ai("plan", "generate", "--objective", "x", "--check", "true", "--failure", "never green when the shell is broken", "--file", "src/app.py")
         _, out, _ = self.ai("hook", "pre-tool-use", stdin=self._payload("organic-implementer"))
         self.assertIn("ai-team acquire implementer --phase 1", self._decision(out)["permissionDecisionReason"])
         self.ai("acquire", "implementer")
@@ -285,7 +286,7 @@ class Hooks(ProjectCase):
 
     def test_retro_hook_uses_the_closed_task(self):
         self.ai("new", "demo", "--kind", "bounded")
-        self.ai("plan", "generate", "--objective", "x", "--check", "true", "--file", "README.md")
+        self.ai("plan", "generate", "--objective", "x", "--check", "true", "--failure", "never green when the shell is broken", "--file", "README.md")
         self.ai("acquire", "implementer")
         self.ai("settle", "t1", "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1", "--duration", "1")
         self.ai("tier", "0", "--phase", "1", "--reason", "docs")

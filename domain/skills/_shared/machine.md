@@ -28,12 +28,12 @@ the working directory). Python 3 standard library only. Installed copy:
 | `status [--json]` | the task in progress, design status and security, phase N of M, open tickets, attempts used, pending question, **what is allowed now**, and the card for the current moment |
 | `new <slug> --kind bounded\|large [--design <path>]` | creates the task JSON (slug is date-prefixed if it is not already) |
 | `design approve <path>` | flips the design frontmatter to `status: approved` with `approved_at`; only after the user's "yes" |
-| `plan generate [--scope <report.md> \| --scope-skipped "<why>"]` | large: plan from the approved design plus the scope report's final fenced json block. Bounded: `plan generate --objective … --decision … --check … --out-of-scope … --file …` (repeatable flags) writes a one-phase plan |
-| `plan amend --phase n --reason "<why>" [--file p]… [--check c]…` | widens a phase after an implementer `blocked` with a `scope_report`; recorded in the plan and the JSON |
+| `plan generate [--scope <report.md> \| --scope-skipped "<why>"] [--check-timeout s]` | large: plan from the approved design plus the scope report's final fenced json block; the scout's calibrations travel into the plan, an un-run check becomes an open question. Under `--scope-skipped` the machine runs the design's checks itself. Bounded: `plan generate --objective … --decision … --check … --failure … --out-of-scope … --file …` (repeatable flags) writes a one-phase plan; the machine runs each `--check` now and records its calibration, `--failure` says how it fails (a known failure's signature when green today, why it is red today otherwise). A zero-work green or a timeout refuses the plan; a red-today check is printed with a `!` |
+| `plan amend --phase n --reason "<why>" [--file p]… [--check c --failure f]… [--check-timeout s]` | widens a phase after an implementer `blocked` with a `scope_report`, or records a check the orchestrator ran after the scout could not; each `--check` runs now and is recorded calibrated; recorded in the plan and the JSON |
 | `phase extract <n>` | writes `.ai-team/plans/<task>/phase-<n>.md`, the implementer's input |
 | `tier --phase n <0\|1\|2> --reason "<one line>"` | the evidence tier of the phase's diff, decided after the candidate exists |
 | `acquire <kind> [--phase n]` | checks the conditions below and issues a ticket, or refuses saying what is missing |
-| `settle <ticket> --outcome … [--model … --tokens … --tool-uses … --duration …] [--report <path>] [--defer F-1,…]` | closes the ticket with the harness figures. Reviewer / security-audit: validates the report's receipt block first; a violating report does not settle |
+| `settle <ticket> --outcome … [--model … --tokens … --tool-uses … --duration …] [--report <path>] [--defer F-1,…]` | closes the ticket with the harness figures. Reviewer / security-audit: validates the report's receipt block first; scout-scope: validates every check's calibration first; a violating report does not settle. |
 | `ruling <ticket> --finding <id> --text "<why>" --cost-if-wrong "<what>"` | adjudicates one open finding of a settled lens ticket |
 | `commit-check --phase n` | exit 0 when the phase may be committed (tier 0 with a clean implementer, or the lens receipts re-validated and clear, or blocked only by ruled CRITICALs) |
 | `phase done <n> --commit <hash>` | records the commit and flips the phase to `committed` (runs `commit-check` first) |
@@ -52,7 +52,7 @@ Outcomes: `ok | warning | needs_input | blocked | failed | infra-death`. `infra-
 | scout-map | a task in progress |
 | security-threat-model | a design in `draft` whose frontmatter says `security: pending` |
 | scout-scope | design `approved` |
-| implementer | large: design `approved`; a plan with phase n; scope report recorded or skipped with a reason; earlier phases committed; fewer than 6 attempts on the phase (the 7th says "reopen the design") |
+| implementer | large: design `approved`; a plan with phase n; scope report recorded or skipped with a reason; earlier phases committed; fewer than 6 attempts on the phase (the 7th says "reopen the design"); at least one calibrated acceptance check on the phase (a phase whose checks were all demoted to open questions names them and the `plan amend --check … --failure …` that records one) |
 | reviewer | tier ≥ 1 declared; the implementer ticket of the current attempt settled `ok` or `warning` |
 | security-audit | as reviewer, tier 2 |
 | retro | task `done` |
@@ -83,8 +83,14 @@ Timestamps are written by the machine, never by the orchestrator.
 **Design file** (`.ai-team/designs/<task>.md`): frontmatter `title`, `created_at`, `status: draft | approved`, `map_report`, `security: not-needed | pending | done`; sections by `## ` heading, Spanish or English names accepted (`Objetivo`/`Objective`, `Decisiones`/`Decisions`, `Seguridad`/`Security`, `Fuera de alcance`/`Out of scope`, `Fases`/`Phases`, and under `## Diseño`/`## Design` the sub-heading `### Superficies nombradas`/`### Named surfaces`). Each phase is a `### Fase N — Title` (or `### Phase N — Title`) block with the lines `Entrega:`/`Delivers:`, `Escenarios:`/`Scenarios:` followed by `- ` bullets, and `Check:` followed by one backticked command per line or bullet.
 
 **Scope report** (scout, `mode: scope`): a Markdown report whose final fenced ```json block is
-`{"kind": "scope-report", "phases": [{"n": 1, "expected_files": [{"action": "MODIFY", "path": "…", "evidence": "file:line"}], "acceptance_checks": [{"command": "…", "verified": "…", "expect": "…"}], "constraints_candidates": ["…"], "open_questions": ["…"]}]}`.
+`{"kind": "scope-report", "phases": [{"n": 1, "expected_files": [{"action": "MODIFY", "path": "…", "evidence": "file:line"}], "acceptance_checks": [{"command": "…", "expect": "exit N", "calibration": {…}}], "constraints_candidates": ["…"], "open_questions": ["…"]}]}`.
 Every phase of the design must appear. A phase absent from the report fails `plan generate`.
+
+**Calibration** of an acceptance check (scope report, plan, phase file) -- what the command did on the current tree:
+- green today: `{"executed": true, "exit_code": N, "digest": "<last output lines>", "failure_signature": "<how a known failure shows>"}` with `exit_code` equal to `expect`'s N;
+- red today: `{"executed": true, "exit_code": M, "digest": "…", "red_reason": "<why it fails now and that the phase turns it green>"}`;
+- not run: `{"executed": false, "target": "file:line", "reason": "…"}` and no `expect` -- `plan generate` moves it to the phase's `open_questions`.
+`expect` is always `exit N`. A digest that is a zero-work output (`No tests found`, `0 files analyzed`, `Tests: 0 total`) is refused. A phase whose design has checks and whose scope entry calibrates none and questions nothing fails `plan generate`. Checks the machine runs itself add `"tree": "<short HEAD>[+dirty]"`.
 
 **Review report** (reviewer, security code-audit): a Markdown report whose final fenced ```json block is the Review Receipt (`result-envelope.md` → Review Receipt).
 

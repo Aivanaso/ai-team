@@ -23,8 +23,13 @@ change needs a 4th file to understand, it was large: say so and switch.
    "no me preguntes", "sin confirmar") IS the yes: write the four lines aloud and go on. Then, verbatim:
    ```
    ai-team new <slug> --kind bounded
-   ai-team plan generate --objective "…" --decision "…" [--decision "…"] --check "…" [--check "…"] --out-of-scope "…" --file <path> [--file <path>]
+   ai-team plan generate --objective "…" --decision "…" [--decision "…"] --check "…" --failure "…" [--check "…" --failure "…"] --out-of-scope "…" --file <path> [--file <path>]
    ```
+   The machine runs each `--check` now and records its calibration; `--failure` says how the check
+   fails (a known failure's signature when it is green today, why it is red today otherwise). A
+   check that takes minutes needs the Bash call's own `timeout` raised above the default. Read the
+   `!` lines it prints: a red-today check is the phase's own gap, or a pre-existing failure to fix
+   or drop before delegating.
 4. Card: delegate.
 
 ## Large change

@@ -68,7 +68,7 @@ def pre_tool_use(payload):
     if task is None and "retro" not in kinds:
         return 0, _deny(
             "ai-team: no task in progress under %s -- a sub-agent launch needs a ticket. %s Bounded change: "
-            "`%s new <slug> --kind bounded` then `%s plan generate --objective ... --decision ... --check ... --file ...`; "
+            "`%s new <slug> --kind bounded` then `%s plan generate --objective ... --decision ... --check ... --failure ... --file ...`; "
             "large change: `%s new <slug> --kind large` and follow `%s status`. Then `%s acquire %s` and relaunch the sub-agent."
             % (root, ORDER, bin_, bin_, bin_, bin_, bin_, " | ".join(kinds))
         ), ""

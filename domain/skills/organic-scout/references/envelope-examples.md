@@ -60,7 +60,7 @@ context_resolution: "self-loaded"
 
 ```yaml
 status: ok
-executive_summary: "Scoped the approved design's 2 phases: 4 files with evidence, 3 checks verified runnable and able to fail, 2 anchored constraint candidates; the report ends with the scope-report json block."
+executive_summary: "Scoped the approved design's 2 phases: 4 files with evidence, 2 checks calibrated on the current tree and 1 reported un-run with its target, 2 anchored constraint candidates; the report ends with the scope-report json block."
 mode: scope
 artifacts:
   - { name: "scope report", path: ".ai-team/explorations/2026-09-05-billing-export-scope.md" }
@@ -86,11 +86,12 @@ The report's final block, for the same pass (fenced as ```json in the report its
   {"n": 1, "expected_files": [
      {"action": "MODIFY", "path": "src/Billing/ExportService.php", "evidence": "src/Billing/ExportService.php:41"},
      {"action": "CREATE", "path": "src/Billing/Export/RowBuilder.php", "evidence": "src/Billing/ExportService.php:44 (insertion site)"}],
-   "acceptance_checks": [{"command": "vendor/bin/phpunit tests/Billing/ExportServiceTest.php", "verified": "executed read-only: 4 tests; deleting the new assertion makes it fail", "expect": "exit 0"}],
+   "acceptance_checks": [{"command": "vendor/bin/phpunit tests/Billing/ExportServiceTest.php", "expect": "exit 0",
+                          "calibration": {"executed": true, "exit_code": 0, "digest": "OK (4 tests, 11 assertions)", "failure_signature": "exit 1 + 'FAILURES!' when the new assertion is deleted"}}],
    "constraints_candidates": ["exports include only status = paid invoices — bin/legacy-export.sh:12"],
    "open_questions": []},
   {"n": 2, "expected_files": [{"action": "MODIFY", "path": "src/Billing/ExportController.php", "evidence": "src/Billing/ExportController.php:24"}],
-   "acceptance_checks": [{"command": "composer phpcs", "verified": "phpcs.xml:14 covers src/Billing/", "expect": "exit 0"}],
+   "acceptance_checks": [{"command": "composer phpcs", "calibration": {"executed": false, "target": "phpcs.xml:14", "reason": "covers src/Billing/; the full sweep exceeds this pass's read-only budget"}}],
    "constraints_candidates": [], "open_questions": []}
 ]}
 ```

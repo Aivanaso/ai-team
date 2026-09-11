@@ -7,6 +7,7 @@ import subprocess
 
 from ai_team import debt, engram
 from ai_team.design import load_design, set_frontmatter
+from ai_team.plan import load_plan, load_scope_report, phase_of
 from ai_team.receipt import derived_verdict, findings_of, validate_report
 from ai_team.store import MachineError, utc_now
 
@@ -151,7 +152,24 @@ class Machine:
                 "phase %d has used its %d attempts -- reopen the design (amend `%s`, `design approve`, `plan generate`)"
                 % (phase_n, MAX_ATTEMPTS, task.get("design") or "the design")
             )
-        return missing
+        return missing + self._calibrated_check_conditions(task, phase_n)
+
+    def _calibrated_check_conditions(self, task, phase_n):
+        """A phase reaches an implementer only with at least one calibrated acceptance check:
+        a phase whose every check was demoted to an open question would settle `ok` having
+        verified nothing."""
+        try:
+            phase = phase_of(load_plan(self.store.abs(task["plan"])), phase_n)
+        except MachineError as exc:
+            return [str(exc)]
+        if phase["acceptance_checks"]:
+            return []
+        demoted = [q for q in phase["open_questions"] if q.startswith("not calibrated:")]
+        return [
+            "phase %d has no calibrated acceptance check -- %s. Run one yourself and record it: "
+            "`ai-team plan amend --phase %d --reason \"...\" --check \"<cmd>\" --failure \"<how it fails>\"`"
+            % (phase_n, "; ".join(demoted) if demoted else "the plan declares none", phase_n)
+        ]
 
     def _lens_conditions(self, task, kind, phase_n):
         missing = []
@@ -270,6 +288,10 @@ class Machine:
             ticket["findings"] = findings_of(data)
             notes += out
         if kind == "scout-scope" and outcome in GOOD:
+            try:
+                load_scope_report(self.store.abs(report_rel))
+            except MachineError as exc:
+                raise MachineError("%s\n-- the ticket stays open, relaunch the scout with these lines" % exc)
             task["scope_report"] = report_rel
             task["scope_skipped"] = None
         if kind == "security-threat-model" and outcome in GOOD and task.get("design"):

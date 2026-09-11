@@ -30,7 +30,7 @@ only `config.yaml` (bootstrap) and its own report at the injected `report_destin
 - Map: when the objective replaces or mirrors logic an external or sibling system enforces, `external_conditions` lists every condition that logic gates on, with the citation naming it. -- because the condition the replaced logic enforced silently is the one the new code drops (ECO-856 retro F1).
 - Scope: every `expected_files` entry cites the evidence that puts the file in the chain; a CREATE entry cites its insertion site (the caller, route table, config entry or import that will reference it). -- because a file that does not exist yet has no body to cite, only a site that will call it.
 - Scope: before closing a phase's files, sweep construction sites of every touched type — object literals, builders, stubs, factories that BUILD it, not only files that mention it. -- because a type gaining a required member breaks its constructors first.
-- Scope: every `acceptance_checks.command` is verified runnable BEFORE it is proposed (executed read-only when side-effect-free, else the declaring target cited `file:line`) and its `verified` note says what a known failure of the same command shows; a linter or analyzer is proposed only when its own configuration scope covers a file of the phase. A check that cannot be shown able to fail goes to `open_questions` (`_shared/evidence-protocol.md` Rule 7). -- because a green that cannot go red protects nothing (ECO-856 retro F3).
+- Scope: every acceptance check carries its `calibration`: run the command on the current tree and record `exit_code` and a `digest` of its output; when it is green today add `failure_signature` (how a known failure of the same command shows), when it is red today add `red_reason` (why it fails now and that the phase turns it green). A command you could not run is reported as `{"executed": false, "target": "file:line", "reason": "…"}` with no `expect` -- the machine turns it into an open question for the orchestrator, who has the budget to run it. A linter or analyzer is proposed when its own configuration scope covers a file of the phase. The machine refuses a report whose check lacks its calibration, whose green digest shows zero work (`No tests found`, `0 files analyzed`) or whose `expect` is not `exit N` (`_shared/evidence-protocol.md` Rule 7). -- because a green that has been seen red is the only green that protects anything (ECO-856 retro F3, ECO-1281 retro F1).
 - Scope: a `constraints_candidates` entry carries a `file:line` anchor or it is not proposed; it is a candidate — the design's decisions are the constraints, and only the user's yes promotes a candidate.
 - Scope: every phase of the design appears in the json block, in the design's order; a phase the scout cannot scope with evidence still appears, with the gap in its `open_questions`. -- because `ai-team plan generate` refuses a report missing a phase.
 - Scope: when the repo has nothing runnable, say so in `open_questions` — never invent a command, never write config outside bootstrap.
@@ -69,11 +69,16 @@ only `config.yaml` (bootstrap) and its own report at the injected `report_destin
 
 7. Bootstrap: write `.ai-team/config.yaml` per the template, `commit_strategy: auto` at the root.
 8. Map: write the report at `report_destination` — Where it lives · Analogue · Documented gotchas · External conditions · Open questions — every line `file:line`. No json block.
-9. Scope: write the report at `report_destination` — one section per phase (files with evidence, checks with `verified`, candidates, questions) — and END it with the machine block:
+9. Scope: write the report at `report_destination` — one section per phase (files with evidence, checks with their calibration, candidates, questions) — and END it with the machine block:
    ```text
    {"kind": "scope-report", "phases": [{"n": 1, "expected_files": [{"action": "CREATE|MODIFY|REMOVE", "path": "…", "evidence": "file:line"}],
-     "acceptance_checks": [{"command": "…", "verified": "…", "expect": "…"}], "constraints_candidates": ["… (file:line)"], "open_questions": ["…"]}]}
+     "acceptance_checks": [
+       {"command": "…", "expect": "exit 0", "calibration": {"executed": true, "exit_code": 0, "digest": "…", "failure_signature": "…"}},
+       {"command": "…", "expect": "exit 0", "calibration": {"executed": true, "exit_code": 1, "digest": "…", "red_reason": "…"}},
+       {"command": "…", "calibration": {"executed": false, "target": "file:line", "reason": "…"}}],
+     "constraints_candidates": ["… (file:line)"], "open_questions": ["…"]}]}
    ```
+   Every phase of the design appears; a phase whose design checks you calibrated none of lists the gap in `open_questions`.
    (fenced as ```json in the real report — the only such block in it).
 10. Return the envelope per the Output Contract.
 
