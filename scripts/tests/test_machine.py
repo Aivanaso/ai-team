@@ -206,6 +206,100 @@ class LargeFlow(ProjectCase):
         self.ai("commit-check", "--phase", "1")
         self.assertEqual(len(self.task()["rulings"]), 2)
 
+    def test_major_finding_blocks_until_ruled_or_deferred(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        _, out, _ = self._review(1, full_receipt([finding("F-1", "MAJOR")]))
+        self.assertNotIn("review-blocked", out)  # the receipt is review-clear -- the gate still fires
+        _, out, _ = self.ai("commit-check", "--phase", "1", expect=1)
+        self.assertIn("F-1", out)
+        self.assertIn("MAJOR", out)
+        self.assertIn("ruling", out)
+        self.assertIn("--defer", out)
+        reviewer_ticket = [t for t in self.task()["tickets"] if t["kind"] == "reviewer"][-1]["id"]
+        self.ai("ruling", reviewer_ticket, "--finding", "F-1", "--text", "accepted", "--cost-if-wrong", "a regression")
+        self.ai("commit-check", "--phase", "1")
+        self.ai("phase", "done", "1", "--commit", self.head)
+        # phase 2: the same shape, cleared by a deferral instead of a ruling
+        self._implement(2)
+        self.ai("tier", "1", "--phase", "2", "--reason", "code")
+        self.ai("commit-check", "--phase", "2", expect=1)
+        self._review(2, full_receipt([finding("F-1", "MAJOR")]), defer="F-1")
+        self.ai("commit-check", "--phase", "2")
+
+    def test_defer_refuses_critical_finding(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket = out.split()[1]
+        report = self.write(".ai-team/reviews/%s.md" % ticket,
+                             receipt_block(full_receipt([finding("S-1", "CRITICAL", evidence="executed")])))
+        debt_path = os.path.join(self.root, ".ai-team", "tech-debt.md")
+        self.assertFalse(os.path.exists(debt_path))
+        _, _, err = self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1",
+                             "--tool-uses", "1", "--duration", "1", "--report", report, "--defer", "S-1", expect=1)
+        self.assertIn("ai-team ruling", err)
+        self.assertFalse(os.path.exists(debt_path))  # a refused settle writes nothing
+        # the ticket stayed open: settle it for real, a CRITICAL is cleared by a ruling only
+        self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1",
+                "--duration", "1", "--report", report)
+        self.ai("commit-check", "--phase", "1", expect=1)
+        self.ai("ruling", ticket, "--finding", "S-1", "--text", "accepted", "--cost-if-wrong", "data exposure")
+        self.ai("commit-check", "--phase", "1")
+
+    def test_disposition_matches_by_id_file_and_severity(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        self._review(1, full_receipt([finding("F-1", "MAJOR", file="src/app.py")]), defer="F-1")
+        self.ai("commit-check", "--phase", "1")
+        # attempt 2: same id, same file, same severity -- the attempt-1 deferral still satisfies it
+        self._implement(1)
+        self._review(1, full_receipt([finding("F-1", "MAJOR", file="src/app.py")]))
+        self.ai("commit-check", "--phase", "1")
+        # attempt 3: the severity increases to CRITICAL -- a new, undispositioned finding
+        self._implement(1)
+        self._review(1, full_receipt([finding("F-1", "CRITICAL", file="src/app.py", evidence="executed")]))
+        _, out, _ = self.ai("commit-check", "--phase", "1", expect=1)
+        self.assertIn("F-1", out)
+        reviewer3 = [t for t in self.task()["tickets"] if t["kind"] == "reviewer"][-1]["id"]
+        self.ai("ruling", reviewer3, "--finding", "F-1", "--text", "accepted", "--cost-if-wrong", "a crash")
+        self.ai("commit-check", "--phase", "1")
+        # attempt 4: back to MAJOR, but at a different file -- a new, undispositioned finding
+        self.write("src/b.py", "OTHER = 1\n")
+        self._implement(1)
+        self._review(1, full_receipt([finding("F-1", "MAJOR", file="src/b.py")]))
+        _, out, _ = self.ai("commit-check", "--phase", "1", expect=1)
+        self.assertIn("F-1", out)
+
+    def test_commit_check_refuses_on_report_drift(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        ticket, _, _ = self._review(1, full_receipt([finding("F-1", "MINOR")]))
+        self.ai("commit-check", "--phase", "1")  # a MINOR-only receipt never blocks
+        report_path = self.task()["tickets"][-1]["report"]
+        tampered = full_receipt([finding("F-1", "MINOR")])
+        tampered["lenses"]["correctness"]["findings"][0]["line"] = 99
+        self.write(report_path, receipt_block(tampered))
+        _, out, _ = self.ai("commit-check", "--phase", "1", expect=1)
+        self.assertIn(ticket, out)
+        self.assertIn(report_path, out)
+
     def test_attempts_cap_and_infra_death(self):
         design = self._design(security="not-needed", body="No aplica.")
         self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)

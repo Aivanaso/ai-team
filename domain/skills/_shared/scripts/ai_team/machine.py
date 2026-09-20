@@ -4,6 +4,7 @@ orchestrator; what must always happen lives here (design note §8, §10, §13, �
 
 import os
 import subprocess
+import unicodedata
 
 from ai_team import debt, engram, worktree
 from ai_team.design import load_design, set_frontmatter
@@ -13,6 +14,8 @@ from ai_team.store import MachineError, utc_now
 
 TICKET_KINDS = ("scout-map", "security-threat-model", "scout-scope", "implementer", "reviewer", "security-audit", "retro")
 LENS_KINDS = ("reviewer", "security-audit")
+SEVERITY_RANK = {"MINOR": 0, "MAJOR": 1, "CRITICAL": 2}
+GATED_SEVERITIES = ("MAJOR", "CRITICAL")
 OUTCOMES = ("ok", "warning", "needs_input", "blocked", "failed", "infra-death")
 GOOD = ("ok", "warning")
 MAX_ATTEMPTS = 6
@@ -26,6 +29,10 @@ AGENT_KINDS = {
     "organic-retro": ("retro",),
 }
 CARDS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "cards")
+
+
+def _nfc(value):
+    return unicodedata.normalize("NFC", value) if isinstance(value, str) else value
 
 
 def _int_field(name, value):
@@ -349,6 +356,13 @@ class Machine:
             unknown = [d for d in defer if d not in known]
             if unknown:
                 raise MachineError("--defer names findings not in the receipt: %s" % ", ".join(unknown))
+            critical = [d for d in defer if known[d]["severity"] == "CRITICAL"]
+            if critical:
+                raise MachineError(
+                    "--defer refuses CRITICAL %s -- a CRITICAL finding is ruled, never deferred: "
+                    "`ai-team ruling %s --finding %s --text \"...\" --cost-if-wrong \"...\"`"
+                    % (", ".join(critical), ticket_id, critical[0])
+                )
             rows = debt.append_findings(os.path.join(self.store.ai_team, "tech-debt.md"), report_rel, [known[d] for d in defer])
             ticket["deferred"] = list(defer)
             notes.append("%d row(s) appended to .ai-team/tech-debt.md" % rows)
@@ -391,8 +405,39 @@ class Machine:
     def _ruled(self, task, ticket_id):
         return {r["finding"] for r in task["rulings"] if r["ticket"] == ticket_id}
 
+    def _dispositions(self, task, kind, phase_n):
+        """Every ruling or deferral recorded against a settled ticket of this kind and phase,
+        resolved through that ticket's OWN findings snapshot to (NFC id, NFC file, severity,
+        is_ruling) -- the identity a later finding of the same id is checked against
+        (security MUST F-1: file must match and the later severity must not be higher)."""
+        out = []
+        for ticket in self.tickets(task, kind, phase_n, settled=True):
+            by_id = {f["id"]: f for f in (ticket.get("findings") or [])}
+            for finding_id in self._ruled(task, ticket["id"]):
+                found = by_id.get(finding_id)
+                if found:
+                    out.append((_nfc(found["id"]), _nfc(found["file"]), found["severity"], True))
+            for finding_id in ticket.get("deferred") or []:
+                found = by_id.get(finding_id)
+                if found:
+                    out.append((_nfc(found["id"]), _nfc(found["file"]), found["severity"], False))
+        return out
+
+    @staticmethod
+    def _dispositioned(dispositions, finding):
+        """A disposition satisfies `finding` only when its id and file (NFC) match and its
+        severity is not lower than the finding's; a CRITICAL is satisfied by a ruling only,
+        since a deferral on a CRITICAL is refused at settle and never reaches this list."""
+        fid, ffile, frank = _nfc(finding["id"]), _nfc(finding["file"]), SEVERITY_RANK[finding["severity"]]
+        for did, dfile, dseverity, is_ruling in dispositions:
+            if did != fid or dfile != ffile or SEVERITY_RANK[dseverity] < frank:
+                continue
+            if finding["severity"] == "CRITICAL" and not is_ruling:
+                continue
+            return True
+        return False
+
     def _lens_gate(self, task, kind, phase):
-        reasons = []
         ticket = self._latest(self.tickets(task, kind, phase["n"], phase["attempts"], settled=True))
         if ticket is None:
             return ["no settled %s ticket for attempt %d" % (kind, phase["attempts"])]
@@ -401,12 +446,29 @@ class Machine:
         code, out, err, data = validate_report(self.store.abs(ticket["report"]), self.store.root)
         if code != 0:
             return ["%s report %s no longer validates: %s" % (kind, ticket["report"], "; ".join(out + err))]
-        if derived_verdict(data) == "review-blocked":
-            ruled = self._ruled(task, ticket["id"])
-            unruled = [f["id"] for f in findings_of(data) if f["severity"] == "CRITICAL" and f["id"] not in ruled]
-            if unruled:
-                reasons.append("%s %s is review-blocked: CRITICAL %s without a ruling (`ai-team ruling %s --finding <id> ...`)"
-                               % (kind, ticket["id"], ", ".join(unruled), ticket["id"]))
+        live_verdict = derived_verdict(data)
+        live_findings = findings_of(data)
+        if live_verdict != ticket["verdict"] or live_findings != ticket["findings"]:
+            return ["%s report %s differs from the findings/verdict snapshot recorded at settle for ticket %s "
+                     "-- restore the report to the content it had at settle, or open the next attempt "
+                     "(`ai-team acquire implementer --phase %d`) and review again"
+                     % (kind, ticket["report"], ticket["id"], phase["n"])]
+        dispositions = self._dispositions(task, kind, phase["n"])
+        reasons = []
+        for f in live_findings:
+            if f["severity"] not in GATED_SEVERITIES or self._dispositioned(dispositions, f):
+                continue
+            if f["severity"] == "CRITICAL":
+                reasons.append(
+                    "%s %s CRITICAL %s without a ruling (`ai-team ruling %s --finding %s --text \"...\" "
+                    "--cost-if-wrong \"...\"`)" % (kind, ticket["id"], f["id"], ticket["id"], f["id"])
+                )
+            else:
+                reasons.append(
+                    "%s %s MAJOR %s without a ruling or a deferral (`ai-team ruling %s --finding %s --text \"...\" "
+                    "--cost-if-wrong \"...\"` or `ai-team settle %s --defer %s`)"
+                    % (kind, ticket["id"], f["id"], ticket["id"], f["id"], ticket["id"], f["id"])
+                )
         return reasons
 
     def commit_check(self, task, phase_n):
