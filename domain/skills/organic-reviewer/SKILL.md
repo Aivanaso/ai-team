@@ -58,11 +58,11 @@ the changed files for new inconsistencies, and the checks; the prior pass's clea
 ## Execution Steps
 
 1. Read `_shared/context-protocol.md` and `_shared/persistence-contract.md`. Validate the injected context (Decision Gates). Report `context_resolution`.
-2. Attempt ≥ 2: read `prior_report`; verify the actual changed set against `delta_scope.changed_files` (Decision Gates); run the bounded pass — each `findings_to_verify` id closed with citation, the changed files for new inconsistencies, the checks — and compose the "not re-verified" list. Otherwise the full pass below.
+2. Attempt ≥ 2: read `prior_report`; verify the actual changed set against `delta_scope.changed_files` (Decision Gates); run the bounded pass — each `findings_to_verify` id closed with citation (into `closed: [{id, file, line}]`) or re-listed under `findings` when still open, the changed files for new inconsistencies, the checks — and compose the "not re-verified" list. `settle` refuses a receipt that drops a prior MAJOR/CRITICAL without one of the two (`_shared/machine.md`). Otherwise the full pass below.
 3. Read the design (`## Decisions`, `## Security`, `## Out of scope`) and the phase file (objective, constraints, scenarios, expected files). Resolve `group_files`; read each file in full; `git diff HEAD -- <group_files>` as a pointer; up to 10 1-hop callers.
 4. Conformity lens: decision by decision, scenario by scenario, file by file (declared vs touched). Then the five correctness lenses on the full contents in scope. `decisions_taken` and `tdd_cycles` are the first surfaces read — the candidate's own declared judgment calls.
 5. Verification: every acceptance check verbatim, every `review_gates` entry, the uncovered build/lint commands. Compare with the claimed `check_results`.
-6. Compute the verdict. Compose the receipt: `tier`, `tier_reason`, `verdict`, `lenses.correctness`, `verification`; DELTA MODE adds `verdict_history` (the injected chain plus exactly one entry — this pass) and `not_reverified`.
+6. Compute the verdict. Compose the receipt: `tier`, `tier_reason`, `verdict`, `lenses.correctness`, `verification`; DELTA MODE adds `verdict_history` (the injected chain plus exactly one entry — this pass), `not_reverified`, and `closed` (every prior MAJOR/CRITICAL this pass verified closed, with a citation; a prior MAJOR/CRITICAL neither closed nor re-listed under `findings` fails `settle`'s reconciliation).
 7. Write the report at `report_destination` per [references/report-format.md](references/report-format.md) (Delta Report Variant in DELTA MODE): Conformity · Findings · Verification · Receipt Self-Validation · `## Receipt` with the single ```json block. Run `skills/_shared/scripts/ai-team receipt check {report_destination} .`; fix and re-run until exit 0.
 8. Return the envelope.
 
@@ -81,7 +81,7 @@ tier_reason: "<one line>"
 verdict: review-clear | review-blocked
 conformity: { decisions_checked: 0, decisions_met: 0, scenarios_checked: 0, scenarios_met: 0 }
 findings_count: { CRITICAL: 0, MAJOR: 0, MINOR: 0 }
-# verdict_history / not_reverified — DELTA MODE only, omit otherwise
+# verdict_history / not_reverified / closed — DELTA MODE only, omit otherwise
 next_recommended: []
 risks: []
 model_used: "sonnet"

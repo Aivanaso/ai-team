@@ -131,6 +131,8 @@ verdict_history:           # attempts ≥ 2 (delta pass) only — the injected c
   - { pass: full | delta, report: "<path>", verdict: review-clear | review-blocked, note: "<one line>" }
 not_reverified:            # delta pass only — what the prior pass covered and this one did not re-check, and why
   - "<one line>"
+closed:                    # delta pass only — the prior findings this pass verified closed, each with a citation
+  - { id: "F-1", file: "<repo-relative path>", line: <int> }
 ```
 
 **Rules:**
@@ -141,6 +143,7 @@ not_reverified:            # delta pass only — what the prior pass covered and
 - Every `claim` resolves to a `file:line` inside `project_root`; an absolute path, a traversal, a symlink escape or a missing file is a VIOLATION.
 - `verification[]` is non-empty on a full receipt, or empty with `verification_omitted_reason` naming one of the two contract cases ("no candidate changes to review" · "every declared check unrunnable in this environment"). A `gate:` row is a `review_gates` outcome; a failing blocking gate is a CRITICAL finding citing the gate's declaration in `.ai-team/config.yaml`.
 - `verdict_history` and `not_reverified` appear only on a delta pass (attempt ≥ 2); the last entry's verdict mirrors the top-level `verdict`.
+- A delta pass lists under `closed` every prior MAJOR/CRITICAL it verified closed, each entry a citation (`file`/`line`, two fields, resolved through the same containment check as a finding's own). `settle` reconciles: every MAJOR/CRITICAL the prior settled lens ticket of the same kind and phase reported must be re-listed under this receipt's `findings` (same id), closed with a citation, or already ruled/deferred against that id, file and severity — otherwise `settle` refuses, naming the finding and the three ways to account for it. `closed` on an attempt-1 ticket is refused at `settle`, naming the attempt; `receipt.py` validates only `closed`'s shape and citation containment, and that an id is never both open (in `lenses.*.findings`) and closed.
 - The receipt carries no `overrides`, `findings_addressed` or `exposure` fields: rulings and deferrals live in the task JSON and `tech-debt.md`, written by the machine; the receipt is final once the lens writes it.
 - Tier 0 candidates produce no receipt.
 

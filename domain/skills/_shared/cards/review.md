@@ -40,14 +40,20 @@ ticket open — relaunch the lens with the printed lines.
 
 ## 3. Verdict
 
-- `review-clear` (no CRITICAL) → card: commit.
+- `review-clear` (no CRITICAL) → card: commit, where `commit-check` still names every
+  undispositioned MAJOR the receipt carries — `review-clear` is the verdict, not a disposition.
 - `review-blocked` → next attempt with the findings (card: delegate). Attempts 2–4 resume the
   same implementer; findings that hold steady between attempts mean the fix class is
   wrong: the next step is the design (the machine denies a 7th attempt anyway).
+- A delta pass (attempt ≥ 2) accounts for every prior MAJOR/CRITICAL: re-listed under
+  `findings`, closed with a citation (`closed: [{id, file, line}]`), or already ruled/deferred
+  — `settle` refuses the report otherwise, naming what is missing.
 - After the 6th attempt: rule each open CRITICAL or stop.
   `ai-team ruling <ticket> --finding F-n --text "<why>" --cost-if-wrong "<what>"`
-- Pre-existing or out-of-phase CRITICAL/MAJOR findings: `--defer F-n,…` at settle time
-  (they land in `.ai-team/tech-debt.md`); fixing one inside this task needs the user's yes.
+- A MAJOR (pre-existing, out-of-phase, or accepted as is) is parked with `--defer F-n,…` at
+  settle time (lands in `.ai-team/tech-debt.md`); a CRITICAL is always ruled — `--defer` on one
+  is refused, naming `ai-team ruling`. Fixing a parked finding inside this task needs the
+  user's yes.
 - MINOR by reading with no trigger: one line in the report; the attempt stands.
 
 A small fix is an attempt too: it goes through the implementer.

@@ -21,8 +21,8 @@ class LensCase(ProjectCase):
         self.ai("settle", "t1", "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1", "--duration", "1")
         self.ai("tier", "2", "--phase", "1", "--reason", "parses untrusted input")
 
-    def settle_lens(self, ticket, expect=0):
-        report = self.write(".ai-team/reviews/%s.md" % ticket, receipt_block(full_receipt(tier=2)))
+    def settle_lens(self, ticket, expect=0, findings=()):
+        report = self.write(".ai-team/reviews/%s.md" % ticket, receipt_block(full_receipt(findings, tier=2)))
         return self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1", "--duration", "1",
                        "--report", report, expect=expect)
 
@@ -100,7 +100,9 @@ class LedgerNotIgnored(LensCase):
 
     def test_machine_writes_under_ai_team_do_not_move_the_tree(self):
         self.ai("acquire", "reviewer", "--phase", "1")
-        self.settle_lens("t4")
+        # attempt 2: F-1 (CRITICAL, t2) re-listed -- still open, not this test's concern
+        self.settle_lens("t4", findings=[
+            {"id": "F-1", "severity": "CRITICAL", "confidence": "high", "evidence": "executed", "file": "src/app.py", "line": 1, "claim": "c"}])
         self.assertEqual(self.ticket("t4")["tree"], self.ticket("t3")["tree"])
 
 
@@ -147,7 +149,9 @@ class TreeFingerprint(LensCase):
         self.ai("settle", "t3", "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1", "--duration", "1")
         self.assertNotEqual(self.ticket("t3")["tree"], self.ticket("t1")["tree"])
         self.ai("acquire", "reviewer", "--phase", "1")
-        self.settle_lens("t4")
+        # attempt 2: F-1 (CRITICAL, t2) re-listed -- still open, not this test's concern
+        self.settle_lens("t4", findings=[
+            {"id": "F-1", "severity": "CRITICAL", "confidence": "high", "evidence": "executed", "file": "src/app.py", "line": 1, "claim": "c"}])
 
     def test_legacy_implementer_ticket_without_a_tree_is_not_compared(self):
         path = os.path.join(self.root, ".ai-team", "tasks", "%s.json" % self.task()["task"])

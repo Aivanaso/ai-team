@@ -154,7 +154,10 @@ report; that pass's own receipt block lives inside it.
 
 ## Closures Verified
 
-{for each named finding from the delta scope: "F-N — closed, {citation}" or "F-N — still open, {citation}"}
+{for each named finding from the delta scope: "F-N — closed, {citation}" (and added to the
+Receipt block's `closed: [{id, file, line}]`) or "F-N — still open, {citation}" (re-listed
+under the Receipt block's `findings`); `settle` refuses a receipt that drops a prior
+MAJOR/CRITICAL without one of the two}
 
 ## New Inconsistency Check
 
@@ -196,6 +199,9 @@ reason: "already clean in the prior pass" | "outside the delta scope"}
   ],
   "not_reverified": [
     "{lens/file not re-checked this pass} — already clean in the prior pass"
+  ],
+  "closed": [
+    { "id": "F-1", "file": "{path}", "line": {int} }
   ]
 }
 ```
@@ -204,6 +210,12 @@ reason: "already clean in the prior pass" | "outside the delta scope"}
 The chain injected as `delta_scope.prior_verdict_history` is appended to, never rebuilt: this
 pass adds exactly one entry — its own — and the resulting array's last entry mirrors this
 receipt's top-level `verdict`.
+
+`closed` carries every prior MAJOR/CRITICAL this pass verified closed, each with a citation
+(`file`/`line`, the same containment check as a finding's own); `settle` reconciles it against
+`findings_to_verify`, the prior pass's still-gated ids — every one of them must be re-listed
+under `findings`, present in `closed`, or already ruled/deferred, or `settle` refuses naming the
+finding (`_shared/machine.md`). `closed` is empty or absent when nothing closed this pass.
 
 A CRITICAL finding in a delta pass escalates to a full re-review — the delta report format is
 never chained a third time for the same objective's finding set

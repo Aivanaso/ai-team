@@ -9,7 +9,7 @@ import unicodedata
 from ai_team import debt, engram, worktree
 from ai_team.design import load_design, set_frontmatter
 from ai_team.plan import load_plan, load_scope_report, phase_of
-from ai_team.receipt import derived_verdict, findings_of, validate_report
+from ai_team.receipt import closed_of, derived_verdict, findings_of, validate_report
 from ai_team.store import MachineError, utc_now
 
 TICKET_KINDS = ("scout-map", "security-threat-model", "scout-scope", "implementer", "reviewer", "security-audit", "retro")
@@ -280,13 +280,21 @@ class Machine:
             return self._lens_prior_hint(task, kind, ticket["phase"], attempt)
         return None
 
+    def _prior_lens_ticket(self, task, kind, phase_n, attempt):
+        """The latest settled ticket of this lens kind and phase, from an earlier attempt, that
+        carries a validated report -- skipping a report-less settlement (blocked/failed before
+        reaching review). Shared by the attempt hint and the `closed` reconciliation (security
+        MUST F-5: both read the same source)."""
+        earlier = [t for t in self.tickets(task, kind, phase_n, settled=True) if t["attempt"] < attempt and t.get("report")]
+        return earlier[-1] if earlier else None
+
     def _lens_prior_hint(self, task, kind, phase_n, attempt):
         """Attempt ≥ 2 of a lens is a delta pass over the earlier report -- when one exists. An
         earlier attempt that settled before reaching review left none, and the lens runs a full
         pass with `prior_report: none` instead of deducing that from an absent path."""
-        earlier = [t for t in self.tickets(task, kind, phase_n, settled=True) if t["attempt"] < attempt and t.get("report")]
-        if earlier:
-            return "attempt %d: delta pass -- inject prior_report %s and its delta_scope" % (attempt, earlier[-1]["report"])
+        prior = self._prior_lens_ticket(task, kind, phase_n, attempt)
+        if prior is not None:
+            return "attempt %d: delta pass -- inject prior_report %s and its delta_scope" % (attempt, prior["report"])
         impls = [t for t in self.tickets(task, "implementer", phase_n, settled=True) if t["attempt"] < attempt]
         why = "; ".join("attempt %d settled %s" % (t["attempt"], t["outcome"]) for t in impls) or "no earlier attempt reached review"
         return "attempt %d: full pass -- no earlier %s report exists for this phase (%s); inject prior_report: none" % (attempt, kind, why)
@@ -331,6 +339,7 @@ class Machine:
                 raise MachineError('a security-audit report must carry a fragment (kind: "security-fragment")')
             ticket["verdict"] = derived_verdict(data)
             ticket["findings"] = findings_of(data)
+            notes += self._reconcile_closed(task, ticket, kind, data)
             notes += out
         if kind == "scout-scope" and outcome in GOOD:
             try:
@@ -436,6 +445,73 @@ class Machine:
                 continue
             return True
         return False
+
+    def _unaccounted_reason(self, ticket_id, prior_id, finding):
+        """One line per prior MAJOR/CRITICAL a delta receipt drops without accounting for it --
+        the three ways that actually settle this ticket (a CRITICAL is never deferred)."""
+        options = ["re-list %s under findings" % finding["id"]]
+        if finding["severity"] == "MAJOR":
+            options[0] += " (then `ai-team settle %s --defer %s` if it stays)" % (ticket_id, finding["id"])
+        options.append("add it to closed: [{\"id\": %r, \"file\": ..., \"line\": ...}]" % finding["id"])
+        options.append('`ai-team ruling %s --finding %s --text "..." --cost-if-wrong "..."`' % (prior_id, finding["id"]))
+        disposed_how = "closed nor ruled" if finding["severity"] == "CRITICAL" else "closed, ruled nor deferred"
+        return "%s (%s, from %s) is neither re-listed, %s -- %s" % (
+            finding["id"], finding["severity"], prior_id, disposed_how, ", ".join(options)
+        )
+
+    def _reconcile_closed(self, task, ticket, kind, data):
+        """A delta pass (attempt >= 2) accounts for every MAJOR/CRITICAL the prior settled lens
+        ticket of the same kind and phase reported: re-listed under `findings`, closed with a
+        citation, or already ruled/deferred (`_dispositioned`, which matches by id, file and
+        severity). `closed` is for a delta pass only -- settle owns this discriminator (open
+        question resolved 2026-09-20T19:03:49Z), not `receipt.py`, which stays ticket-free.
+        Returns the notes to print; raises on refusal (before any write)."""
+        closed = closed_of(data)
+        if ticket["attempt"] < 2:
+            if closed:
+                raise MachineError(
+                    "ticket %s is attempt %d -- closed is for a delta pass (attempt >= 2 of the same "
+                    "lens kind and phase); a fresh attempt reports findings only" % (ticket["id"], ticket["attempt"])
+                )
+            return []
+        prior = self._prior_lens_ticket(task, kind, ticket["phase"], ticket["attempt"])
+        if prior is None:
+            # No earlier report-carrying ticket of this lens kind and phase exists: this
+            # settles as a full pass in effect (nothing to reconcile against), the same as an
+            # attempt-1 ticket -- `closed` names nothing real and is refused identically.
+            if closed:
+                raise MachineError(
+                    "ticket %s: closed names id(s) but no earlier %s report exists for phase %d -- "
+                    "this settles as a full pass (nothing to reconcile `closed` against); relist "
+                    "under findings instead" % (ticket["id"], kind, ticket["phase"])
+                )
+            return ["ticket %s: no earlier settled %s report for phase %d -- closed reconciliation "
+                    "did not run (this settles as a full pass)" % (ticket["id"], kind, ticket["phase"])]
+        prior_findings = {f["id"]: f for f in (prior.get("findings") or [])}
+        prior_ids_nfc = {_nfc(fid) for fid in prior_findings}
+        unknown = sorted({c["id"] for c in closed if c.get("id") and _nfc(c["id"]) not in prior_ids_nfc})
+        if unknown:
+            raise MachineError(
+                "ticket %s: closed names id(s) %s not reported by %s -- closed accounts for a prior "
+                "finding, it does not introduce one" % (ticket["id"], ", ".join(unknown), prior["id"])
+            )
+        closed_ids_nfc = {_nfc(c["id"]) for c in closed if c.get("id")}
+        current_ids_nfc = {_nfc(f["id"]) for f in ticket["findings"]}
+        dispositions = self._dispositions(task, kind, ticket["phase"])
+        unresolved = [
+            f for fid, f in prior_findings.items()
+            if f["severity"] in GATED_SEVERITIES
+            and _nfc(fid) not in current_ids_nfc
+            and _nfc(fid) not in closed_ids_nfc
+            and not self._dispositioned(dispositions, f)
+        ]
+        if unresolved:
+            reasons = [self._unaccounted_reason(ticket["id"], prior["id"], f) for f in unresolved]
+            raise MachineError(
+                "ticket %s does not account for every MAJOR/CRITICAL finding of %s:\n  - %s"
+                % (ticket["id"], prior["id"], "\n  - ".join(reasons))
+            )
+        return []
 
     def _lens_gate(self, task, kind, phase):
         ticket = self._latest(self.tickets(task, kind, phase["n"], phase["attempts"], settled=True))

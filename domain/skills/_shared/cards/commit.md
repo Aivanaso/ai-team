@@ -5,9 +5,10 @@
 ```
 ai-team commit-check --phase <n>
 ```
-Exit 0 means: implementer settled `ok`/`warning`, tier declared, and — above tier 0 — the
-lens reports re-validated just now, clear or blocked only by ruled CRITICALs. Exit 1 lists
-what is missing; that list is the next action.
+Exit 0 means: implementer settled `ok`/`warning`, tier declared, and — above tier 0 — every
+lens report re-validates unchanged since its `settle` (drift refuses, naming the ticket and
+the path), every CRITICAL it carries is ruled, and every MAJOR is ruled or deferred. Exit 1
+lists what is missing; that list is the next action.
 
 ## The commit — the one thing you do to the tree
 

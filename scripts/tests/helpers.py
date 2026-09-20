@@ -67,6 +67,9 @@ class ProjectCase(unittest.TestCase):
         with open(os.path.join(tasks_dir, files[-1])) as handle:
             return json.load(handle)
 
+    def ticket_by_id(self, ticket_id):
+        return next(t for t in self.task()["tickets"] if t["id"] == ticket_id)
+
     def write(self, rel, text):
         path = os.path.join(self.root, rel)
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -83,24 +86,32 @@ def receipt_block(obj):
     return "# Review Report\n\nprose\n\n## Receipt\n\n```json\n%s\n```\n" % json.dumps(obj, indent=2)
 
 
-def full_receipt(findings=(), verdict=None, tier=1):
+def full_receipt(findings=(), verdict=None, tier=1, closed=None, verdict_history=None):
     critical = any(f.get("severity") == "CRITICAL" for f in findings)
-    return {
+    receipt = {
         "tier": tier,
         "tier_reason": "tier %d: test" % tier,
         "verdict": verdict or ("review-blocked" if critical else "review-clear"),
         "lenses": {"correctness": {"status": "findings" if findings else "pass", "findings": list(findings)}},
         "verification": [{"command": "true", "exit_code": 0, "outcome": "pass"}],
     }
+    if closed is not None:
+        receipt["closed"] = closed
+    if verdict_history is not None:
+        receipt["verdict_history"] = verdict_history
+    return receipt
 
 
-def fragment(findings=()):
-    return {
+def fragment(findings=(), closed=None):
+    frag = {
         "kind": "security-fragment",
         "tier": 2,
         "tier_reason": "tier 2: test",
         "lenses": {"security": {"status": "findings" if findings else "pass", "findings": list(findings)}},
     }
+    if closed is not None:
+        frag["closed"] = closed
+    return frag
 
 
 def finding(fid, severity="MINOR", file="src/app.py", evidence="read", trigger=None):

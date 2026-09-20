@@ -161,6 +161,47 @@ def _check_verdict_history(data, violations):
         violations.append("verdict_history's last entry verdict must match the top-level verdict")
 
 
+def _check_closed(data, project_root, violations, skip_containment, open_ids_nfc):
+    """`closed` shape and citation containment only -- structural, ticket-free (the machine
+    owns the full/delta discriminator at settle: a `closed` list on an attempt-1 ticket is
+    refused there, naming the attempt, not flagged here). An id also open under `lenses.*` is
+    a VIOLATION: an id is never both open and closed."""
+    closed = data.get("closed")
+    if closed is None:
+        return
+    if not isinstance(closed, list):
+        violations.append("closed must be a list when present")
+        return
+    seen = set()
+    for i, entry in enumerate(closed):
+        where = "closed[%d]" % i
+        if not isinstance(entry, dict):
+            violations.append("%s must be an object" % where)
+            continue
+        cid = entry.get("id")
+        if not isinstance(cid, str) or not cid:
+            violations.append("%s.id must be a non-empty string" % where)
+        else:
+            key = unicodedata.normalize("NFC", cid)
+            if key in seen:
+                violations.append("duplicate id in closed (after Unicode normalization): %r" % cid)
+            seen.add(key)
+            if key in open_ids_nfc:
+                violations.append("closed[%d].id %r also appears in lenses findings -- an id is never both open and closed" % (i, cid))
+        file_field = entry.get("file")
+        if not isinstance(file_field, str) or not file_field:
+            violations.append("%s.file must be a non-empty string" % where)
+        elif os.path.isabs(file_field):
+            violations.append("%s.file %r: absolute paths are not permitted as citations" % (where, file_field))
+        elif not skip_containment:
+            ok, reason = check_containment(project_root, file_field)
+            if not ok:
+                violations.append("%s.file %r: %s" % (where, file_field, reason))
+        line = entry.get("line")
+        if not _is_strict_int(line) or line < 1:
+            violations.append("%s.line must be an integer >= 1 (got %r)" % (where, line))
+
+
 def validate_receipt(data, project_root):
     """Return (violations, infos) for an already-parsed receipt object."""
     violations = []
@@ -216,6 +257,8 @@ def validate_receipt(data, project_root):
         if security_valid else ([], False)
     )
     _check_duplicate_ids(correctness_ids + security_ids, violations)
+    open_ids_nfc = {unicodedata.normalize("NFC", fid) for fid in correctness_ids + security_ids if isinstance(fid, str)}
+    _check_closed(data, project_root, violations, degenerate_root, open_ids_nfc)
 
     verdict = data.get("verdict")
     if is_fragment:
@@ -308,6 +351,15 @@ def findings_of(data):
                     "trigger": finding.get("trigger"),
                     "evidence": finding.get("evidence"),
                 })
+    return out
+
+
+def closed_of(data):
+    """Flatten a validated receipt's `closed` list: [{id, file, line}], [] when absent."""
+    out = []
+    for entry in data.get("closed") or []:
+        if isinstance(entry, dict):
+            out.append({"id": entry.get("id"), "file": entry.get("file"), "line": entry.get("line")})
     return out
 
 

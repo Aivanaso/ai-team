@@ -20,11 +20,13 @@ EXIT_1 = [
     "receipt-history-garbage-entry", "receipt-kind-unknown", "receipt-fragment-with-correctness",
     "receipt-verification-empty", "receipt-verification-garbage", "receipt-not-reverified-garbage",
     "receipt-file-nul", "receipt-verification-reason-with-entries", "receipt-fragment-with-omitted-reason",
+    "receipt-closed-and-findings-same-id", "receipt-closed-file-traversal",
 ]
 EXIT_1_SINGLE_VIOLATION = ["receipt-md-no-block", "receipt-md-two-blocks", "receipt-md-malformed-block", "receipt-md-wrong-fence-label"]
 EXIT_2 = ["receipt-not-utf8", "receipt-top-level-array"]
 EXIT_0 = ["receipt-good", "receipt-verification-omitted-with-reason", "receipt-security-fragment-good",
-          "receipt-md-block-good", "receipt-md-prose-fence-string"]
+          "receipt-md-block-good", "receipt-md-prose-fence-string",
+          "receipt-closed-good", "receipt-closed-on-full-receipt"]
 
 GOOD_BODY = """{
   "tier": 1, "tier_reason": "tier 1: standard code change", "verdict": "review-clear",

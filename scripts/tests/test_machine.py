@@ -283,6 +283,174 @@ class LargeFlow(ProjectCase):
         _, out, _ = self.ai("commit-check", "--phase", "1", expect=1)
         self.assertIn("F-1", out)
 
+    def test_delta_receipt_must_account_for_every_prior_major_critical(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        self._review(1, full_receipt([finding("F-1", "MAJOR"), finding("F-2", "MAJOR")]))
+        self._implement(1)  # attempt 2
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket = out.split()[1]
+        report_path = ".ai-team/reviews/%s.md" % ticket
+        empty = self.write(report_path, receipt_block(full_receipt([])))
+        _, _, err = self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1",
+                             "--tool-uses", "1", "--duration", "1", "--report", empty, expect=1)
+        self.assertIn("F-1", err)
+        self.assertIn("F-2", err)
+        self.assertIsNone(self.ticket_by_id(ticket)["settled_at"])
+        # re-listing F-2 and closing F-1 with a citation accounts for both
+        good = self.write(report_path, receipt_block(
+            full_receipt([finding("F-2", "MAJOR")], closed=[{"id": "F-1", "file": "src/app.py", "line": 1}])))
+        self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1",
+                "--duration", "1", "--report", good)
+        _, out, _ = self.ai("commit-check", "--phase", "1", expect=1)
+        self.assertIn("F-2", out)
+        self.assertNotIn("F-1", out)
+
+    def test_closed_on_a_fresh_attempt_is_refused(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket = out.split()[1]
+        report = self.write(".ai-team/reviews/%s.md" % ticket, receipt_block(
+            full_receipt([], closed=[{"id": "F-1", "file": "src/app.py", "line": 1}])))
+        _, _, err = self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1",
+                             "--tool-uses", "1", "--duration", "1", "--report", report, expect=1)
+        self.assertIn("attempt", err)
+        self.assertIsNone(self.ticket_by_id(ticket)["settled_at"])
+
+    def test_deferred_prior_finding_may_be_omitted_from_the_delta_receipt(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        self._review(1, full_receipt([finding("F-1", "MAJOR")]), defer="F-1")
+        self._implement(1)
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket = out.split()[1]
+        report = self.write(".ai-team/reviews/%s.md" % ticket, receipt_block(full_receipt([])))
+        self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1",
+                "--duration", "1", "--report", report)
+        self.ai("commit-check", "--phase", "1")
+
+    def test_reconciliation_skips_a_reportless_prior_and_reaches_further_back(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        self._review(1, full_receipt([finding("F-1", "MAJOR")]))
+        reviewer1 = [t for t in self.task()["tickets"] if t["kind"] == "reviewer"][-1]["id"]
+        self._implement(1)  # attempt 2
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket2 = out.split()[1]
+        self.ai("settle", ticket2, "--outcome", "blocked", "--model", "sonnet", "--tokens", "1",
+                "--tool-uses", "1", "--duration", "1")  # blocked, no --report -- reconciliation skips it
+        self._implement(1)  # attempt 3
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket3 = out.split()[1]
+        report = self.write(".ai-team/reviews/%s.md" % ticket3, receipt_block(full_receipt([])))
+        _, _, err = self.ai("settle", ticket3, "--outcome", "ok", "--model", "sonnet", "--tokens", "1",
+                             "--tool-uses", "1", "--duration", "1", "--report", report, expect=1)
+        self.assertIn("F-1", err)
+        self.assertIn(reviewer1, err)
+
+    def test_reconciliation_refusal_writes_nothing_to_tech_debt(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        self._review(1, full_receipt([finding("F-1", "MAJOR"), finding("F-2", "MINOR")]), defer="F-2")
+        before = self.read(".ai-team/tech-debt.md")
+        self._implement(1)
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket = out.split()[1]
+        bad = self.write(".ai-team/reviews/%s.md" % ticket, receipt_block(full_receipt([])))
+        self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1",
+                "--duration", "1", "--report", bad, expect=1)
+        self.assertEqual(self.read(".ai-team/tech-debt.md"), before)
+
+    def test_reconciliation_refusal_fires_before_defer_in_the_same_settle_call(self):
+        # F-2 is a legitimate --defer target THIS pass (re-listed); F-1 is silently dropped.
+        # If reconciliation ever ran after --defer's debt.append_findings, F-2 would land in
+        # tech-debt.md before the F-1 refusal was even raised.
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        self._review(1, full_receipt([finding("F-1", "MAJOR"), finding("F-2", "MAJOR"), finding("F-3", "MINOR")]), defer="F-3")
+        before = self.read(".ai-team/tech-debt.md")
+        self._implement(1)
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket = out.split()[1]
+        report = self.write(".ai-team/reviews/%s.md" % ticket, receipt_block(full_receipt([finding("F-2", "MAJOR")])))
+        _, _, err = self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1",
+                             "--tool-uses", "1", "--duration", "1", "--report", report, "--defer", "F-2", expect=1)
+        self.assertIn("F-1", err)
+        self.assertEqual(self.read(".ai-team/tech-debt.md"), before)
+        self.assertIsNone(self.ticket_by_id(ticket)["settled_at"])
+        self.assertEqual(self.ticket_by_id(ticket)["deferred"], [])
+
+    def test_closed_naming_an_id_the_prior_receipt_never_reported_is_refused(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        self._review(1, full_receipt([finding("F-1", "MAJOR")]))
+        self._implement(1)
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket = out.split()[1]
+        report = self.write(".ai-team/reviews/%s.md" % ticket, receipt_block(
+            full_receipt([], closed=[{"id": "F-9", "file": "src/app.py", "line": 1}])))
+        _, _, err = self.ai("settle", ticket, "--outcome", "ok", "--model", "sonnet", "--tokens", "1",
+                             "--tool-uses", "1", "--duration", "1", "--report", report, expect=1)
+        self.assertIn("F-9", err)
+        self.assertIsNone(self.ticket_by_id(ticket)["settled_at"])
+
+    def test_no_prior_report_prints_a_note_and_still_refuses_a_nonempty_closed(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket1 = out.split()[1]
+        # attempt 1's reviewer settles blocked with no report -- reconciliation for attempt 2
+        # finds no earlier report-carrying ticket at all.
+        self.ai("settle", ticket1, "--outcome", "blocked", "--model", "sonnet", "--tokens", "1",
+                "--tool-uses", "1", "--duration", "1")
+        self._implement(1)
+        _, out, _ = self.ai("acquire", "reviewer", "--phase", "1")
+        ticket2 = out.split()[1]
+        report = self.write(".ai-team/reviews/%s.md" % ticket2, receipt_block(
+            full_receipt([], closed=[{"id": "F-1", "file": "src/app.py", "line": 1}])))
+        _, _, err = self.ai("settle", ticket2, "--outcome", "ok", "--model", "sonnet", "--tokens", "1",
+                             "--tool-uses", "1", "--duration", "1", "--report", report, expect=1)
+        self.assertIn("no earlier", err)
+        self.assertIsNone(self.ticket_by_id(ticket2)["settled_at"])
+        # the same shape with an empty closed settles, and the note names the phase
+        empty = self.write(".ai-team/reviews/%s.md" % ticket2, receipt_block(full_receipt([])))
+        _, out, _ = self.ai("settle", ticket2, "--outcome", "ok", "--model", "sonnet", "--tokens", "1",
+                             "--tool-uses", "1", "--duration", "1", "--report", empty)
+        self.assertIn("no earlier settled reviewer report for phase 1", out)
+
     def test_commit_check_refuses_on_report_drift(self):
         design = self._design(security="not-needed", body="No aplica.")
         self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
