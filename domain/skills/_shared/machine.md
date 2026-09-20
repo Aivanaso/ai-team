@@ -2,7 +2,7 @@
 
 > One JSON per task under `.ai-team/tasks/`. The machine owns what must always happen
 > (timestamps, ticket conditions, attempt counts, receipt validation, the balance); the
-> orchestrator keeps only what needs judgment. Design note: `memorias-ivan/_diseno__2026-09-05-rediseno-orquestador.md` §5, §8, §10.
+> orchestrator keeps only what needs judgment. Design note: `retros/old/_diseno__2026-09-05-rediseno-orquestador.md` §5, §8, §10.
 
 Runs anywhere inside a project that has an `.ai-team/` directory (the CLI walks up from
 the working directory). Python 3 standard library only. Installed copy:

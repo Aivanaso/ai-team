@@ -44,4 +44,12 @@ the gate on purpose once it is green and watch the test go red again.
 | `domain/skills/_shared/cards/` | the orchestrator's cards, one per moment |
 | `domain/skills/_shared/scripts/ai_team/` | the machine (Python, stdlib only) |
 | `scripts/tests/` | its unittest suites |
-| `memorias-ivan/` | retros and design notes; the source of every change in this repo |
+| `retros/` | retros, design notes and the watchlist; local notes, gitignored, the source of every change in this repo |
+
+## Where changes come from
+
+Every change to the skills, the cards or the machine answers a pattern seen in **two or more
+retros** under `retros/`, and the commit message names those retros. A symptom seen once lands
+in `retros/watchlist.md` as one line — date, symptom, originating retro — and waits there
+until a later retro repeats it; only then does the analysis start. `retros/` is gitignored:
+each maintainer keeps their own notes, and the rule above is what turns them into changes.

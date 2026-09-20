@@ -23,3 +23,6 @@ __pycache__/
 # Override global ignore for template files: adapter templates MUST ship with the repo
 !adapters/*/templates/CLAUDE.md
 !adapters/*/templates/AGENTS.md
+
+# Retros and design notes: local working notes, the source of every change here (see CLAUDE.md)
+retros/
