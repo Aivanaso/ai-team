@@ -257,6 +257,18 @@ def amend(plan, n, reason, files, checks, runner):
     return phase, notes
 
 
+def amend_decisions(plan, n, reason, decisions):
+    """Append mid-task design decisions verbatim to the plan's constraints and record them on phase n.
+    A text the plan already holds is refused before anything changes."""
+    phase = phase_of(plan, n)
+    for index, decision in enumerate(decisions):
+        if decision in plan["constraints"] or decision in decisions[:index]:
+            raise MachineError("decision %r is already a constraint of the plan -- amend with a decision the plan does not hold" % decision)
+    plan["constraints"] += list(decisions)
+    phase["amendments"].append({"at": utc_now(), "reason": reason, "files": [], "checks": [], "decisions": list(decisions)})
+    return phase
+
+
 def render_phase(plan, n, plan_rel):
     phase = phase_of(plan, n)
     brief = {

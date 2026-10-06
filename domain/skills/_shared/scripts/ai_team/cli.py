@@ -14,11 +14,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ai_team import engram, hook  # noqa: E402
 from ai_team.debt import fix as debt_fix  # noqa: E402
-from ai_team.design import approve as approve_design, design_problems, load_design  # noqa: E402
+from ai_team.design import append_decisions, approve as approve_design, design_problems, load_design  # noqa: E402
 from ai_team.machine import Machine, TICKET_KINDS  # noqa: E402
 from ai_team.calibration import DEFAULT_TIMEOUT_S, calibrate_by_running  # noqa: E402
 from ai_team.plan import (  # noqa: E402
-    amend, build_inline_plan, build_plan, load_plan, load_scope_report, render_phase, render_plan, write_text,
+    amend, amend_decisions, build_inline_plan, build_plan, load_plan, load_scope_report, render_phase, render_plan, write_text,
 )
 from ai_team.receipt import validate_report  # noqa: E402
 from ai_team.store import AI_TEAM_DIR, MachineError, Store, find_root  # noqa: E402
@@ -118,6 +118,28 @@ def cmd_design_attach(args):
     task["design"] = rel
     store.save(task)
     print("design %s attached to %s (status %s, security %s)" % (rel, task["task"], design["status"], design["security"]))
+    return 0
+
+
+def cmd_design_amend(args):
+    store = Store(_root(args))
+    task = _task(store)
+    if not task.get("design"):
+        raise MachineError("task %s has no design to amend -- `ai-team design attach <path>` records it" % task["task"])
+    if not task.get("plan"):
+        raise MachineError("task %s has no plan -- `ai-team plan generate` first; before the plan, edit the design file itself" % task["task"])
+    decisions = [text.strip() for text in args.decision]
+    if any(not text or "\n" in text for text in decisions):
+        raise MachineError("each --decision must be one non-empty line of text -- pass `--decision \"<one line>\"`, one flag per decision")
+    machine_phase = Machine(store).phase(task, args.phase)
+    plan = load_plan(store.abs(task["plan"]))
+    phase = amend_decisions(plan, args.phase, args.reason, decisions)
+    append_decisions(store.abs(task["design"]), decisions)
+    write_text(store.abs(task["plan"]), render_plan(plan))
+    machine_phase["amendments"].append({"at": phase["amendments"][-1]["at"], "reason": args.reason, "decisions": decisions})
+    store.save(task)
+    print("design %s amended with %d decision%s for phase %d (re-run `ai-team phase extract %d`)" % (
+        task["design"], len(decisions), "" if len(decisions) == 1 else "s", args.phase, args.phase))
     return 0
 
 
@@ -377,6 +399,11 @@ def build_parser():
     p = design.add_parser("attach", help="record a draft design as the task's design (before the threat-model)")
     p.add_argument("path")
     p.set_defaults(func=cmd_design_attach)
+    p = design.add_parser("amend", help="add a decision to the approved design mid-task (design file, plan constraints, task JSON)")
+    p.add_argument("--phase", type=int, required=True)
+    p.add_argument("--reason", required=True)
+    p.add_argument("--decision", action="append", required=True, help="the decision text, one line; repeatable")
+    p.set_defaults(func=cmd_design_amend)
     p = design.add_parser("approve", help="flip a design to approved (after the user's yes)")
     p.add_argument("path")
     p.set_defaults(func=cmd_design_approve)

@@ -45,6 +45,7 @@ ticket open — relaunch the lens with the printed lines.
 - `review-blocked` → next attempt with the findings (card: delegate). Attempts 2–4 resume the
   same implementer; findings that hold steady between attempts mean the fix class is
   wrong: the next step is the design (the machine denies a 7th attempt anyway).
+- A finding that needs a new design decision before the next attempt: `ai-team design amend --phase <n> --reason "<why>" --decision "<text>"` (the design stays approved, the implementer gets the constraint), then the next attempt.
 - A delta pass (attempt ≥ 2) accounts for every prior MAJOR/CRITICAL: re-listed under
   `findings`, closed with a citation (`closed: [{id, file, line}]`), or already ruled/deferred
   — `settle` refuses the report otherwise, naming what is missing.

@@ -271,3 +271,26 @@ def approve(path):
         raise MachineError("design %s is not complete:\n  - %s" % (path, "\n  - ".join(problems)))
     set_frontmatter(path, {"status": "approved", "approved_at": utc_now()})
     return load_design(path)
+
+
+def append_decisions(path, decisions):
+    """Add each decision as a bullet at the end of the `## Decisiones` / `## Decisions` section;
+    the rest of the file, frontmatter included, is untouched."""
+    lines = read_text(path).split("\n")
+    start = None
+    end = len(lines)
+    for index, line in enumerate(lines):
+        if not line.startswith("## ") or line.startswith("### "):
+            continue
+        if start is not None:
+            end = index
+            break
+        if _canonical(line[3:], SECTION_ALIASES) == "decisions":
+            start = index
+    if start is None:
+        raise MachineError("design %s has no `## Decisiones` / `## Decisions` section to append the decision to" % path)
+    last = end - 1
+    while last > start and not lines[last].strip():
+        last -= 1
+    lines[last + 1:last + 1] = ["- %s" % decision for decision in decisions]
+    atomic_write(path, "\n".join(lines))

@@ -530,6 +530,89 @@ class LargeFlow(ProjectCase):
         self.assertIn("needs src/util.py", plan)
         self.assertEqual(self.task()["phases"][0]["amendments"][0]["reason"], "needs src/util.py")
 
+    def _planned_large_task(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        return design
+
+    def test_design_amend_records_a_decision_in_design_plan_and_task(self):
+        design = self._planned_large_task()
+        decision = "Un flag vacío cuenta como apagado."
+        _, out, _ = self.ai("design", "amend", "--phase", "1", "--reason", "review F-2 needs a rule for empty flags",
+                            "--decision", decision, "--decision", "El flag se lee una sola vez.")
+        self.assertIn("phase 1", out)
+        text = self.read(design)
+        decisions_section = text.split("## Decisiones")[1].split("## Diseño")[0]
+        self.assertIn("- " + decision, decisions_section)
+        self.assertIn("- El flag se lee una sola vez.", decisions_section)
+        self.assertIn("- Un valor de flag no reconocido se rechaza, nunca se interpreta.", decisions_section)
+        self.ai("phase", "extract", "1")
+        phase_file = self.read(os.path.join(".ai-team", "plans", "2026-09-05-demo", "phase-1.md"))
+        constraints = phase_file.split("## Constraints")[1].split("## Scenarios")[0]
+        self.assertIn("- " + decision, constraints)
+        amendment = self.task()["phases"][0]["amendments"][-1]
+        self.assertEqual(amendment["decisions"], [decision, "El flag se lee una sola vez."])
+        self.assertEqual(amendment["reason"], "review F-2 needs a rule for empty flags")
+        self.assertEqual(self.task()["design"], design)
+
+    def test_design_amend_keeps_the_design_approved(self):
+        design = self._planned_large_task()
+        self.ai("design", "amend", "--phase", "1", "--reason", "new rule", "--decision", "Regla nueva.")
+        _, out, _ = self.ai("status")
+        self.assertIn("Design: approved", out)
+        self.assertIn('status: "approved"', self.read(design))
+
+    def test_design_amend_names_the_verb_that_supplies_what_is_missing(self):
+        self.ai("new", "2026-09-05-demo", "--kind", "large")
+        _, _, err = self.ai("design", "amend", "--phase", "1", "--reason", "r", "--decision", "d", expect=1)
+        self.assertIn("design attach", err)
+        self.ai("design", "attach", self._design(security="not-needed", body="No aplica."))
+        _, _, err = self.ai("design", "amend", "--phase", "1", "--reason", "r", "--decision", "d", expect=1)
+        self.assertIn("plan generate", err)
+
+    def test_design_amend_refuses_a_decision_the_plan_already_holds(self):
+        design = self._planned_large_task()
+        before = self.read(design)
+        existing = "Un valor de flag no reconocido se rechaza, nunca se interpreta."
+        _, _, err = self.ai("design", "amend", "--phase", "1", "--reason", "r", "--decision", "Regla nueva.",
+                            "--decision", existing, expect=1)
+        self.assertIn(existing, err)
+        self.assertEqual(self.read(design), before)
+        self.assertEqual(self.task()["phases"][0]["amendments"], [])
+        self.ai("design", "amend", "--phase", "1", "--reason", "r", "--decision", "Regla nueva.")
+        _, _, err = self.ai("design", "amend", "--phase", "1", "--reason", "again", "--decision", "Regla nueva.", expect=1)
+        self.assertIn("Regla nueva.", err)
+
+    def test_design_amend_refuses_the_same_decision_twice_in_one_call(self):
+        design = self._planned_large_task()
+        before = self.read(design)
+        plan_before = self.read(self.task()["plan"])
+        _, _, err = self.ai("design", "amend", "--phase", "1", "--reason", "r",
+                            "--decision", "Regla nueva.", "--decision", "Regla nueva.", expect=1)
+        self.assertIn("Regla nueva.", err)
+        self.assertEqual(self.read(design), before)
+        self.assertEqual(self.read(self.task()["plan"]), plan_before)
+        self.assertEqual(self.task()["phases"][0]["amendments"], [])
+
+    def test_design_amend_refuses_a_decision_that_is_not_one_line(self):
+        design = self._planned_large_task()
+        before = self.read(design)
+        for bad in ("", "   ", "first line\nsecond line"):
+            _, _, err = self.ai("design", "amend", "--phase", "1", "--reason", "r", "--decision", bad, expect=1)
+            self.assertIn("one non-empty line", err)
+            self.assertIn("--decision", err)
+        self.assertEqual(self.read(design), before)
+        self.assertEqual(self.task()["phases"][0]["amendments"], [])
+
+    def test_design_amend_refuses_an_unknown_phase_without_touching_the_design(self):
+        design = self._planned_large_task()
+        before = self.read(design)
+        _, _, err = self.ai("design", "amend", "--phase", "9", "--reason", "r", "--decision", "Regla nueva.", expect=1)
+        self.assertIn("phase 9", err)
+        self.assertEqual(self.read(design), before)
+
     def test_plan_regeneration_keeps_progress(self):
         design = self._design(security="not-needed", body="No aplica.")
         self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
