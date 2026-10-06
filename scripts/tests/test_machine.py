@@ -3,6 +3,7 @@ settlement rules, the commit gate, attempts, rulings, deferrals and the engram f
 
 import json
 import os
+import tempfile
 import unittest
 
 from helpers import DESIGN_ES, SCOPE_REPORT, ProjectCase, finding, fragment, full_receipt, receipt_block
@@ -99,6 +100,48 @@ class LargeFlow(ProjectCase):
             args += ["--defer", defer]
         code, out, err = self.ai(*args, expect=expect)
         return ticket, out, err
+
+    def test_attach_gives_a_designless_large_task_its_threat_model(self):
+        _, out, _ = self.ai("new", "2026-09-05-demo", "--kind", "large")
+        self.assertIn("design attach", out)
+        self.assertLess(out.index("design attach"), out.index("design approve"))
+        _, _, err = self.ai("acquire", "security-threat-model", expect=1)
+        self.assertIn("ai-team design attach <path>", err)
+        design = self._design()
+        _, out, _ = self.ai("design", "attach", design)
+        self.assertIn("attached", out)
+        self.assertEqual(self.task()["design"], design)
+        _, out, _ = self.ai("status")
+        self.assertIn("Design: draft, security pending", out)
+        self.ai("acquire", "security-threat-model")
+        self.assertEqual(self.task()["tickets"][-1]["kind"], "security-threat-model")
+
+    def test_attach_refuses_what_is_not_a_draft_design(self):
+        self.ai("new", "2026-09-05-demo", "--kind", "large")
+        self.ai("design", "attach", ".ai-team/designs/missing.md", expect=2)
+        with tempfile.TemporaryDirectory() as elsewhere:
+            outside = os.path.join(elsewhere, "design.md")
+            with open(outside, "w", encoding="utf-8") as handle:
+                handle.write(DESIGN_ES.format(security="pending", security_body="- x"))
+            self.ai("design", "attach", outside, expect=2)
+        notes = self.write(".ai-team/designs/notes.md", "just some notes, no frontmatter\n")
+        _, _, err = self.ai("design", "attach", notes, expect=2)
+        self.assertIn("status", err)
+        self.assertIsNone(self.task().get("design"))
+        design = self._design()
+        self.ai("design", "attach", design)
+        other = self.write(".ai-team/designs/other.md", DESIGN_ES.format(security="pending", security_body="- x"))
+        _, _, err = self.ai("design", "attach", other, expect=1)
+        self.assertIn(design, err)
+        self.ai("design", "attach", design)  # the same path again is a no-op
+        self.assertEqual(self.task()["design"], design)
+
+    def test_attach_is_for_a_large_task_in_progress(self):
+        design = self._design()
+        self.ai("design", "attach", design, expect=1)  # no task in progress
+        self.ai("new", "demo", "--kind", "bounded")
+        _, _, err = self.ai("design", "attach", design, expect=1)
+        self.assertIn("large", err)
 
     def test_design_gates_then_scope_then_phases(self):
         design = self._design()

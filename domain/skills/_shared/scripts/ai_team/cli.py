@@ -95,9 +95,29 @@ def cmd_new(args):
     task = store.new_task(args.slug, args.kind, design)
     print("created task %s (%s) at %s" % (task["task"], task["kind"], store.rel(store.task_path(task["task"]))))
     if args.kind == "large":
-        print("next: scout-map pass → brainstorm → write .ai-team/designs/%s.md → `ai-team design approve <path>`" % task["task"])
+        attach = "" if design else " → `ai-team design attach <path>` (records the draft; the threat-model needs it)"
+        print("next: scout-map pass → brainstorm → write .ai-team/designs/%s.md%s → `ai-team design approve <path>`" % (task["task"], attach))
     else:
         print("next: four approved lines → `ai-team plan generate --objective ... --decision ... --check ... --failure ... --file ...`")
+    return 0
+
+
+def cmd_design_attach(args):
+    store = Store(_root(args))
+    task = _task(store)
+    if task["kind"] != "large":
+        raise MachineError("task %s is %s -- only a large task has a design" % (task["task"], task["kind"]))
+    rel = store.rel(args.path)
+    if not store.contained(rel) or not os.path.isfile(store.abs(rel)):
+        raise MachineError("design %s must be an existing file inside the project" % args.path, 2)
+    design = load_design(store.abs(rel))
+    if design["status"] not in ("draft", "approved"):
+        raise MachineError("%s does not parse as a design: its frontmatter needs `status: draft` (see cards/design.md section 2)" % rel, 2)
+    if task.get("design") and task["design"] != rel:
+        raise MachineError("task already has design %s -- edit that file, or fix the path by hand in the task JSON" % task["design"])
+    task["design"] = rel
+    store.save(task)
+    print("design %s attached to %s (status %s, security %s)" % (rel, task["task"], design["status"], design["security"]))
     return 0
 
 
@@ -354,6 +374,9 @@ def build_parser():
     p.set_defaults(func=cmd_new)
 
     design = sub.add_parser("design", help="design verbs").add_subparsers(dest="design_verb", required=True)
+    p = design.add_parser("attach", help="record a draft design as the task's design (before the threat-model)")
+    p.add_argument("path")
+    p.set_defaults(func=cmd_design_attach)
     p = design.add_parser("approve", help="flip a design to approved (after the user's yes)")
     p.add_argument("path")
     p.set_defaults(func=cmd_design_approve)

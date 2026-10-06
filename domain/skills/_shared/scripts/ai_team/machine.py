@@ -117,7 +117,7 @@ class Machine:
         design = self.design_of(task)
         if kind == "security-threat-model":
             if design is None:
-                missing.append("no design file (task.design is %r)" % task.get("design"))
+                missing.append("no design file (task.design is %r) -- `ai-team design attach <path>` records the draft design" % task.get("design"))
             else:
                 if design["status"] == "approved":
                     missing.append("the design is already approved -- the threat-model runs on the draft")

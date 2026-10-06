@@ -46,6 +46,7 @@ security: pending | not-needed
 
 Auth, crypto, secrets, payments, PII, migrations/deletion, untrusted-input parsing, permission
 checks, public contracts, a blocking gate of the review plane → `security: pending`, then
+`ai-team design attach <path>` when the task was created without `--design`, then
 `ai-team acquire security-threat-model` (sonnet, high) over the design FILE. Its MUST/SHOULD
 requirements are copied into `## Security` as decisions. Otherwise `security: not-needed`
 with the reason in `## Security`.

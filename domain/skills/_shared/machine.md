@@ -27,6 +27,7 @@ the working directory). Python 3 standard library only. Installed copy:
 |---|---|
 | `status [--json]` | the task in progress, design status and security, phase N of M, open tickets, attempts used, pending question, **what is allowed now**, and the card for the current moment |
 | `new <slug> --kind bounded\|large [--design <path>]` | creates the task JSON (slug is date-prefixed if it is not already) |
+| `design attach <path>` | records a draft design as `task.design` of the large task in progress; the file must exist inside the project and carry `status: draft` or `approved` in its frontmatter; a task that already has another design refuses. Run it when the task was created without `--design` and before `acquire security-threat-model` |
 | `design approve <path>` | flips the design frontmatter to `status: approved` with `approved_at`; only after the user's "yes" |
 | `plan generate [--scope <report.md> \| --scope-skipped "<why>"] [--check-timeout s]` | large: plan from the approved design plus the scope report's final fenced json block; the scout's calibrations travel into the plan, an un-run check becomes an open question. Under `--scope-skipped` the machine runs the design's checks itself. Bounded: `plan generate --objective … --decision … --check … --failure … --out-of-scope … --file …` (repeatable flags) writes a one-phase plan; the machine runs each `--check` now and records its calibration, `--failure` says how it fails (a known failure's signature when green today, why it is red today otherwise). A zero-work green or a timeout refuses the plan; a red-today check is printed with a `!` |
 | `plan amend --phase n --reason "<why>" [--file p]… [--check c --failure f]… [--check-timeout s]` | widens a phase after an implementer `blocked` with a `scope_report`, or records a check the orchestrator ran after the scout could not; each `--check` runs now and is recorded calibrated; recorded in the plan and the JSON |
@@ -50,7 +51,7 @@ Outcomes: `ok | warning | needs_input | blocked | failed | infra-death`. `infra-
 | Kind | Requires |
 |---|---|
 | scout-map | a task in progress |
-| security-threat-model | a design in `draft` whose frontmatter says `security: pending` |
+| security-threat-model | a design in `draft` whose frontmatter says `security: pending`, recorded in the task (`new --design`, or `design attach <path>` when the task was created without it) |
 | scout-scope | design `approved` |
 | implementer | large: design `approved`; a plan with phase n; scope report recorded or skipped with a reason; earlier phases committed; fewer than 6 attempts on the phase (the 7th says "reopen the design"); at least one calibrated acceptance check on the phase (a phase whose checks were all demoted to open questions names them and the `plan amend --check … --failure …` that records one) |
 | reviewer | tier ≥ 1 declared; the implementer ticket of the current attempt settled `ok` or `warning` |
