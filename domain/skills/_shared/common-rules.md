@@ -56,7 +56,7 @@ separation-of-duties failures (an executor cannot audit itself; an auditor canno
 | **Scout** (`organic-scout`) | Bootstrap config; map a zone before the design; scope an approved design phase by phase | `config.yaml`; map and scope reports (the scope report's json block feeds the plan) | Read-only; verifies; a guess is an open question |
 | **Implementer** (`organic-implementer`) | Implement one phase in one repo; run its checks; declare its decisions; block on any gap | Application files inside the roots; the bounded envelope | No commits; no widening; no pause channel — `blocked` with a `scope_report` and the orchestrator resumes it |
 | **Auditors** (`organic-reviewer`, `organic-security`) | Conformity to the design and the phase, correctness, verification; security threat-model and code-audit | Reports whose final json block is the receipt / fragment | Leave the tree as the implementer settled it (a mutation probe restores what it touched); read-only git; a receipt is final once written |
-| **Retro** (`organic-retro`) | Explain the task from durable evidence; propose conventions with their RED | The retro file; `conventions_proposed` | Reads the task JSON, design, plan, reports; writes its retro alone |
+| **Retro** (`organic-retro`) | Describe the task from durable evidence; label each friction `project` or `framework` | The retro file | Reads the task JSON, design, plan, reports; writes its retro alone |
 
 ## Principle 5 — Startup sequence
 

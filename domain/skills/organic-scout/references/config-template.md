@@ -90,7 +90,7 @@ commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits
 # retro: on-signal
 #   Optional, safe-absent default: on-signal. Read by the orchestrator when `ai-team close` flips a task to
 #   `done` (_shared/cards/close.md), to decide whether to delegate organic-retro:
-#     always     -> delegate organic-retro (mode: retro) unconditionally at task close
+#     always     -> delegate organic-retro unconditionally at task close
 #     on-signal  -> delegate only when >=1 signal fired this task: >=2 attempts on a phase, an infra-death,
 #                   a red blocking review_gates gate, or a single delegation reporting >300k
 #                   tokens

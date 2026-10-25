@@ -25,14 +25,15 @@ instrument that tells whether fewer rules worked better; every figure reaches th
 
 | Value | Action |
 |---|---|
-| `always` | `ai-team acquire retro`, then delegate `organic-retro` (mode `retro`, sonnet · medium) |
+| `always` | `ai-team acquire retro`, then delegate `organic-retro` (sonnet · medium) |
 | `on-signal` (default) | only when the task had ≥2 attempts on a phase, an `infra-death`, a `review-blocked`, or one ticket above 300k tokens |
 | `off` | none |
 
 Inject: `task_json` (`.ai-team/tasks/<task>.json`), `design`, `plan`, every report path the
 tickets recorded, `report_destination: .ai-team/retros/<task>.md`. The retro copies the JSON's
-figures verbatim. Its `conventions_proposed` are proposals: the user or you
-apply one as a trivial edit, or leave it.
+figures verbatim. The retro describes and cites; it proposes nothing. It is read in the
+ai-team repository, where its frictions are counted in the watchlist and a pattern seen twice
+becomes a change.
 
 ## Deferred findings
 

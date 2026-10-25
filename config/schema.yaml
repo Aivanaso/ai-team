@@ -86,7 +86,7 @@
 # retro: always | on-signal | off
 #   Optional, safe-absent default: on-signal. Read by the orchestrator when `ai-team close` flips a task to
 #   `done` (domain/skills/_shared/cards/close.md):
-#   always delegates organic-retro (mode: retro) unconditionally; on-signal delegates only when
+#   always delegates organic-retro unconditionally; on-signal delegates only when
 #   the task raised >=1 signal (>=2 attempts on a phase, an infra-death, a review-blocked
 #   verdict, or a single ticket above 300k tokens); off never delegates it. Canonical annotated
 #   source: domain/skills/organic-scout/references/config-template.md.

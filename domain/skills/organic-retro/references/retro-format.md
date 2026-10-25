@@ -1,6 +1,6 @@
 # Retro Format
 
-The template `organic-retro` (`retro` mode) fills in when composing the retro file at the
+The template `organic-retro` fills in when composing the retro file at the
 injected `report_destination` — convention `.ai-team/retros/<task>.md`, the same task id as
 `.ai-team/tasks/<task>.json`. Every section is evidence, not memory: a claim with no citable
 source (a task JSON field, a design decision, a report path and finding id, or `file:line`)
@@ -35,7 +35,11 @@ When the task JSON's `status` is not `done` (Decision Gates warning row), the Re
 - Numbered (F1, F2, …) so Watch-items can reference them.
 - Each friction: what happened (cited) → **the mechanism** — which rule, artifact or moment
   let it happen (a decision that was really a mechanism, a scope pass skipped, a check that
-  could not fail, findings that did not decrease) → one concrete proposal. Attempts are the
+  could not fail, findings that did not decrease) → **`Scope: project | framework`** —
+  `framework` when the mechanism that let it happen is a card, a skill, a protocol or a machine
+  verb; `project` when it is the repository's tooling, convention or code. The friction ends
+  there: it describes and cites, and proposes nothing. Language- and repo-specific detail is
+  kept whole, never abstracted. Attempts are the
   first place to look: every attempt beyond the first has a cause, and the cause is either the
   design (the constraint was wrong or missing), the plan (a file or check was missing) or the
   worker.
@@ -64,20 +68,6 @@ recorded", never guessed.
 - One line per item, phrased as a question the *next* retro should answer, tied to a friction
   number: `"F2 — did the scope pass name the construction sites this time?"`.
 
-## Conventions proposed
-
-Present only when a friction yields a reusable rule. Per entry (mirrors the envelope's
-`conventions_proposed` shape):
-
-```markdown
-### C1 — {rule, one line}
-**Why**: {one line, cites the friction}
-**Good**: {an example from this task, cited}
-**Bad**: {the counter-example from this task, cited}
-**Target**: {file#section — a card, a skill, a protocol}
-**RED**: {the eval scenario under evals/ that would catch a recurrence}
-```
-
 ## Compact worked example
 
 ```markdown
@@ -97,8 +87,7 @@ Present only when a friction yields a reusable rule. Per entry (mirrors the enve
    "totals are rounded with `Tax::round`" named a helper, not an invariant; the implementer used
    it, the reviewer flagged a rounding defect in a path the helper never covered
    (`…-phase-2-attempt-1-reviewer.md` F-1, CRITICAL). Mechanism: the decision test (card:
-   classify) was not applied at approval. Proposal: the design card's self-review names the
-   decision test explicitly.
+   classify) was not applied at approval. Scope: framework.
 
 ## Metrics
 | id | kind | phase | attempt | model | tokens | tool uses | duration | outcome / verdict |
@@ -112,9 +101,4 @@ Attempts per phase: phase 1 → 1; phase 2 → 2 (findings 3 → 0).
 
 ## Watch-items
 - F1 — did every approved decision pass the rewrite test this time?
-
-## Conventions proposed
-### C1 — A decision that names a function is a mechanism; rewrite it as the invariant it protects
-**Why**: F1. **Good**: "an empty batch exports zero rows and exits 0". **Bad**: "totals use `Tax::round`".
-**Target**: `_shared/cards/design.md#2`. **RED**: `evals/cases/design-mechanism-as-decision`.
 ```
