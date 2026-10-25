@@ -392,6 +392,11 @@ class Machine:
         impl = self._latest(self.tickets(task, "implementer", phase_n, phase["attempts"], settled=True))
         if impl is None:
             raise MachineError("tier is decided from the candidate's diff -- settle the implementer ticket of phase %d first" % phase_n)
+        if phase["status"] == "committed" and phase["tier"] is not None and tier < phase["tier"]:
+            raise MachineError(
+                "phase %d is committed at tier %d -- a committed phase's tier is never lowered (tier %d would "
+                "skip a lens its commit already passed); raising it is allowed" % (phase_n, phase["tier"], tier)
+            )
         phase["tier"] = tier
         phase["tier_reason"] = reason.strip()
         self.store.save(task)
@@ -585,6 +590,32 @@ class Machine:
         self.store.save(task)
         return phase
 
+    def _undisposed_findings(self, task):
+        """One line per finding, of any severity, in the final attempt's lens receipt of a
+        committed phase that `_dispositioned` does not satisfy -- the same criterion as
+        commit-check, widened from MAJOR/CRITICAL to every severity: close succeeds when each
+        finding is fixed (absent from the final receipt), deferred or ruled. The lens kinds
+        come from the settled lens tickets themselves, not from the mutable `phase["tier"]`.
+        Every lens ticket is settled by now, so a deferral (recorded at the lens's settle) has
+        already passed and the ruling is the verb available."""
+        lines = []
+        for phase in task["phases"]:
+            for kind in ("reviewer", "security-audit"):
+                ticket = self._latest(self.tickets(task, kind, phase["n"], phase["attempts"], settled=True))
+                if ticket is None:
+                    continue
+                dispositions = self._dispositions(task, kind, phase["n"])
+                for f in ticket.get("findings") or []:
+                    if not self._dispositioned(dispositions, f):
+                        lines.append(
+                            "phase %d %s %s %s %s: `ai-team ruling %s --finding %s --text \"...\" --cost-if-wrong \"...\"` "
+                            "(a deferral is recorded at the lens's settle, `ai-team settle %s --defer %s`, "
+                            "which has already passed)"
+                            % (phase["n"], kind, ticket["id"], f["severity"], f["id"],
+                               ticket["id"], f["id"], ticket["id"], f["id"])
+                        )
+        return lines
+
     def close(self, task):
         if task["status"] != "active":
             raise MachineError("task %s is %s" % (task["task"], task["status"]))
@@ -595,6 +626,11 @@ class Machine:
             raise MachineError("phases not committed: %s" % ", ".join(str(n) for n in pending))
         if self.open_tickets(task):
             raise MachineError("open tickets: %s" % ", ".join(t["id"] for t in self.open_tickets(task)))
+        undisposed = self._undisposed_findings(task)
+        if undisposed:
+            raise MachineError(
+                "findings of the final attempt without a ruling or a deferral:\n  - %s" % "\n  - ".join(undisposed)
+            )
         task["status"] = "done"
         task["closed_at"] = utc_now()
         self.store.save(task)

@@ -249,6 +249,80 @@ class LargeFlow(ProjectCase):
         self.ai("commit-check", "--phase", "1")
         self.assertEqual(len(self.task()["rulings"]), 2)
 
+    def _committed_tier_one_phase(self, receipt, defer=None):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        ticket, _, _ = self._review(1, receipt, defer=defer)
+        self.ai("phase", "done", "1", "--commit", self.head)
+        self._commit_tier_zero_phase(2)
+        return ticket
+
+    def _commit_tier_zero_phase(self, phase):
+        self._implement(phase)
+        self.ai("tier", "0", "--phase", str(phase), "--reason", "rename only")
+        self.ai("phase", "done", str(phase), "--commit", self.head)
+
+    def test_close_refuses_a_minor_finding_without_ruling_or_deferral(self):
+        self._committed_tier_one_phase(full_receipt([finding("F-1", "MINOR")]))
+        _, _, err = self.ai("close", expect=1)
+        self.assertIn("F-1", err)
+        self.assertIn("ai-team ruling", err)
+        self.assertIn("--defer", err)
+        self.assertIn("has already passed", err)  # a deferral belongs to the lens's settle, now settled
+        self.assertNotIn("or `ai-team settle", err)  # the only verb offered now is the ruling
+        self.assertEqual(self.task()["status"], "active")
+
+    def test_close_reads_the_lens_kinds_from_the_settled_tickets_not_from_the_tier(self):
+        self._committed_tier_one_phase(full_receipt([finding("F-1", "MINOR")]))
+        task_file = os.path.join(self.root, ".ai-team", "tasks", sorted(os.listdir(os.path.join(self.root, ".ai-team", "tasks")))[-1])
+        task = self.task()
+        task["phases"][0]["tier"] = 0
+        with open(task_file, "w") as handle:
+            json.dump(task, handle)
+        _, _, err = self.ai("close", expect=1)
+        self.assertIn("F-1", err)
+
+    def test_tier_of_a_committed_phase_cannot_be_lowered(self):
+        self._committed_tier_one_phase(full_receipt([finding("F-1", "MINOR")]))
+        _, _, err = self.ai("tier", "--phase", "1", "0", "--reason", "docs only", expect=1)
+        self.assertIn("phase 1", err)
+        self.assertIn("tier 1", err)
+        self.assertEqual(self.task()["phases"][0]["tier"], 1)
+        self.ai("tier", "--phase", "1", "2", "--reason", "more review is allowed")
+
+    def test_close_accepts_a_minor_finding_that_was_deferred(self):
+        self._committed_tier_one_phase(full_receipt([finding("F-1", "MINOR")]), defer="F-1")
+        self.ai("close")
+        self.assertEqual(self.task()["status"], "done")
+
+    def test_close_accepts_a_minor_finding_that_was_ruled(self):
+        ticket = self._committed_tier_one_phase(full_receipt([finding("F-1", "MINOR")]))
+        self.ai("ruling", ticket, "--finding", "F-1", "--text", "accepted by the user", "--cost-if-wrong", "a cosmetic flaw")
+        self.ai("close")
+        self.assertEqual(self.task()["status"], "done")
+
+    def test_close_checks_the_security_audit_receipt_of_a_tier_two_phase(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "2", "--phase", "1", "--reason", "parses untrusted input")
+        self._review(1, full_receipt([]))
+        _, out, _ = self.ai("acquire", "security-audit", "--phase", "1")
+        sec = out.split()[1]
+        sec_report = self.write(".ai-team/reviews/sec.md", receipt_block(fragment([finding("S-1", "MINOR")])))
+        self.ai("settle", sec, "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1", "--duration", "1", "--report", sec_report)
+        self.ai("phase", "done", "1", "--commit", self.head)
+        self._commit_tier_zero_phase(2)
+        _, _, err = self.ai("close", expect=1)
+        self.assertIn("S-1", err)
+        self.assertIn("security-audit", err)
+
     def test_major_finding_blocks_until_ruled_or_deferred(self):
         design = self._design(security="not-needed", body="No aplica.")
         self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)

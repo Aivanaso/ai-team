@@ -7,6 +7,12 @@ ai-team close
 ```
 Refused while a ticket is open or a phase is not committed — finish those first.
 
+Close succeeds when every finding of each phase's final-attempt lens receipt (reviewer,
+security-audit) is fixed, deferred or ruled. A deferral is recorded at the lens's settle
+(`ai-team settle <ticket> --defer <id>`), which has already passed at close; an undisposed
+finding of any severity is refused by id, and the verb available now is
+`ai-team ruling <ticket> --finding <id> --text "..." --cost-if-wrong "..."`.
+
 ## Report the balance
 
 `ai-team status --json` before closing, or the `close` output: tickets, tokens, tool uses,
