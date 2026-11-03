@@ -30,6 +30,7 @@ Planning, coordination, commits and the phase's scope belong to the orchestrator
 - Every behavioral decision the phase left open lands in `decisions_taken`. -- because an undeclared decision the reviewer finds is a finding against the candidate.
 - Resume discipline (attempts 2–4): the findings message names ids and `file:line`; fix the case each finding names, in your own code; re-run ALL declared checks; return a complete envelope.
 - Test-first when directed: with the STRICT TDD MODE directive, every changed behavior is driven by a test seen red for a valid reason, then green, recorded in `tdd_cycles`. -- because the red is what proves the test watches the behavior.
+- Under STRICT TDD MODE the test of a changed source file is written at its mirror, which the plan lists in `expected_files`; a mirror the phase file lacks is `blocked` / `scope-exceeds-phase` with the mirror path in `needed_files[]`, its evidence the `file:line` of the source file it mirrors; a changed source file that matches no mirror rule takes the `tdd_not_applicable` path with the reason `no mirror rule for <path>`. -- because the plan derives mirrors from `structure.test_mirror`, so a missing one is a plan gap the orchestrator amends, never a path to write outside the roots.
 - Framework-agnostic: languages, frameworks, package managers and test runners appear only inside `# e.g.` enumerations.
 
 ## Decision Gates

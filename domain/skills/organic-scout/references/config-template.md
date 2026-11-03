@@ -59,6 +59,26 @@ commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits
 #   returns tdd_cycles evidence for each red -> green cycle
 #   (red -> green -> triangulate -> refactor).
 
+# structure.test_mirror (below, under `structure:`)
+#   Optional, safe-absent; required once strict_tdd: true. It declares where each source file's
+#   unit test lives; the machine reads it, never infers it, and adds the mirror of every expected
+#   file (file and edit root) to the plan. Block-style list only; the flow form `{source: ...}`
+#   is refused. `source: .` means the project root; `tests: .` is refused.
+#   When strict_tdd: true and the key is absent, `plan generate` / `plan amend` refuse and print
+#   this block -- read the test layout once (one source file and its test) and add it:
+#     structure:
+#       test_mirror:
+#         - source: "<source directory>/"
+#           tests: "<mirrored test directory>/"
+#           suffix: "<optional stem suffix>"   # or prefix: "<optional stem prefix>"
+#   Examples, one convention each (the extension is kept as it is):
+#     - source: "src/"       # src/Domain/Flag.php -> tests/Unit/Domain/FlagTest.php
+#       tests: "tests/Unit/"
+#       suffix: "Test"
+#     - source: "app/"       # app/flags.py -> tests/test_flags.py
+#       tests: "tests/"
+#       prefix: "test_"
+
 # test_commands:
 #   unit: "{command}"       # e.g. "npm test" | "pytest" | "phpunit"
 #   security: "{command}"   # e.g. "npm audit" | "composer audit"
