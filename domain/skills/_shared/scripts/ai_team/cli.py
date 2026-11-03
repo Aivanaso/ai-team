@@ -16,6 +16,7 @@ from ai_team import engram, hook  # noqa: E402
 from ai_team.debt import fix as debt_fix  # noqa: E402
 from ai_team.design import append_decisions, approve as approve_design, design_problems, load_design  # noqa: E402
 from ai_team.machine import Machine, TICKET_KINDS  # noqa: E402
+from ai_team.config import load_config  # noqa: E402
 from ai_team.calibration import DEFAULT_TIMEOUT_S, calibrate_by_running  # noqa: E402
 from ai_team.plan import (  # noqa: E402
     amend, amend_decisions, build_inline_plan, build_plan, load_plan, load_scope_report, render_phase, render_plan, write_text,
@@ -190,7 +191,7 @@ def cmd_plan_generate(args):
         if task["kind"] == "large":
             raise MachineError("a large task generates its plan from the approved design, not from --objective")
         plan, notes = build_inline_plan(task, args.objective, args.decision or [], _paired_checks(args),
-                                        args.out_of_scope or [], args.file or [], runner)
+                                        args.out_of_scope or [], args.file or [], runner, load_config(store.root))
         task["scope_report"] = None
         task["scope_skipped"] = plan["scope_skipped"]
     else:
@@ -211,7 +212,8 @@ def cmd_plan_generate(args):
         elif not skipped:
             raise MachineError("large task: pass --scope <scout report.md> (its final json block) or --scope-skipped \"<why the map pass already covers every file>\"")
         plan, notes = build_plan(task, design, design_rel, scope=scope, scope_rel=scope_rel if scope else None,
-                                 scope_skipped=None if scope else skipped, runner=runner)
+                                 scope_skipped=None if scope else skipped, runner=runner,
+                                 config=load_config(store.root))
         task["scope_report"] = scope_rel if scope else None
         task["scope_skipped"] = None if scope else skipped
     plan_rel = os.path.join(AI_TEAM_DIR, "plans", task["task"] + ".md")
@@ -235,7 +237,8 @@ def cmd_plan_amend(args):
     if not task.get("plan"):
         raise MachineError("no plan to amend")
     plan = load_plan(store.abs(task["plan"]))
-    phase, notes = amend(plan, args.phase, args.reason, args.file or [], _paired_checks(args), _runner(store, args))
+    phase, notes = amend(plan, args.phase, args.reason, args.file or [], _paired_checks(args), _runner(store, args),
+                        load_config(store.root))
     write_text(store.abs(task["plan"]), render_plan(plan))
     Machine(store).phase(task, args.phase)["amendments"].append({"at": phase["amendments"][-1]["at"], "reason": args.reason})
     store.save(task)

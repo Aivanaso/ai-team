@@ -6,7 +6,10 @@ import os
 import tempfile
 import unittest
 
-from helpers import DESIGN_ES, SCOPE_REPORT, ProjectCase, finding, fragment, full_receipt, receipt_block
+from helpers import (
+    DESIGN_ES, SCOPE_REPORT, STRICT_PREFIX_MIRROR, STRICT_UNIT_MIRROR, STRICT_WITHOUT_MIRROR, ProjectCase,
+    finding, fragment, full_receipt, receipt_block, scope_report_listing,
+)
 
 
 class NoProject(unittest.TestCase):
@@ -79,6 +82,141 @@ class BoundedFlow(ProjectCase):
         self.ai("pause")
         self.ai("resume", expect=1)  # two paused: say which
         self.ai("resume", self.task()["task"])
+
+
+class TestMirrors(ProjectCase):
+    """Under strict_tdd the plan names the test mirror of every source file and carries its directory
+    as an edit root, so the implementer's first test is inside its roots on the first attempt."""
+
+    def setUp(self):
+        super().setUp()
+        self.design = self.write(".ai-team/designs/2026-09-05-demo.md", DESIGN_ES.format(security="not-needed", security_body="No aplica."))
+
+    def _large_task(self):
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", self.design)
+        self.ai("design", "approve", self.design)
+
+    def _generate_scoped(self, phase1_files, expect=0):
+        self._large_task()
+        scope = self.write(".ai-team/explorations/2026-09-05-demo-scope.md", scope_report_listing(phase1_files))
+        return self.ai("plan", "generate", "--scope", scope, expect=expect)
+
+    def _generate_bounded(self, *files, expect=0):
+        self.ai("new", "demo", "--kind", "bounded")
+        args = ["plan", "generate", "--objective", "x", "--check", "true", "--failure", "never red: a no-op"]
+        for path in files:
+            args += ["--file", path]
+        return self.ai(*args, expect=expect)
+
+    def test_a_scoped_plan_gains_the_mirror_as_a_create_with_its_directory_as_a_root(self):
+        self.write(".ai-team/config.yaml", STRICT_UNIT_MIRROR)
+        self._generate_scoped(["src/A/B.php"])
+        phase = self.plan()["phases"][0]
+        self.assertEqual(phase["expected_files"], [
+            {"action": "CREATE", "path": "src/A/B.php", "evidence": "src/app.py:1"},
+            {"action": "CREATE", "path": "tests/Unit/A/BTest.php",
+             "evidence": "test mirror of src/A/B.php (config structure.test_mirror)"},
+        ])
+        self.assertEqual(phase["allowed_edit_roots"], ["src/A", "tests/Unit/A"])
+        self.ai("phase", "extract", "1")
+        phase_file = self.read(os.path.join(".ai-team", "plans", "2026-09-05-demo", "phase-1.md"))
+        self.assertIn("`tests/Unit/A`", phase_file.split("## Allowed edit roots")[1].split("## Out of scope")[0])
+
+    def test_without_strict_tdd_the_roots_are_the_source_directory_only(self):
+        self.write(".ai-team/config.yaml", STRICT_UNIT_MIRROR.replace("strict_tdd: true\n", ""))
+        self._generate_scoped(["src/A/B.php"])
+        phase = self.plan()["phases"][0]
+        self.assertEqual(phase["allowed_edit_roots"], ["src/A"])
+        self.assertEqual([f["path"] for f in phase["expected_files"]], ["src/A/B.php"])
+
+    def test_strict_tdd_without_a_mirror_refuses_and_names_the_key_and_the_lines_to_add(self):
+        self.write(".ai-team/config.yaml", STRICT_WITHOUT_MIRROR)
+        _, _, err = self._generate_scoped(["src/A/B.php"], expect=1)
+        self.assertIn("structure.test_mirror", err)
+        self.assertIn("test_mirror:", err)
+        self.assertIn("source:", err)
+        self.assertIn("tests:", err)
+        self.assertIsNone(self.task().get("plan"))
+
+    def test_the_refusal_writes_no_plan_file(self):
+        self.write(".ai-team/config.yaml", STRICT_WITHOUT_MIRROR)
+        self._generate_scoped(["src/A/B.php"], expect=1)
+        self.assertFalse(os.path.exists(os.path.join(self.root, ".ai-team", "plans", "2026-09-05-demo.md")))
+
+    def test_a_mirror_the_scout_already_listed_is_not_duplicated(self):
+        self.write(".ai-team/config.yaml", STRICT_UNIT_MIRROR)
+        self._large_task()
+        report = json.loads(scope_report_listing(["src/A/B.php"]).split("```json\n")[1].split("\n```")[0])
+        report["phases"][0]["expected_files"].append(
+            {"action": "CREATE", "path": "tests/Unit/A/BTest.php", "evidence": "tests/Unit/A/CTest.php:1 follows"})
+        scope = self.write(".ai-team/explorations/2026-09-05-demo-scope.md", "# s\n\n```json\n%s\n```\n" % json.dumps(report))
+        self.ai("plan", "generate", "--scope", scope)
+        mirrors = [f for f in self.plan()["phases"][0]["expected_files"] if f["path"] == "tests/Unit/A/BTest.php"]
+        self.assertEqual(mirrors, [{"action": "CREATE", "path": "tests/Unit/A/BTest.php", "evidence": "tests/Unit/A/CTest.php:1 follows"}])
+
+    def test_a_mirror_present_on_disk_is_a_modify_and_an_absent_one_a_create(self):
+        self.write(".ai-team/config.yaml", STRICT_UNIT_MIRROR)
+        self.write("tests/Unit/A/BTest.php", "<?php\n")
+        self._generate_scoped(["src/A/B.php", "src/A/C.php"])
+        actions = {f["path"]: f["action"] for f in self.plan()["phases"][0]["expected_files"]}
+        self.assertEqual(actions["tests/Unit/A/BTest.php"], "MODIFY")
+        self.assertEqual(actions["tests/Unit/A/CTest.php"], "CREATE")
+
+    def test_a_source_matching_no_rule_gets_no_mirror(self):
+        self.write(".ai-team/config.yaml", STRICT_UNIT_MIRROR)
+        self._generate_scoped(["config/app.yaml"])
+        self.assertEqual([f["path"] for f in self.plan()["phases"][0]["expected_files"]], ["config/app.yaml"])
+
+    def test_a_scope_skipped_plan_gains_the_mirrors_of_the_designs_surfaces(self):
+        self.write(".ai-team/config.yaml", STRICT_UNIT_MIRROR)
+        self._large_task()
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        phase = self.plan()["phases"][0]
+        self.assertIn("tests/Unit/flagsTest.py", [f["path"] for f in phase["expected_files"]])
+        self.assertIn("tests/Unit", phase["allowed_edit_roots"])
+
+    def test_a_bounded_plan_gains_the_mirror_of_each_file(self):
+        self.write(".ai-team/config.yaml", STRICT_PREFIX_MIRROR)
+        self._generate_bounded("src/x.py")
+        phase = self.plan()["phases"][0]
+        self.assertEqual(phase["expected_files"][-1], {
+            "action": "CREATE", "path": "tests/test_x.py", "evidence": "test mirror of src/x.py (config structure.test_mirror)"})
+        self.assertEqual(phase["allowed_edit_roots"], ["src", "tests"])
+
+    def test_a_bounded_plan_under_strict_tdd_without_a_mirror_refuses(self):
+        self.write(".ai-team/config.yaml", STRICT_WITHOUT_MIRROR)
+        _, _, err = self._generate_bounded("src/x.py", expect=1)
+        self.assertIn("structure.test_mirror", err)
+
+    def test_an_amendment_gains_the_mirrors_of_the_added_files(self):
+        self.write(".ai-team/config.yaml", STRICT_UNIT_MIRROR)
+        self._large_task()
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self.ai("plan", "amend", "--phase", "1", "--reason", "needs src/util.py", "--file", "src/util.py")
+        phase = self.plan()["phases"][0]
+        self.assertIn({"action": "CREATE", "path": "tests/Unit/utilTest.py",
+                       "evidence": "test mirror of src/util.py (config structure.test_mirror)"}, phase["expected_files"])
+        self.assertIn("tests/Unit", phase["allowed_edit_roots"])
+        self.assertEqual(self.task()["phases"][0]["amendments"][0]["reason"], "needs src/util.py")
+
+    def test_an_amendment_refusal_runs_no_check_and_leaves_the_plan_byte_identical(self):
+        self._large_task()
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        before = self.read(self.task()["plan"])
+        self.write(".ai-team/config.yaml", STRICT_WITHOUT_MIRROR)
+        self.ai("plan", "amend", "--phase", "1", "--reason", "needs src/util.py", "--file", "src/util.py",
+                "--check", "python3 -c \"open('check-ran.marker', 'w').close()\"", "--failure", "never red: a no-op", expect=1)
+        self.assertFalse(os.path.exists(os.path.join(self.root, "check-ran.marker")))
+        self.assertEqual(self.read(self.task()["plan"]), before)
+
+    def test_an_amendment_under_strict_tdd_without_a_mirror_refuses_and_leaves_the_plan(self):
+        self._large_task()
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        before = self.read(self.task()["plan"])
+        self.write(".ai-team/config.yaml", STRICT_WITHOUT_MIRROR)
+        _, _, err = self.ai("plan", "amend", "--phase", "1", "--reason", "needs src/util.py", "--file", "src/util.py", expect=1)
+        self.assertIn("structure.test_mirror", err)
+        self.assertEqual(self.read(self.task()["plan"]), before)
 
 
 class LargeFlow(ProjectCase):

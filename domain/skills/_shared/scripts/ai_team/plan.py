@@ -7,6 +7,7 @@ implementer's input from that object.
 import os
 
 from ai_team.calibration import check_line, demotion_question, is_calibrated, state_note, validate_check, validate_scope_checks
+from ai_team.config import mirror_path, required_mirror_rules
 from ai_team.fenced import load_json_block, render_json_block
 from ai_team.store import MachineError, atomic_write, utc_now
 
@@ -19,6 +20,24 @@ def compute_roots(paths):
         if "/" in normalized:
             roots.add(os.path.dirname(normalized))
     return sorted(roots)
+
+
+def add_test_mirrors(files, rules, root):
+    """`files` extended with the test mirror of each path a rule matches. A mirror already listed
+    keeps its entry (the scout's evidence wins); one present under `root` is a MODIFY, else a CREATE."""
+    known = {f["path"][2:] if f["path"].startswith("./") else f["path"] for f in files}
+    extended = list(files)
+    for entry in files:
+        mirror = mirror_path(entry["path"], rules)
+        if mirror is None or mirror in known:
+            continue
+        known.add(mirror)
+        extended.append({
+            "action": "MODIFY" if os.path.isfile(os.path.join(root, mirror)) else "CREATE",
+            "path": mirror,
+            "evidence": "test mirror of %s (config structure.test_mirror)" % entry["path"],
+        })
+    return extended
 
 
 def load_scope_report(path):
@@ -72,10 +91,12 @@ def _scoped_checks(scoped, phase_n):
     return entries, questions, notes
 
 
-def build_plan(task, design, design_rel, scope=None, scope_rel=None, scope_skipped=None, runner=None):
+def build_plan(task, design, design_rel, scope=None, scope_rel=None, scope_skipped=None, runner=None, *, config):
     """The plan object plus the lines `plan generate` prints (red-today checks, demoted checks).
     With a scope report the scout's calibrations are used; without one (`--scope-skipped`) the
-    machine runs the design's checks through `runner(command, failure)`."""
+    machine runs the design's checks through `runner(command, failure)`. Under strict TDD each
+    phase's files gain their test mirrors (`config`); a strict project without a mirror is refused."""
+    rules = required_mirror_rules(config)
     constraints = list(design["decisions"]) + ["security: %s" % m for m in design["security_measures"]]
     phases, notes = [], []
     for phase in design["phases"]:
@@ -116,6 +137,7 @@ def build_plan(task, design, design_rel, scope=None, scope_rel=None, scope_skipp
             entry["acceptance_checks"] = checks
             entry["open_questions"] += questions
             notes += phase_notes
+        entry["expected_files"] = add_test_mirrors(entry["expected_files"], rules, config.root)
         entry["allowed_edit_roots"] = compute_roots([f["path"] for f in entry["expected_files"]])
         phases.append(entry)
     return {
@@ -133,11 +155,14 @@ def build_plan(task, design, design_rel, scope=None, scope_rel=None, scope_skipp
     }, notes
 
 
-def build_inline_plan(task, objective, decisions, checks, out_of_scope, files, runner):
-    """The bounded plan plus its notes; `checks` is a list of (command, failure) the machine runs."""
+def build_inline_plan(task, objective, decisions, checks, out_of_scope, files, runner, config):
+    """The bounded plan plus its notes; `checks` is a list of (command, failure) the machine runs.
+    Under strict TDD the files gain their test mirrors (`config`)."""
     if not objective or not checks:
         raise MachineError("a bounded plan needs --objective and at least one --check")
-    expected = [{"action": "MODIFY", "path": f, "evidence": "user-approved in chat"} for f in files]
+    rules = required_mirror_rules(config)
+    expected = add_test_mirrors(
+        [{"action": "MODIFY", "path": f, "evidence": "user-approved in chat"} for f in files], rules, config.root)
     entries, notes = _run_checks(runner, checks, 1, "orchestrator")
     return {
         "kind": "plan",
@@ -157,7 +182,7 @@ def build_inline_plan(task, objective, decisions, checks, out_of_scope, files, r
             "scenarios": [],
             "acceptance_checks": entries,
             "expected_files": expected,
-            "allowed_edit_roots": compute_roots(files),
+            "allowed_edit_roots": compute_roots([f["path"] for f in expected]),
             "scout_notes": [],
             "open_questions": [],
             "amendments": [],
@@ -242,15 +267,18 @@ def phase_of(plan, n):
     raise MachineError("plan has no phase %d (phases: 1..%d)" % (n, len(plan["phases"])))
 
 
-def amend(plan, n, reason, files, checks, runner):
+def amend(plan, n, reason, files, checks, runner, config):
     """Widen a phase; `checks` is a list of (command, failure) the machine runs before the
-    plan changes, so a check that times out or does zero work leaves the plan untouched."""
+    plan changes, so a check that times out or does zero work leaves the plan untouched.
+    Under strict TDD the added files gain their test mirrors (`config`)."""
+    rules = required_mirror_rules(config)
     phase = phase_of(plan, n)
     entries, notes = _run_checks(runner, checks, n, "orchestrator")
     known = {f["path"] for f in phase["expected_files"]}
     for path in files:
         if path not in known:
             phase["expected_files"].append({"action": "MODIFY", "path": path, "evidence": "amendment: %s" % reason})
+    phase["expected_files"] = add_test_mirrors(phase["expected_files"], rules, config.root)
     phase["acceptance_checks"] += entries
     phase["allowed_edit_roots"] = compute_roots([f["path"] for f in phase["expected_files"]])
     phase["amendments"].append({"at": utc_now(), "reason": reason, "files": list(files), "checks": [c for c, _ in checks]})

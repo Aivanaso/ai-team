@@ -81,6 +81,10 @@ class ProjectCase(unittest.TestCase):
         with open(os.path.join(self.root, rel), encoding="utf-8") as handle:
             return handle.read()
 
+    def plan(self):
+        """The plan object the machine reads back: the final json block of the plan file."""
+        return json.loads(self.read(self.task()["plan"]).split("```json\n")[1].split("\n```")[0])
+
 
 def receipt_block(obj):
     return "# Review Report\n\nprose\n\n## Receipt\n\n```json\n%s\n```\n" % json.dumps(obj, indent=2)
@@ -192,3 +196,34 @@ prose
 ]}
 ```
 """
+
+
+STRICT_UNIT_MIRROR = """strict_tdd: true
+structure:
+  test_mirror:
+    - source: "src/"
+      tests: "tests/Unit/"
+      suffix: "Test"
+"""
+
+STRICT_PREFIX_MIRROR = """strict_tdd: true
+structure:
+  test_mirror:
+    - source: "src/"
+      tests: "tests/"
+      prefix: "test_"
+"""
+
+STRICT_WITHOUT_MIRROR = "strict_tdd: true\n"
+
+
+def scope_report_listing(phase1_files, phase2_files=("src/app.py",)):
+    """A scope report whose two phases name only the given files (action CREATE for phase 1, MODIFY for phase 2)."""
+    def entry(n, action, paths):
+        return {"n": n, "expected_files": [{"action": action, "path": p, "evidence": "src/app.py:1"} for p in paths],
+                "acceptance_checks": [{"command": "true", "expect": "exit 0",
+                                       "calibration": {"executed": True, "exit_code": 0, "digest": "(no output)",
+                                                       "failure_signature": "never red: a no-op"}}],
+                "constraints_candidates": [], "open_questions": []}
+    report = {"kind": "scope-report", "phases": [entry(1, "CREATE", phase1_files), entry(2, "MODIFY", phase2_files)]}
+    return "# Scope report\n\nprose\n\n```json\n%s\n```\n" % json.dumps(report)
