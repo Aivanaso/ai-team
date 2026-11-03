@@ -8,7 +8,7 @@ Inherited from check-receipt.py's calibration suite; the prose is never parsed, 
 {
   "tier": 1,
   "tier_reason": "tier 1: standard code change",
-  "verdict": "review-clear",
+  "verdict": "review-gated",
   "lenses": {
     "correctness": {
       "status": "findings",

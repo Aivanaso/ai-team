@@ -529,11 +529,15 @@ class Machine:
             return ["%s report %s no longer validates: %s" % (kind, ticket["report"], "; ".join(out + err))]
         live_verdict = derived_verdict(data)
         live_findings = findings_of(data)
-        if live_verdict != ticket["verdict"] or live_findings != ticket["findings"]:
+        if live_findings != ticket["findings"]:
             return ["%s report %s differs from the findings/verdict snapshot recorded at settle for ticket %s "
                      "-- restore the report to the content it had at settle, or open the next attempt "
                      "(`ai-team acquire implementer --phase %d`) and review again"
                      % (kind, ticket["report"], ticket["id"], phase["n"])]
+        if live_verdict != ticket["verdict"]:
+            return ["%s ticket %s stores verdict %s, which predates the three-valued verdict; its findings now "
+                     "derive %s -- open the next attempt (`ai-team acquire implementer --phase %d`) and review again"
+                     % (kind, ticket["id"], ticket["verdict"], live_verdict, phase["n"])]
         dispositions = self._dispositions(task, kind, phase["n"])
         reasons = []
         for f in live_findings:

@@ -91,11 +91,12 @@ def receipt_block(obj):
 
 
 def full_receipt(findings=(), verdict=None, tier=1, closed=None, verdict_history=None):
-    critical = any(f.get("severity") == "CRITICAL" for f in findings)
+    severities = {f.get("severity") for f in findings}
+    derived = "review-blocked" if "CRITICAL" in severities else "review-gated" if "MAJOR" in severities else "review-clear"
     receipt = {
         "tier": tier,
         "tier_reason": "tier %d: test" % tier,
-        "verdict": verdict or ("review-blocked" if critical else "review-clear"),
+        "verdict": verdict or derived,
         "lenses": {"correctness": {"status": "findings" if findings else "pass", "findings": list(findings)}},
         "verification": [{"command": "true", "exit_code": 0, "outcome": "pass"}],
     }

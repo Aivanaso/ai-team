@@ -469,7 +469,8 @@ class LargeFlow(ProjectCase):
         self._implement(1)
         self.ai("tier", "1", "--phase", "1", "--reason", "code")
         _, out, _ = self._review(1, full_receipt([finding("F-1", "MAJOR")]))
-        self.assertNotIn("review-blocked", out)  # the receipt is review-clear -- the gate still fires
+        self.assertNotIn("review-blocked", out)  # a MAJOR is review-gated -- the gate still fires
+        self.assertEqual(self.task()["tickets"][-1]["verdict"], "review-gated")
         _, out, _ = self.ai("commit-check", "--phase", "1", expect=1)
         self.assertIn("F-1", out)
         self.assertIn("MAJOR", out)
@@ -485,6 +486,39 @@ class LargeFlow(ProjectCase):
         self.ai("commit-check", "--phase", "2", expect=1)
         self._review(2, full_receipt([finding("F-1", "MAJOR")]), defer="F-1")
         self.ai("commit-check", "--phase", "2")
+
+    def test_a_security_fragment_with_a_major_and_no_verdict_settles_review_gated(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "2", "--phase", "1", "--reason", "parses untrusted input")
+        self._review(1, full_receipt([]))
+        _, out, _ = self.ai("acquire", "security-audit", "--phase", "1")
+        sec = out.split()[1]
+        sec_report = self.write(".ai-team/reviews/sec.md", receipt_block(fragment([finding("S-1", "MAJOR", evidence="executed")])))
+        self.ai("settle", sec, "--outcome", "ok", "--model", "sonnet", "--tokens", "1", "--tool-uses", "1", "--duration", "1", "--report", sec_report)
+        self.assertEqual(self.ticket_by_id(sec)["verdict"], "review-gated")
+
+    def test_commit_check_decides_from_findings_not_from_the_stored_verdict(self):
+        design = self._design(security="not-needed", body="No aplica.")
+        self.ai("new", "2026-09-05-demo", "--kind", "large", "--design", design)
+        self.ai("design", "approve", design)
+        self.ai("plan", "generate", "--scope-skipped", "covered by the map")
+        self._implement(1)
+        self.ai("tier", "1", "--phase", "1", "--reason", "code")
+        ticket, _, _ = self._review(1, full_receipt([finding("F-1", "MAJOR")]))
+        task_path = os.path.join(self.root, ".ai-team", "tasks", "2026-09-05-demo.json")
+        with open(task_path) as handle:
+            task = json.load(handle)
+        next(t for t in task["tickets"] if t["id"] == ticket)["verdict"] = "review-clear"
+        with open(task_path, "w") as handle:
+            json.dump(task, handle)
+        _, out, err = self.ai("commit-check", "--phase", "1", expect=1)
+        self.assertIn(ticket, out + err)
+        self.assertIn("predates the three-valued verdict", out + err)
+        self.assertNotIn("restore the report", out + err)
 
     def test_defer_refuses_critical_finding(self):
         design = self._design(security="not-needed", body="No aplica.")

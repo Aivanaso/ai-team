@@ -3,6 +3,7 @@ check-receipt.py: every known-negative fixture must exit 1 (or 2 when validation
 so the checks are proven able to fail before their green counts (evidence-protocol Rule 7).
 """
 
+import json
 import os
 import shutil
 import tempfile
@@ -21,12 +22,28 @@ EXIT_1 = [
     "receipt-verification-empty", "receipt-verification-garbage", "receipt-not-reverified-garbage",
     "receipt-file-nul", "receipt-verification-reason-with-entries", "receipt-fragment-with-omitted-reason",
     "receipt-closed-and-findings-same-id", "receipt-closed-file-traversal",
+    "receipt-major-clear-mismatch", "receipt-critical-gated-mismatch", "receipt-major-blocked-mismatch",
+    "receipt-minor-gated-mismatch", "receipt-security-fragment-major-clear",
 ]
 EXIT_1_SINGLE_VIOLATION = ["receipt-md-no-block", "receipt-md-two-blocks", "receipt-md-malformed-block", "receipt-md-wrong-fence-label"]
 EXIT_2 = ["receipt-not-utf8", "receipt-top-level-array"]
 EXIT_0 = ["receipt-good", "receipt-verification-omitted-with-reason", "receipt-security-fragment-good",
           "receipt-md-block-good", "receipt-md-prose-fence-string",
-          "receipt-closed-good", "receipt-closed-on-full-receipt"]
+          "receipt-closed-good", "receipt-closed-on-full-receipt", "receipt-gated-good"]
+
+NEEDS_GATED = "verdict must be 'review-gated' -- 'F-1' is MAJOR and no CRITICAL finding exists in any lens of the receipt"
+NEEDS_BLOCKED = "verdict must be 'review-blocked' -- 'F-1' is CRITICAL"
+NEEDS_CLEAR = "verdict must be 'review-clear' -- no MAJOR or CRITICAL finding exists in any lens of the receipt"
+# One wrong pairing per fixture: the verdict the receipt writes against the one its findings set.
+VERDICT_MISMATCHES = {
+    "receipt-verdict-mismatch": NEEDS_BLOCKED,                  # CRITICAL written review-clear
+    "receipt-critical-gated-mismatch": NEEDS_BLOCKED,           # CRITICAL written review-gated
+    "receipt-major-clear-mismatch": NEEDS_GATED,                # MAJOR written review-clear
+    "receipt-major-blocked-mismatch": NEEDS_GATED,              # MAJOR written review-blocked
+    "receipt-minor-gated-mismatch": NEEDS_CLEAR,                # MINOR written review-gated
+    "receipt-security-fragment-major-clear": NEEDS_GATED,       # fragment MAJOR written review-clear
+    "receipt-security-fragment-bad-verdict": NEEDS_BLOCKED,     # fragment CRITICAL written review-clear
+}
 
 GOOD_BODY = """{
   "tier": 1, "tier_reason": "tier 1: standard code change", "verdict": "review-clear",
@@ -65,6 +82,13 @@ class FixtureTable(unittest.TestCase):
                 self.assertEqual(code, 1, out + err)
                 self.assertTrue(violations(out), out)
 
+    def test_a_verdict_that_disagrees_with_its_findings_is_refused_with_the_expected_value(self):
+        for name, expected in VERDICT_MISMATCHES.items():
+            with self.subTest(name):
+                code, out, _ = check(fixture(name))
+                self.assertEqual(code, 1)
+                self.assertEqual(violations(out), ["VIOLATION %s: %s" % (fixture(name), expected)])
+
     def test_container_negatives_are_one_violation(self):
         for name in EXIT_1_SINGLE_VIOLATION:
             with self.subTest(name):
@@ -95,6 +119,24 @@ class FixtureTable(unittest.TestCase):
                 self.assertEqual(len(violations(out)), 1, out)
 
 
+def receipt_body(correctness, security=None, verdict="review-clear"):
+    """A full receipt whose lenses carry one finding per given severity (ids F-1, F-2, ...)."""
+    def lens(severities, start):
+        findings = [
+            {"id": "F-%d" % (start + i), "severity": sev, "confidence": "high", "evidence": "executed",
+             "file": "README.md", "line": 1, "claim": "c"}
+            for i, sev in enumerate(severities)
+        ]
+        return {"status": "findings" if findings else "pass", "findings": findings}
+    lenses = {"correctness": lens(correctness, 1)}
+    if security is not None:
+        lenses["security"] = lens(security, 1 + len(correctness))
+    return json.dumps({
+        "tier": 2, "tier_reason": "tier 2: test", "verdict": verdict, "lenses": lenses,
+        "verification": [{"command": "true", "exit_code": 0, "outcome": "pass"}],
+    })
+
+
 class Generated(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="ai-team-receipt-")
@@ -105,6 +147,34 @@ class Generated(unittest.TestCase):
         with open(path, "w") as handle:
             handle.write(text)
         return path
+
+    def test_the_three_verdicts_each_validate_only_their_own_severity(self):
+        severities = {"review-blocked": ["CRITICAL", "MAJOR"], "review-gated": ["MAJOR", "MINOR"], "review-clear": ["MINOR"]}
+        for written in severities:
+            for expected in severities:
+                with self.subTest(written=written, findings=expected):
+                    path = self._write("v.md", wrap(receipt_body(severities[expected], verdict=written)))
+                    code, out, err = check(path)
+                    self.assertEqual(code, 0 if written == expected else 1, out + err)
+
+    def test_the_verdict_reads_every_lens_of_the_receipt(self):
+        for written, expected_code in (("review-clear", 1), ("review-gated", 1), ("review-blocked", 0)):
+            with self.subTest(written):
+                path = self._write("v.md", wrap(receipt_body([], ["CRITICAL"], verdict=written)))
+                code, out, err = check(path)
+                self.assertEqual(code, expected_code, out + err)
+                self.assertNotIn("combines tier-2 verdicts", out)
+        path = self._write("v.md", wrap(receipt_body(["MINOR"], ["MAJOR"], verdict="review-gated")))
+        self.assertEqual(check(path)[0], 0)
+
+    def test_a_violation_names_the_finding_by_its_id_and_never_quotes_its_claim(self):
+        body = json.loads(receipt_body(["MAJOR"]))
+        body["lenses"]["correctness"]["findings"][0]["id"] = "F-" + "x" * 300
+        body["lenses"]["correctness"]["findings"][0]["claim"] = "SECRET-CLAIM-TEXT"
+        code, out, _ = check(self._write("v.md", wrap(json.dumps(body))))
+        self.assertEqual(code, 1)
+        self.assertNotIn("SECRET-CLAIM-TEXT", out)
+        self.assertLess(len(out), 400)
 
     def test_missing_file_is_exit_2(self):
         code, out, err = check(os.path.join(self.tmp, "never-written.md"))

@@ -34,7 +34,7 @@ pass verified closed, and re-lists a different id under `findings`.
     { "id": "F-1", "file": "README.md", "line": 1 }
   ],
   "verdict_history": [
-    { "pass": "full", "report": "prior.md", "verdict": "review-blocked", "note": "F-1 MAJOR" },
+    { "pass": "full", "report": "prior.md", "verdict": "review-gated", "note": "F-1 MAJOR" },
     { "pass": "delta", "report": "this.md", "verdict": "review-clear", "note": "F-1 closed at README.md:1" }
   ]
 }

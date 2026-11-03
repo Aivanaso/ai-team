@@ -21,7 +21,8 @@ from ai_team.fenced import load_json_block
 SEVERITIES = ("CRITICAL", "MAJOR", "MINOR")
 CONFIDENCES = ("high", "medium", "low")
 EVIDENCE_KINDS = ("executed", "read")
-VERDICTS = ("review-clear", "review-blocked")
+VERDICTS = ("review-clear", "review-gated", "review-blocked")
+ID_NAME_CAP = 64
 KINDS = ("security-fragment",)
 
 
@@ -93,14 +94,14 @@ def _check_finding(where, finding, project_root, violations, skip_containment):
 
 
 def _check_lens(lens_name, lenses, project_root, violations, skip_containment):
-    ids = []
-    any_critical = False
+    """Check one lens; return its findings as [(id or None, severity)] for the verdict rule."""
+    entries = []
     lens = lenses.get(lens_name)
     if lens is None:
-        return ids, any_critical
+        return entries
     if not isinstance(lens, dict):
         violations.append("lenses.%s must be an object" % lens_name)
-        return ids, any_critical
+        return entries
     status = lens.get("status")
     if status not in ("pass", "findings"):
         violations.append("lenses.%s.status must be 'pass' or 'findings' (got %r)" % (lens_name, status))
@@ -110,16 +111,12 @@ def _check_lens(lens_name, lenses, project_root, violations, skip_containment):
         findings = []
     for i, finding in enumerate(findings):
         where = "lenses.%s.findings[%d]" % (lens_name, i)
-        fid, severity = _check_finding(where, finding, project_root, violations, skip_containment)
-        if fid:
-            ids.append(fid)
-        if severity == "CRITICAL":
-            any_critical = True
+        entries.append(_check_finding(where, finding, project_root, violations, skip_containment))
     if status == "pass" and findings:
         violations.append("lenses.%s.status is 'pass' but findings is non-empty (%d entries)" % (lens_name, len(findings)))
     if status == "findings" and not findings:
         violations.append("lenses.%s.status is 'findings' but findings is empty" % lens_name)
-    return ids, any_critical
+    return entries
 
 
 def _check_duplicate_ids(ids, violations):
@@ -202,6 +199,49 @@ def _check_closed(data, project_root, violations, skip_containment, open_ids_nfc
             violations.append("%s.line must be an integer >= 1 (got %r)" % (where, line))
 
 
+def expected_verdict(findings):
+    """The verdict a receipt's findings set: (verdict, setting finding id or None).
+
+    `review-blocked` when any finding is CRITICAL, else `review-gated` when any is MAJOR, else
+    `review-clear`. The setting finding is the first one at the highest severity. Findings are
+    {id, severity} pairs over every lens of the receipt; the validator, `derived_verdict` and
+    the drift check at commit-check all take their verdict from this one function.
+    """
+    for severity, verdict in (("CRITICAL", "review-blocked"), ("MAJOR", "review-gated")):
+        for fid, found in findings:
+            if found == severity:
+                return verdict, fid
+    return "review-clear", None
+
+
+def _finding_name(fid):
+    """How a violation names a finding: the capped %r of its id, never its claim text."""
+    if isinstance(fid, str) and fid:
+        return repr(fid[:ID_NAME_CAP])
+    return "a finding without a valid id"
+
+
+def _check_verdict(data, entries, is_fragment, violations):
+    """The written verdict must equal the one the findings set; a fragment may omit it."""
+    verdict = data.get("verdict")
+    if verdict is None and is_fragment:
+        return
+    if verdict not in VERDICTS:
+        violations.append("verdict must be one of %s (got %r)" % (list(VERDICTS), verdict))
+        return
+    expected, setter = expected_verdict(entries)
+    if verdict == expected:
+        return
+    name = _finding_name(setter)
+    if expected == "review-blocked":
+        reason = "%s is CRITICAL" % name
+    elif expected == "review-gated":
+        reason = "%s is MAJOR and no CRITICAL finding exists in any lens of the receipt" % name
+    else:
+        reason = "no MAJOR or CRITICAL finding exists in any lens of the receipt"
+    violations.append("verdict must be %r -- %s" % (expected, reason))
+
+
 def validate_receipt(data, project_root):
     """Return (violations, infos) for an already-parsed receipt object."""
     violations = []
@@ -248,40 +288,16 @@ def validate_receipt(data, project_root):
     elif not correctness_valid:
         violations.append('lenses.correctness is required unless the top-level kind: "security-fragment" is declared')
 
-    correctness_ids, critical_correctness = (
-        _check_lens("correctness", lenses, project_root, violations, degenerate_root)
-        if correctness_valid else ([], False)
-    )
-    security_ids, critical_security = (
-        _check_lens("security", lenses, project_root, violations, degenerate_root)
-        if security_valid else ([], False)
-    )
-    _check_duplicate_ids(correctness_ids + security_ids, violations)
-    open_ids_nfc = {unicodedata.normalize("NFC", fid) for fid in correctness_ids + security_ids if isinstance(fid, str)}
+    entries = []
+    for lens_name, valid in (("correctness", correctness_valid), ("security", security_valid)):
+        if valid:
+            entries += _check_lens(lens_name, lenses, project_root, violations, degenerate_root)
+    ids = [fid for fid, _ in entries if fid]
+    _check_duplicate_ids(ids, violations)
+    open_ids_nfc = {unicodedata.normalize("NFC", fid) for fid in ids}
     _check_closed(data, project_root, violations, degenerate_root, open_ids_nfc)
 
-    verdict = data.get("verdict")
-    if is_fragment:
-        if verdict is not None:
-            if verdict not in VERDICTS:
-                violations.append("verdict, when present on a security fragment, must be one of %s (got %r)" % (list(VERDICTS), verdict))
-            elif critical_security and verdict != "review-blocked":
-                violations.append("verdict must be 'review-blocked' -- this security fragment has a CRITICAL finding")
-            elif not critical_security and verdict == "review-blocked":
-                violations.append("verdict must not be 'review-blocked' -- this security fragment has no CRITICAL finding")
-    else:
-        if verdict not in VERDICTS:
-            violations.append("verdict must be one of %s (got %r)" % (list(VERDICTS), verdict))
-        elif critical_correctness:
-            if verdict != "review-blocked":
-                violations.append("verdict must be 'review-blocked' -- lenses.correctness has a CRITICAL finding")
-        elif verdict != "review-clear":
-            violations.append("verdict must be 'review-clear' -- no CRITICAL finding in lenses.correctness")
-        if critical_security and not critical_correctness:
-            infos.append(
-                "CRITICAL finding(s) present only in lenses.security -- this verdict reflects "
-                "lenses.correctness alone; the machine combines tier-2 verdicts at commit-check"
-            )
+    _check_verdict(data, entries, is_fragment, violations)
 
     verification = data.get("verification")
     if is_fragment:
@@ -364,11 +380,8 @@ def closed_of(data):
 
 
 def derived_verdict(data):
-    """A full receipt's own verdict; a fragment's is derived from its CRITICAL findings."""
-    if data.get("kind") == "security-fragment":
-        critical = any(f["severity"] == "CRITICAL" for f in findings_of(data))
-        return "review-blocked" if critical else "review-clear"
-    return data.get("verdict")
+    """The verdict a validated receipt's findings set, for every receipt kind."""
+    return expected_verdict([(f["id"], f["severity"]) for f in findings_of(data)])[0]
 
 
 def validate_report(path, project_root):
