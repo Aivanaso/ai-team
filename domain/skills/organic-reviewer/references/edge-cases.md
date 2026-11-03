@@ -22,9 +22,9 @@ implementer did not need to touch). The gate must not block on a clean slate.
 `confidence: low`.
 
 **Behavior:** Record every one of them — coverage never filters by confidence (Hard Rules).
-The verdict follows the standard iff unchanged: `review-blocked` if any of them is CRITICAL,
-`review-clear` otherwise, regardless of confidence. Note in executive summary: "All {N}
-findings reported at low confidence — none suppressed; verdict follows the standard iff."
+The verdict follows the highest-severity rule unchanged: `review-blocked` if any of them is CRITICAL,
+`review-gated` if the highest is MAJOR, `review-clear` otherwise, regardless of confidence. Note in executive summary: "All {N}
+findings reported at low confidence — none suppressed; verdict follows the highest-severity rule."
 Nothing is hidden from the orchestrator: low confidence is visible per-finding for its own
 triage.
 
@@ -82,8 +82,8 @@ fail`, `gate: "<name>"`) — objective evidence, never suppressed. Also record a
 `.ai-team/config.yaml` — the same container and citation shape as the blocking case (Decision
 Gates), just a lower severity. This finding alone never sets `verdict: review-blocked`
 (Decision Gates: verdict is `review-blocked` iff ≥ 1 CRITICAL finding exists). When no CRITICAL
-finding exists elsewhere in the run, the verdict stays `review-clear`; the failure is
-documented, not blocking.
+finding exists elsewhere in the run, the verdict is `review-gated`: the MAJOR is documented and
+still needs a ruling or a deferral before the commit.
 
 ## Verification Discrepancy
 
@@ -113,7 +113,7 @@ empty list.
 
 **Behavior:** Return `status: blocked`, `failure_class: review`, naming the unreachable path or
 the missing field. Do NOT fall back to a bounded pass with an empty closure list — a `verdict:
-review-clear` derived from no prior evidence at all is worse than blocking (Decision Gates). An
+review-clear` (or `review-gated`) derived from no prior evidence at all is worse than blocking (Decision Gates). An
 empty `findings_to_verify` list is invalid input, not "nothing to verify".
 
 ## Delta Scope Exceeded By The Actual Diff
@@ -124,7 +124,7 @@ section (Execution Step 2).
 
 **Behavior:** Do NOT silently review the wider diff. Record a CRITICAL correctness finding
 citing the out-of-scope path, `claim`: "delta scope exceeded — full pass required" — the
-standard `verdict` iff (`SKILL.md` → Hard Rules) then resolves to `review-blocked` with no
+standard `verdict` rule (`SKILL.md` → Hard Rules) then resolves to `review-blocked` with no
 special case. This CRITICAL finding is itself the "Delta Pass Files a CRITICAL" case below — the
 orchestrator routes it to a full re-review on the whole candidate, never a further chained delta
 pass.

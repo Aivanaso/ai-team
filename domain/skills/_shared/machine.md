@@ -98,7 +98,7 @@ Every phase of the design must appear. A phase absent from the report fails `pla
 - not run: `{"executed": false, "target": "file:line", "reason": "…"}` and no `expect` -- `plan generate` moves it to the phase's `open_questions`.
 `expect` is always `exit N`. A digest that is a zero-work output (`No tests found`, `0 files analyzed`, `Tests: 0 total`) is refused. A phase whose design has checks and whose scope entry calibrates none and questions nothing fails `plan generate`. Checks the machine runs itself add `"tree": "<short HEAD>[+dirty]"`.
 
-**Review report** (reviewer, security code-audit): a Markdown report whose final fenced ```json block is the Review Receipt (`result-envelope.md` → Review Receipt).
+**Review report** (reviewer, security code-audit): a Markdown report whose final fenced ```json block is the Review Receipt (`result-envelope.md` → Review Receipt). Its `verdict` is three-valued -- `review-blocked` when a finding of any lens is CRITICAL, `review-gated` when the highest is MAJOR, `review-clear` otherwise -- and the machine stores the verdict derived from the findings at `settle`, for a full receipt and a security fragment alike; a written verdict that differs from the findings is a VIOLATION naming the expected value and the finding that sets it. `commit-check` and `close` decide from findings and dispositions, never from the stored verdict. A full receipt settled before this rule that reads a MAJOR with `review-clear` no longer validates: `commit-check` refuses it ("no longer validates") and the next step is `ai-team acquire implementer --phase <n>`, then review again on the next attempt.
 
 ## Engram mirror
 

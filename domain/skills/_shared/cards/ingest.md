@@ -35,4 +35,5 @@ verify the tree with `git status`, then relaunch the same prompt.
 3. Two or three options at most, each with a cost, one recommendation stated as such.
 4. The complete record stays in the reports and the task JSON; the message summarises.
 
-A worker's vocabulary (`review-blocked`, `evidence: executed`) is translated into plain words.
+A worker's vocabulary (`review-blocked`, `evidence: executed`) is translated into plain words:
+`review-gated` is "no blocker; a MAJOR still needs a ruling or a deferral".

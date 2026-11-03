@@ -40,9 +40,9 @@ ticket open — relaunch the lens with the printed lines.
 
 ## 3. Verdict
 
-- `review-clear` (no CRITICAL) → card: commit, where `commit-check` still names every
-  undispositioned MAJOR the receipt carries — `review-clear` is the verdict, not a disposition.
-- `review-blocked` → next attempt with the findings (card: delegate). Attempts 2–4 resume the
+- `review-clear` (nothing above MINOR) or `review-gated` (highest MAJOR) → card: commit, where
+  `commit-check` names every undispositioned MAJOR the receipt carries — a verdict is not a disposition.
+- `review-blocked` (any CRITICAL) → next attempt with the findings (card: delegate). Attempts 2–4 resume the
   same implementer; findings that hold steady between attempts mean the fix class is
   wrong: the next step is the design (the machine denies a 7th attempt anyway).
 - A finding that needs a new design decision before the next attempt: `ai-team design amend --phase <n> --reason "<why>" --decision "<text>"` (the design stays approved, the implementer gets the constraint), then the next attempt.

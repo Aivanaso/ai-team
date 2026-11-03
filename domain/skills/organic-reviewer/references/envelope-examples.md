@@ -29,11 +29,11 @@ model_used: "opus"
 context_resolution: self-loaded
 ```
 
-## Variant 2: review-clear, MAJOR/MINOR findings only
+## Variant 2: review-gated, MAJOR/MINOR findings only
 
 ```yaml
 status: ok
-executive_summary: "Review complete for session-refresh. 2 MAJOR findings (no CRITICAL), 1 MINOR at low confidence also reported. Gate does not block; findings are informational."
+executive_summary: "Review complete for session-refresh. 2 MAJOR findings (no CRITICAL), 1 MINOR at low confidence also reported. No CRITICAL, so the verdict is review-gated: each MAJOR needs a ruling or a deferral before the commit."
 group_id: session-refresh
 artifacts: []
 tier: 1
@@ -48,7 +48,7 @@ lenses:
 verification:
   - { command: "<test suite>", exit_code: 0, outcome: pass }
 overrides: []
-verdict: review-clear
+verdict: review-gated
 next_recommended:
   - "orchestrator: commit creation"
 risks: []
@@ -149,7 +149,7 @@ artifacts: []
 lenses: {}
 verification: []
 overrides: []
-verdict: null                   # never review-clear/review-blocked here — no review ran, so no verdict was computed
+verdict: null                   # never review-clear, review-gated or review-blocked here — no review ran, so no verdict was computed
 next_recommended: []
 risks:
   - "group_files: missing from injected context"

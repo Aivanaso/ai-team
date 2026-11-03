@@ -99,7 +99,7 @@ commit_strategy: auto  # orchestrator's own commit-creation step: auto = commits
 #   `confidence`; the orchestrator's downstream triage is the filter, never a suppression rule
 #   at the lens (see `_shared/result-envelope.md` → Review Receipt). A failing blocking gate
 #   (blocking: true, or blocking absent) is a CRITICAL finding (verdict: review-blocked);
-#   blocking: false is a MAJOR finding that documents but does not block. An unrunnable gate is
+#   blocking: false is a MAJOR finding (verdict: review-gated) that needs a ruling or a deferral. An unrunnable gate is
 #   omitted from `verification` and noted in `risks` — never fabricated pass/fail. Calibration
 #   (`_shared/evidence-protocol.md` -> Rule 7): whoever hand-adds a gate here first runs it
 #   against a known-failing state (or a synthetic fixture) to confirm it CAN fail, and runs it

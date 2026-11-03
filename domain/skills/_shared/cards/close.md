@@ -26,7 +26,7 @@ instrument that tells whether fewer rules worked better; every figure reaches th
 | Value | Action |
 |---|---|
 | `always` | `ai-team acquire retro`, then delegate `organic-retro` (sonnet · medium) |
-| `on-signal` (default) | only when the task had ≥2 attempts on a phase, an `infra-death`, a `review-blocked`, or one ticket above 300k tokens |
+| `on-signal` (default) | only when the task had ≥2 attempts on a phase, an `infra-death`, a `review-blocked` (a CRITICAL; `review-gated` does not count), or one ticket above 300k tokens |
 | `off` | none |
 
 Inject: `task_json` (`.ai-team/tasks/<task>.json`), `design`, `plan`, every report path the

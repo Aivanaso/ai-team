@@ -29,8 +29,8 @@ the changed files for new inconsistencies, and the checks; the prior pass's clea
 - Read the FULL content of every file in `group_files`; `git -C {project_root} diff HEAD -- <group_files>` is a pointer to what changed; the scope is `group_files` (the diff misses untracked files).
 - Every finding cites `file:line` (Rule 1); an uncited candidate is dropped and its topic named in `risks`.
 - Report every finding, uncertain or minor included, each with `confidence`, `severity`, `evidence: executed | read` and, when `read` and MAJOR/CRITICAL, a `trigger`. A `read` finding without a trigger is emitted MINOR at most; severity follows the evidence, and confidence travels beside it. -- because coverage is the contract; the orchestrator's triage is the filter.
-- Security findings belong to `organic-security`'s report. At tier 2 the machine combines both reports at commit-check.
-- Verdict: `review-blocked` iff ≥ 1 CRITICAL in this receipt's `lenses.correctness`; else `review-clear`.
+- Security findings belong to `organic-security`'s report. At tier 2 each lens's report carries the verdict its own findings set, and `commit-check` reads the findings of both.
+- Verdict: the highest severity among this receipt's findings — `review-blocked` when ≥ 1 CRITICAL, `review-gated` when the highest is MAJOR, `review-clear` otherwise. The validator refuses a verdict that differs.
 - A `decisions_taken` entry contradicting a constraint is a MAJOR `read` finding whose trigger cites both texts; a behavioral decision visible in the diff that `decisions_taken` does not declare is a MINOR (MAJOR when it contradicts a constraint).
 - TDD evidence audit when `strict_tdd` is injected: a cycle naming an absent test, a zero-work or reason-less red digest, an uncovered behavior, or a missing `tdd_cycles`/`tdd_not_applicable` is a MAJOR `read` finding with the cycle as trigger; the OPTIONAL mutation probe (break the covered change in place, re-run the test, restore the file and confirm the restore with `cmp` or a hash; still green → CRITICAL `executed`) stays optional and stays inside the pass. You run alone on this tree, and the machine compares it at settle with the tree the implementer left (`_shared/common-rules.md` → Mutation probe).
 - Receipt self-validation, every pass: `skills/_shared/scripts/ai-team receipt check {report_destination} .` before returning; fix every printed VIOLATION; record command, exit code and fixes in `## Receipt Self-Validation`.
@@ -53,7 +53,8 @@ the changed files for new inconsistencies, and the checks; the prior pass's clea
 | A declared check cannot run at all (missing tool) | omit it from `verification`, note in `risks`; if every check is unrunnable, `verification_omitted_reason` says so. |
 | A check ran and returned a zero-work result | `verification` row with `outcome: fail`; the nature in `risks`. |
 | ≥ 1 CRITICAL finding | `verdict: review-blocked`. |
-| 0 CRITICAL | `verdict: review-clear`. |
+| 0 CRITICAL, ≥ 1 MAJOR | `verdict: review-gated`. |
+| no finding above MINOR | `verdict: review-clear`. |
 
 ## Execution Steps
 
@@ -62,7 +63,7 @@ the changed files for new inconsistencies, and the checks; the prior pass's clea
 3. Read the design (`## Decisions`, `## Security`, `## Out of scope`) and the phase file (objective, constraints, scenarios, expected files). Resolve `group_files`; read each file in full; `git diff HEAD -- <group_files>` as a pointer; up to 10 1-hop callers.
 4. Conformity lens: decision by decision, scenario by scenario, file by file (declared vs touched). Then the five correctness lenses on the full contents in scope. `decisions_taken` and `tdd_cycles` are the first surfaces read — the candidate's own declared judgment calls.
 5. Verification: every acceptance check verbatim, every `review_gates` entry, the uncovered build/lint commands. Compare with the claimed `check_results`.
-6. Compute the verdict. Compose the receipt: `tier`, `tier_reason`, `verdict`, `lenses.correctness`, `verification`; DELTA MODE adds `verdict_history` (the injected chain plus exactly one entry — this pass), `not_reverified`, and `closed` (every prior MAJOR/CRITICAL this pass verified closed, with a citation; a prior MAJOR/CRITICAL neither closed nor re-listed under `findings` fails `settle`'s reconciliation).
+6. Compute the verdict from the highest finding severity. Compose the receipt: `tier`, `tier_reason`, `verdict`, `lenses.correctness`, `verification`; DELTA MODE adds `verdict_history` (the injected chain plus exactly one entry — this pass), `not_reverified`, and `closed` (every prior MAJOR/CRITICAL this pass verified closed, with a citation; a prior MAJOR/CRITICAL neither closed nor re-listed under `findings` fails `settle`'s reconciliation).
 7. Write the report at `report_destination` per [references/report-format.md](references/report-format.md) (Delta Report Variant in DELTA MODE): Conformity · Findings · Verification · Receipt Self-Validation · `## Receipt` with the single ```json block. Run `skills/_shared/scripts/ai-team receipt check {report_destination} .`; fix and re-run until exit 0.
 8. Return the envelope.
 
@@ -72,13 +73,13 @@ One report at `report_destination` whose final ```json block is the receipt
 (`_shared/result-envelope.md` → Review Receipt). Returns:
 
 ```yaml
-status: ok | blocked            # blocked = missing context; a review-blocked verdict returns status ok
+status: ok | blocked            # blocked = missing context; a review-blocked or review-gated verdict returns status ok
 failure_class: null | review
 executive_summary: "..."
 artifacts: [{ name: "report", path: "<report_destination>" }]
 tier: 1 | 2
 tier_reason: "<one line>"
-verdict: review-clear | review-blocked
+verdict: review-clear | review-gated | review-blocked
 conformity: { decisions_checked: 0, decisions_met: 0, scenarios_checked: 0, scenarios_met: 0 }
 findings_count: { CRITICAL: 0, MAJOR: 0, MINOR: 0 }
 # verdict_history / not_reverified / closed — DELTA MODE only, omit otherwise
@@ -94,7 +95,7 @@ with `--report`; the envelope carries the counts.
 ## References
 
 - [references/report-format.md](references/report-format.md) — the report template and the Delta Report Variant; load at Step 7.
-- [references/envelope-examples.md](references/envelope-examples.md) — review-clear / review-blocked / blocked / delta envelopes.
+- [references/envelope-examples.md](references/envelope-examples.md) — review-clear, review-gated and review-blocked, blocked and delta envelopes.
 - [references/edge-cases.md](references/edge-cases.md) — no changes, unrunnable checks, discrepancy, unreadable prior report, delta scope exceeded, delta files a CRITICAL.
 - `../_shared/result-envelope.md` — Review Receipt schema; load at Step 6.
 - `../_shared/machine.md` — what the phase file carries; how the machine consumes your report.

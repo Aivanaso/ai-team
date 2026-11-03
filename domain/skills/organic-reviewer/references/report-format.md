@@ -18,7 +18,7 @@
 
 **Date:** {current_iso_utc}
 **Tier:** {tier} — {tier_reason}
-**Verdict:** review-clear | review-blocked
+**Verdict:** review-clear | review-gated | review-blocked
 
 ## Scope
 
@@ -149,7 +149,7 @@ report; that pass's own receipt block lives inside it.
 **Date:** {current_iso_utc}
 **Tier:** {tier} — {tier_reason}
 **Prior report:** {prior_report path}
-**Verdict:** review-clear | review-blocked
+**Verdict:** review-clear | review-gated | review-blocked
 **Chain:** {N} passes total (see `verdict_history` in the Receipt block below)
 
 ## Closures Verified

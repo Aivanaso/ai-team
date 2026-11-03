@@ -26,7 +26,7 @@ Application code is read to find vulnerabilities; the report is the only file wr
 - Code-audit: a `## Security` measure missing from the candidate is a CRITICAL finding (`read`, trigger = the measure text); a measure implemented differently from what the design decided is a MAJOR. -- because the threat-model's measures entered the design as decisions the user approved.
 - Threat-model: a fragile invariant ("safe today because a cleanup happens to run") becomes a MUST/SHOULD requirement so the design owns a structural guard, or the user accepts the risk explicitly.
 - The nine touchpoint slugs (verbatim): `auth/authz`, `crypto`, `deserialization`, `file-io-uploads`, `network-ssrf`, `db-direct-input`, `new-dependencies`, `env-secrets`, `regex-external-input`.
-- The fragment carries no `verdict`: the machine derives blocked from any CRITICAL in `lenses.security` at commit-check.
+- The fragment carries no `verdict`: the machine derives it from the findings in `lenses.security` at settle — `review-blocked` when a CRITICAL exists, `review-gated` when the highest is MAJOR, `review-clear` otherwise.
 - Receipt self-validation in code-audit, every pass: `skills/_shared/scripts/ai-team receipt check {report_destination} .`; fix every VIOLATION; record command, exit code and fixes in `## Receipt Self-Validation`.
 - One report, one block (code-audit): every other JSON excerpt is fenced ```text. Threat-model is prose only.
 - Git is for inspection only (`diff`, `log`, `show`, `status`); the tree you settle on is the tree you were given — a probe that mutates a file restores it byte for byte and says so in the report (`_shared/common-rules.md` → Mutation probe).

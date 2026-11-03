@@ -115,7 +115,7 @@ unreadable report, or a top-level value that is not an object, is exit 2.
 kind: security-fragment  # OPTIONAL — omit for a full reviewer receipt; present ONLY on organic-security's code-audit fragment
 tier: 0 | 1 | 2
 tier_reason: "<one line, mandatory>"
-verdict: review-clear | review-blocked   # full receipt only; a fragment carries none (the machine derives blocked from any CRITICAL)
+verdict: review-clear | review-gated | review-blocked   # the highest severity among the findings of every lens; a fragment may omit it (the machine derives it)
 lenses:
   correctness:             # full receipt: REQUIRED; fragment: FORBIDDEN
     status: pass | findings
@@ -128,7 +128,7 @@ verification:
   - { command: "<verbatim>", exit_code: 0, outcome: pass | fail, gate: "<name>" }  # gate: only for review_gates entries
 verification_omitted_reason: "<one line>"   # ONLY when verification is [] on a full receipt; absent otherwise
 verdict_history:           # attempts ≥ 2 (delta pass) only — the injected chain plus exactly one new entry, oldest first
-  - { pass: full | delta, report: "<path>", verdict: review-clear | review-blocked, note: "<one line>" }
+  - { pass: full | delta, report: "<path>", verdict: review-clear | review-gated | review-blocked, note: "<one line>" }
 not_reverified:            # delta pass only — what the prior pass covered and this one did not re-check, and why
   - "<one line>"
 closed:                    # delta pass only — the prior findings this pass verified closed, each with a citation
@@ -137,8 +137,8 @@ closed:                    # delta pass only — the prior findings this pass ve
 
 **Rules:**
 - `kind` absent or `null` = full receipt; `"security-fragment"` = fragment; any other value is a VIOLATION.
-- A full receipt REQUIRES `lenses.correctness` and `verdict`; a fragment REQUIRES `lenses.security`, forbids `lenses.correctness` and carries no `verdict` (if one is present it must be coherent with its CRITICALs).
-- `verdict` is `review-blocked` iff ≥ 1 CRITICAL in `lenses.correctness`, at ANY confidence; `review-clear` otherwise. The machine combines the two reports at tier 2. `commit-check` reads every validated receipt's findings regardless of verdict: a CRITICAL blocks the commit until the orchestrator records a ruling for it (`ai-team ruling`); a MAJOR blocks until it is ruled or deferred (`ai-team settle --defer`) — `--defer` on a CRITICAL id is refused, naming `ai-team ruling`. A ruling or deferral satisfies a later finding of the same id only when `file` matches (NFC-normalized) and the later severity is not higher; otherwise the later finding is new and undispositioned.
+- A full receipt REQUIRES `lenses.correctness` and `verdict`; a fragment REQUIRES `lenses.security`, forbids `lenses.correctness` and may omit `verdict` (if one is present it must equal the verdict its findings set).
+- `verdict` names the highest severity among the findings of every lens the receipt carries, at ANY confidence: `review-blocked` when a CRITICAL exists, `review-gated` when the highest is MAJOR, `review-clear` otherwise. A written verdict that differs is refused, the error naming the expected value and the finding that sets it; `settle` stores the verdict derived from the findings, never the lens's own string. `commit-check` reads every validated receipt's findings and never the verdict (`review-gated` gates nothing by itself): a CRITICAL blocks the commit until the orchestrator records a ruling for it (`ai-team ruling`); a MAJOR blocks until it is ruled or deferred (`ai-team settle --defer`) — `--defer` on a CRITICAL id is refused, naming `ai-team ruling`. A ruling or deferral satisfies a later finding of the same id only when `file` matches (NFC-normalized) and the later severity is not higher; otherwise the later finding is new and undispositioned.
 - Every finding carries `confidence` and `evidence`; a `read` finding without a `trigger` is emitted MINOR at most; severity follows the evidence, and confidence travels beside it. Coverage is the contract: every finding is reported; the orchestrator's triage is the filter.
 - Every `claim` resolves to a `file:line` inside `project_root`; an absolute path, a traversal, a symlink escape or a missing file is a VIOLATION.
 - `verification[]` is non-empty on a full receipt, or empty with `verification_omitted_reason` naming one of the two contract cases ("no candidate changes to review" · "every declared check unrunnable in this environment"). A `gate:` row is a `review_gates` outcome; a failing blocking gate is a CRITICAL finding citing the gate's declaration in `.ai-team/config.yaml`.
