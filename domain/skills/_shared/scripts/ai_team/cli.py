@@ -23,6 +23,7 @@ from ai_team.plan import (  # noqa: E402
 )
 from ai_team.receipt import validate_report  # noqa: E402
 from ai_team.store import AI_TEAM_DIR, MachineError, Store, find_root  # noqa: E402
+from ai_team.summary import summarize  # noqa: E402
 
 
 def _root(args):
@@ -377,6 +378,13 @@ def cmd_receipt_check(args):
     return code
 
 
+def cmd_summary(args):
+    if args.last is not None and args.last < 1:
+        raise MachineError("--last must be a positive number of tasks (got %d) -- pass `--last 3` or leave it out" % args.last, 2)
+    print("\n".join(summarize(Store(_root(args)).list_tasks(), args.last)))
+    return 0
+
+
 def cmd_hook(args):
     return hook.main(args.event)
 
@@ -496,6 +504,10 @@ def build_parser():
     p.add_argument("file")
     p.add_argument("project_root", nargs="?", default=".")
     p.set_defaults(func=cmd_receipt_check)
+
+    p = sub.add_parser("summary", help="what the project's recorded tasks add up to (read-only)")
+    p.add_argument("--last", type=int, help="only the N most recent tasks")
+    p.set_defaults(func=cmd_summary)
 
     p = sub.add_parser("hook", help="Claude Code hook entry point (JSON on stdin)")
     p.add_argument("event", choices=("pre-tool-use", "session-start"))
