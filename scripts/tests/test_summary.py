@@ -1,6 +1,6 @@
 """`ai-team summary [--last N]`: what the recorded tasks of a project add up to. The verb reads
 the task JSONs and prints; a figure the JSON does not hold is shown as `not recorded`, never
-added as zero, and the tokens of a resumed implementer stay out of every mean and total."""
+added as zero, and the tokens and duration of a resumed implementer stay out of every mean and total."""
 
 import json
 import os
@@ -130,9 +130,9 @@ class SummaryOfAResumedImplementer(SummaryCase):
     def setUp(self):
         super().setUp()
         self.record(task_json("2026-11-01-resumed", tickets=[
-            ticket("t1", "implementer", outcome="blocked", phase=1, attempt=1, tokens=1000),
-            ticket("t2", "implementer", outcome="blocked", phase=1, attempt=2, tokens=7777),
-            ticket("t3", "implementer", outcome="ok", phase=1, attempt=3, tokens=9999),
+            ticket("t1", "implementer", outcome="blocked", phase=1, attempt=1, tokens=1000, duration_s=100),
+            ticket("t2", "implementer", outcome="blocked", phase=1, attempt=2, tokens=7777, duration_s=6543),
+            ticket("t3", "implementer", outcome="ok", phase=1, attempt=3, tokens=9999, duration_s=8765),
             ticket("t4", "reviewer", phase=1, attempt=3, tokens=400),
         ], phases=[phase(1, 3)]))
         self.out = self.summary()
@@ -144,11 +144,18 @@ class SummaryOfAResumedImplementer(SummaryCase):
         self.assertNotIn("7777", implementer)
         self.assertNotIn("9999", implementer)
 
-    def test_resumed_tokens_are_counted_apart_and_labelled_cumulative(self):
+    def test_resumed_durations_stay_out_of_the_mean_and_the_total_of_the_kind(self):
+        implementer = self.line_of(self.out, "implementer")
+        self.assertIn("mean 100s", implementer)
+        self.assertIn("total 100s", implementer)
+        self.assertNotIn("6543", implementer)
+        self.assertNotIn("8765", implementer)
+
+    def test_resumed_tokens_and_durations_are_listed_apart_and_labelled_cumulative(self):
         resumed = self.line_of(self.out, "resumed implementer")
         self.assertIn("cumulative", resumed)
-        self.assertIn("7777", resumed)
-        self.assertIn("9999", resumed)
+        for figure in ("7777", "9999", "6543s", "8765s"):
+            self.assertIn(figure, resumed)
 
     def test_the_resumed_tickets_still_count_as_settled_tickets_with_their_outcome(self):
         implementer = self.line_of(self.out, "implementer")
@@ -156,7 +163,7 @@ class SummaryOfAResumedImplementer(SummaryCase):
         self.assertIn("blocked 2", implementer)
 
     def test_no_figure_adds_resumed_tokens_to_the_others(self):
-        for added in ("17776", "18776", "8888", "9259"):
+        for added in ("17776", "18776", "8888", "9259", "15408", "15308", "7654", "5136"):
             self.assertNotIn(added, self.out)
 
     def test_a_fresh_attempt_after_the_resumed_ones_is_a_fresh_ticket(self):
@@ -199,6 +206,15 @@ class SummaryOfMissingFigures(SummaryCase):
         ]))
         resumed = self.line_of(self.summary(), "resumed implementer")
         self.assertIn("not recorded", resumed)
+
+    def test_a_resumed_ticket_without_duration_is_listed_as_not_recorded(self):
+        self.record(task_json("2026-11-01-resumed-no-duration", tickets=[
+            ticket("t1", "implementer", phase=1, attempt=1, duration_s=100),
+            ticket("t2", "implementer", phase=1, attempt=2, tokens=800, duration_s=None),
+        ]))
+        resumed = self.line_of(self.summary(), "resumed implementer")
+        self.assertIn("duration not recorded", resumed)
+        self.assertIn("tokens 800", resumed)
 
     def test_a_phase_without_its_attempts_figure_shows_not_recorded(self):
         broken = phase(1, 1)

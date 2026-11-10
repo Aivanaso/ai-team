@@ -1,8 +1,8 @@
 """`ai-team summary`: what the recorded tasks of a project add up to. Reads the task JSONs and
 returns text; it writes nothing. A figure the JSON does not hold (a null, an absent key) is
-`not recorded` and never adds as zero; the tokens of a resumed implementer (attempts 2-4) are
-cumulative over the attempts before them, so they are listed apart and stay out of every mean
-and total (machine.md, Verbs)."""
+`not recorded` and never adds as zero; the tokens and the duration of a resumed implementer
+(attempts 2-4) are cumulative over the attempts before them, so they are listed apart and stay
+out of every mean and total (machine.md, Verbs)."""
 
 from ai_team.machine import OUTCOMES, RESUME_ATTEMPTS, TICKET_KINDS
 
@@ -47,22 +47,31 @@ def _describe_outcomes(tickets):
     return ", ".join("%s %d" % (o, counts[o]) for o in known + extra)
 
 
+def _figure_or_not_recorded(ticket, key, unit=""):
+    value = ticket.get(key)
+    return NOT_RECORDED if value is None else "%d%s" % (value, unit)
+
+
+def _describe_resumed(ticket):
+    return "tokens %s, duration %s" % (
+        _figure_or_not_recorded(ticket, "tokens"), _figure_or_not_recorded(ticket, "duration_s", "s"))
+
+
 def _kind_lines(tickets):
     lines = []
     for kind in TICKET_KINDS:
         of_kind = [t for t in tickets if t["kind"] == kind]
         if not of_kind:
             continue
-        counted_for_tokens = [t for t in of_kind if not _is_resumed_implementer(t)]
+        fresh = [t for t in of_kind if not _is_resumed_implementer(t)]
         lines.append("%-24s %4d  %s | duration: %s | tokens: %s" % (
             kind, len(of_kind), _describe_outcomes(of_kind),
-            _describe_figures(_figures_of(of_kind, "duration_s"), len(of_kind), "s"),
-            _describe_figures(_figures_of(counted_for_tokens, "tokens"), len(counted_for_tokens))))
+            _describe_figures(_figures_of(fresh, "duration_s"), len(fresh), "s"),
+            _describe_figures(_figures_of(fresh, "tokens"), len(fresh))))
     resumed = [t for t in tickets if _is_resumed_implementer(t)]
     if resumed:
-        figures = ", ".join(str(t["tokens"]) if t.get("tokens") is not None else NOT_RECORDED for t in resumed)
-        lines.append("resumed implementer      %s, tokens cumulative per ticket, outside every mean and total above: %s"
-                     % (_plural(len(resumed), "ticket"), figures))
+        lines.append("resumed implementer      %s, tokens and duration cumulative per ticket, outside every mean and total above: %s"
+                     % (_plural(len(resumed), "ticket"), "; ".join(_describe_resumed(t) for t in resumed)))
     return lines
 
 
