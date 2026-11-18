@@ -15,7 +15,7 @@ change needs a 4th file to understand, it was large: say so and switch.
 
 ## Bounded change
 
-1. Read the 1–3 files yourself. Ask the questions that matter, one message.
+1. Read the 1–3 files yourself. Ask the user the questions one at a time: the most blocking one, with your recommendation; the next comes after the answer, optionally with one line saying how many remain.
 2. Write the four lines in chat, in the user's language:
    **objective** (the observable result) · **decisions** (invariants in plain words, each with
    how it is demonstrated) · **check** (a runnable command) · **out of scope**. A decision that

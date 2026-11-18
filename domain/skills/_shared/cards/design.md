@@ -13,7 +13,7 @@ external conditions the replaced logic gates on, and open questions — every cl
 Report: `.ai-team/explorations/<task>-map[-<zone>].md`. Model sonnet, effort medium.
 Settle each ticket with the harness figures (card: ingest).
 
-Open questions → questions to the user. Gotchas and conditions → surfaces the design names.
+Open questions → the user, one at a time (most blocking first, with a recommendation). Gotchas and conditions → surfaces the design names.
 
 ## 2. Brainstorm, then write the file
 

@@ -23,7 +23,7 @@ verify the tree with `git status`, then relaunch the same prompt.
 | Outcome | Next |
 |---|---|
 | `ok` / `warning` (checks failed but pre-existing, evidence cited) | card: review |
-| `needs_input` | the questions to the user, in their language; then the next attempt with the answers |
+| `needs_input` | the questions to the user one at a time, most blocking first with a recommendation, in their language; then the next attempt with the answers |
 | `blocked` + `scope_report` | a plan defect: `ai-team plan amend --phase n --reason …` (card: plan), then the next attempt |
 | `failed` | read the cause; next attempt with it named; two in a row → tell the user |
 | scout / security report | settle with `--report`; the machine records it |
