@@ -47,7 +47,7 @@ class BoundedFlow(ProjectCase):
         self.ai("acquire", "implementer")
         self.assertEqual(self.task()["phases"][0]["attempts"], 1)
         self.ai("acquire", "implementer", expect=1)  # open ticket
-        # figures are mandatory
+        # the model is mandatory; the figures come as a set of three or not at all
         _, _, err = self.ai("settle", "t1", "--outcome", "ok", expect=2)
         self.assertIn("--model", err)
         self.ai("settle", "t1", "--outcome", "ok", "--model", "sonnet", "--tokens", "10", "--tool-uses", "2", "--duration", "5")
@@ -82,6 +82,132 @@ class BoundedFlow(ProjectCase):
         self.ai("pause")
         self.ai("resume", expect=1)  # two paused: say which
         self.ai("resume", self.task()["task"])
+
+
+class Figures(ProjectCase):
+    """The harness figures (tokens, tool uses, duration) come with `settle` or later with `figures`;
+    a ticket without them stores null, never zero, and `close` lists it."""
+
+    def setUp(self):
+        super().setUp()
+        self.ai("new", "demo", "--kind", "bounded")
+        self.ai("plan", "generate", "--objective", "x", "--check", "true", "--failure", "never red: a no-op", "--file", "README.md")
+        self.ai("acquire", "implementer")
+
+    def _settle_without_figures(self):
+        self.ai("settle", "t1", "--outcome", "ok", "--model", "sonnet")
+
+    def _commit_phase(self):
+        self.ai("tier", "0", "--phase", "1", "--reason", "docs only")
+        self.ai("phase", "done", "1", "--commit", self.head)
+
+    def test_settle_without_figures_stores_null_for_the_three(self):
+        self._settle_without_figures()
+        ticket = self.ticket_by_id("t1")
+        self.assertEqual(ticket["outcome"], "ok")
+        self.assertEqual((ticket["tokens"], ticket["tool_uses"], ticket["duration_s"]), (None, None, None))
+
+    def test_settle_with_a_partial_set_names_the_missing_flags_and_leaves_the_ticket_open(self):
+        _, _, err = self.ai("settle", "t1", "--outcome", "ok", "--model", "sonnet", "--tokens", "10", expect=2)
+        self.assertIn("--tool-uses", err)
+        self.assertIn("--duration", err)
+        self.assertNotIn("missing --tokens", err)
+        self.assertIsNone(self.ticket_by_id("t1")["settled_at"])
+
+    def test_settle_still_requires_the_model_unless_the_ticket_died(self):
+        _, _, err = self.ai("settle", "t1", "--outcome", "ok", "--tokens", "1", "--tool-uses", "1", "--duration", "1", expect=2)
+        self.assertIn("--model", err)
+        self.ai("settle", "t1", "--outcome", "infra-death")
+        self.assertEqual(self.ticket_by_id("t1")["outcome"], "infra-death")
+
+    def test_figures_records_the_three_and_changes_no_other_field(self):
+        self._settle_without_figures()
+        before = self.ticket_by_id("t1")
+        self.ai("figures", "t1", "--tokens", "120", "--tool-uses", "7", "--duration", "33")
+        after = self.ticket_by_id("t1")
+        self.assertEqual((after["tokens"], after["tool_uses"], after["duration_s"]), (120, 7, 33))
+        changed = {key for key in before if before[key] != after[key]}
+        self.assertEqual(changed, {"tokens", "tool_uses", "duration_s"})
+        self.assertEqual(set(before), set(after))
+
+    def test_figures_replaces_the_figures_a_settle_recorded(self):
+        self.ai("settle", "t1", "--outcome", "ok", "--model", "sonnet", "--tokens", "10", "--tool-uses", "2", "--duration", "5")
+        self.ai("figures", "t1", "--tokens", "11", "--tool-uses", "3", "--duration", "6")
+        ticket = self.ticket_by_id("t1")
+        self.assertEqual((ticket["tokens"], ticket["tool_uses"], ticket["duration_s"]), (11, 3, 6))
+
+    def test_figures_on_a_done_task(self):
+        self._settle_without_figures()
+        self._commit_phase()
+        self.ai("close")
+        self.assertEqual(self.task()["status"], "done")
+        self.ai("figures", "t1", "--tokens", "9", "--tool-uses", "1", "--duration", "4")
+        self.assertEqual(self.ticket_by_id("t1")["tokens"], 9)
+        self.assertEqual(self.task()["status"], "done")
+
+    def test_the_command_close_prints_writes_to_the_closed_task_not_to_the_active_one(self):
+        self._settle_without_figures()
+        self._commit_phase()
+        _, out, _ = self.ai("close")
+        closed = self.task()["task"]
+        command = next(line for line in out.splitlines() if "ai-team figures" in line).split("`")[1]
+        self.assertIn("--task %s" % closed, command)
+        # ticket ids restart in every task: the second task has its own t1, with real figures
+        self.ai("new", "second", "--kind", "bounded")
+        self.ai("plan", "generate", "--objective", "x", "--check", "true", "--failure", "never red: a no-op", "--file", "README.md")
+        self.ai("acquire", "implementer")
+        self.ai("settle", "t1", "--outcome", "ok", "--model", "sonnet", "--tokens", "5", "--tool-uses", "1", "--duration", "2")
+        args = command.split()[2:]
+        args = [arg.replace("<n>", "77").replace("<s>", "88") for arg in args]
+        _, figures_out, _ = self.ai("figures", *args)
+        self.assertIn(closed, figures_out)
+        tasks = {t["task"]: t for t in self._all_tasks()}
+        first, second = tasks[closed]["tickets"][0], next(t for name, t in tasks.items() if name != closed)["tickets"][0]
+        self.assertEqual((first["tokens"], first["tool_uses"], first["duration_s"]), (77, 77, 88))
+        self.assertEqual((second["tokens"], second["tool_uses"], second["duration_s"]), (5, 1, 2))
+
+    def _all_tasks(self):
+        tasks_dir = os.path.join(self.root, ".ai-team", "tasks")
+        found = []
+        for name in sorted(os.listdir(tasks_dir)):
+            if name.endswith(".json"):
+                with open(os.path.join(tasks_dir, name)) as handle:
+                    found.append(json.load(handle))
+        return found
+
+    def test_figures_on_an_open_ticket_is_refused_naming_settle(self):
+        _, _, err = self.ai("figures", "t1", "--tokens", "9", "--tool-uses", "1", "--duration", "4", expect=2)
+        self.assertIn("ai-team settle", err)
+        self.assertIsNone(self.ticket_by_id("t1")["tokens"])
+
+    def test_figures_refuses_a_partial_set_naming_the_missing_flags(self):
+        self._settle_without_figures()
+        _, _, err = self.ai("figures", "t1", "--tokens", "9", expect=2)
+        self.assertIn("--tool-uses", err)
+        self.assertIn("--duration", err)
+        self.assertIsNone(self.ticket_by_id("t1")["tokens"])
+
+    def test_close_names_the_ticket_and_the_command_that_supplies_its_figures(self):
+        self._settle_without_figures()
+        self._commit_phase()
+        code, out, _ = self.ai("close")
+        self.assertEqual(code, 0)
+        self.assertIn("ticket t1", out)
+        self.assertIn("ai-team figures t1 --task %s --tokens <n> --tool-uses <n> --duration <s>" % self.task()["task"], out)
+
+    def test_close_prints_no_figures_line_when_every_ticket_holds_them(self):
+        self.ai("settle", "t1", "--outcome", "ok", "--model", "sonnet", "--tokens", "10", "--tool-uses", "2", "--duration", "5")
+        self._commit_phase()
+        _, out, _ = self.ai("close")
+        self.assertNotIn("ai-team figures", out)
+
+    def test_close_leaves_an_infra_death_ticket_out_of_the_list(self):
+        self.ai("settle", "t1", "--outcome", "infra-death")
+        self.ai("acquire", "implementer")
+        self.ai("settle", "t2", "--outcome", "ok", "--model", "sonnet", "--tokens", "10", "--tool-uses", "2", "--duration", "5")
+        self._commit_phase()
+        _, out, _ = self.ai("close")
+        self.assertNotIn("ai-team figures", out)
 
 
 class TestMirrors(ProjectCase):

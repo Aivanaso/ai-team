@@ -41,6 +41,25 @@ def _int_field(name, value):
     return value
 
 
+FIGURE_FLAGS = (("tokens", "--tokens"), ("tool_uses", "--tool-uses"), ("duration_s", "--duration"))
+
+
+def _figures(tokens, tool_uses, duration_s):
+    """The three harness figures as one set: all three given (each a non-negative integer) or none
+    of them (stored as null, shown as `not recorded`). A partial set is refused, naming the missing
+    flags and the verb that records them."""
+    given = {"tokens": tokens, "tool_uses": tool_uses, "duration_s": duration_s}
+    if all(value is None for value in given.values()):
+        return None, None, None
+    missing = [flag for key, flag in FIGURE_FLAGS if given[key] is None]
+    if missing:
+        raise MachineError(
+            "the figures come as a set of three: missing %s -- pass all of --tokens --tool-uses --duration, or none "
+            "of them and record them later with `ai-team figures <ticket> --tokens <n> --tool-uses <n> --duration <s>`"
+            % " ".join(missing), 2)
+    return (_int_field("tokens", tokens), _int_field("tool-uses", tool_uses), _int_field("duration", duration_s))
+
+
 class Machine:
     def __init__(self, store):
         self.store = store
@@ -309,9 +328,7 @@ class Machine:
         if outcome != "infra-death":
             if not model:
                 raise MachineError("--model is required (the harness reports it)", 2)
-            tokens = _int_field("tokens", tokens)
-            tool_uses = _int_field("tool-uses", tool_uses)
-            duration_s = _int_field("duration", duration_s)
+            tokens, tool_uses, duration_s = _figures(tokens, tool_uses, duration_s)
         kind = ticket["kind"]
         data = None
         notes = []
@@ -382,6 +399,20 @@ class Machine:
             )
         self.store.save(task)
         return ticket, notes
+
+    def figures(self, task, ticket_id, tokens=None, tool_uses=None, duration_s=None):
+        """Records or replaces the three figures of a settled ticket, also when the task is done;
+        every other field of the ticket stays as it was."""
+        ticket = self.ticket(task, ticket_id)
+        if ticket["settled_at"] is None:
+            raise MachineError("ticket %s is still open -- `ai-team settle %s --outcome <...> --model <m>` closes it; "
+                               "figures are recorded on a settled ticket" % (ticket_id, ticket_id), 2)
+        values = _figures(tokens, tool_uses, duration_s)
+        if values[0] is None:
+            raise MachineError("figures needs the three: --tokens <n> --tool-uses <n> --duration <s>", 2)
+        ticket["tokens"], ticket["tool_uses"], ticket["duration_s"] = values
+        self.store.save(task)
+        return ticket
 
     def declare_tier(self, task, phase_n, tier, reason):
         if tier not in (0, 1, 2):
@@ -647,6 +678,17 @@ class Machine:
             "decision", self.store.root,
         )
         return balance
+
+    def figureless(self, task):
+        """One line per settled ticket that holds no figures (an infra-death ticket never has any),
+        naming the verb that supplies them and the task it writes to (ticket ids restart in every task)."""
+        return [
+            "ticket %s (%s) holds no figures: `ai-team figures %s --task %s --tokens <n> --tool-uses <n> --duration <s>`"
+            % (t["id"], t["kind"], t["id"], task["task"])
+            for t in task["tickets"]
+            if t["settled_at"] is not None and t["outcome"] != "infra-death"
+            and any(t.get(key) is None for key, _ in FIGURE_FLAGS)
+        ]
 
     def pause(self, task, question):
         if task["status"] != "active":

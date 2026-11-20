@@ -8,13 +8,21 @@ An envelope is a **claim**; the tree is the proof. Before settling:
   --porcelain` shows only expected files (a stray path is scope creep to name).
 - A report was expected (scout, lenses): the file exists at the injected destination.
 
-## Settle — always, immediately, with the harness figures
+## Settle — always, in the turn the sub-agent returns
+
+In a background launch the report arrives as the hand-back message and the figures in the
+`<usage>` block of the `<task-notification>` (duration there is in milliseconds, settle takes
+seconds). The first action after a hand-back is the tree verification above, a tool call; settle
+in that same turn, never waiting for the notification and never estimating a figure:
 
 ```
 ai-team settle <ticket> --outcome <ok|warning|needs_input|blocked|failed|infra-death> \
-  --model <alias> --tokens <n> --tool-uses <n> --duration <seconds> [--report <path.md>]
+  --model <alias> [--tokens <n> --tool-uses <n> --duration <seconds>] [--report <path.md>]
 ```
-The `Agent` tool result reports tokens, tool uses and duration — copy them from the tool result.
+Pass the three figures together when the notification is in view, none otherwise (stored as
+`not recorded`). When they arrive later: `ai-team figures <ticket> --tokens <n> --tool-uses <n>
+--duration <seconds>`, also after `close`: `close` lists each ticket still lacking them, with
+`--task <closed task>` in the command (ticket ids restart in every task); run that line as printed.
 A death without an envelope is `infra-death` (no figures; it does not count as an attempt):
 verify the tree with `git status`, then relaunch the same prompt.
 

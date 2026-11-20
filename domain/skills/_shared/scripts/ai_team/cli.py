@@ -289,7 +289,7 @@ def cmd_acquire(args):
     hint = machine.attempt_hint(task, ticket)
     if hint:
         print(hint)
-    print("settle with: ai-team settle %s --outcome <ok|warning|needs_input|blocked|failed|infra-death> --model <m> --tokens <n> --tool-uses <n> --duration <s>%s"
+    print("settle with: ai-team settle %s --outcome <ok|warning|needs_input|blocked|failed|infra-death> --model <m> [--tokens <n> --tool-uses <n> --duration <s>]%s"
           % (ticket["id"], " --report <path.md>" if ticket["kind"] in ("reviewer", "security-audit", "scout-scope", "scout-map") else ""))
     return 0
 
@@ -307,6 +307,16 @@ def cmd_settle(args):
     print(line)
     for note in notes:
         print(note)
+    return 0
+
+
+def cmd_figures(args):
+    store = Store(_root(args))
+    task = _task(store, args.task, allow_done=True)
+    ticket = Machine(store).figures(
+        task, args.ticket, tokens=args.tokens, tool_uses=args.tool_uses, duration_s=args.duration)
+    print("task %s ticket %s figures recorded: %d tokens · %d tool uses · %ds"
+          % (task["task"], ticket["id"], ticket["tokens"], ticket["tool_uses"], ticket["duration_s"]))
     return 0
 
 
@@ -363,8 +373,11 @@ def cmd_resume(args):
 def cmd_close(args):
     store = Store(_root(args))
     task = _task(store)
-    balance = Machine(store).close(task)
+    machine = Machine(store)
+    balance = machine.close(task)
     print("task %s done · %d tickets · %d tokens · %d attempts" % (task["task"], balance["tickets"], balance["tokens"], balance["attempts"]))
+    for line in machine.figureless(task):
+        print(line)
     print("next: `ai-team acquire retro` when a retrospective is wanted")
     return 0
 
@@ -461,7 +474,7 @@ def build_parser():
     p.add_argument("--task")
     p.set_defaults(func=cmd_acquire)
 
-    p = sub.add_parser("settle", help="close a ticket with the harness figures")
+    p = sub.add_parser("settle", help="close a ticket; the harness figures come with it or later with `figures`")
     p.add_argument("ticket")
     p.add_argument("--outcome", required=True)
     p.add_argument("--model")
@@ -472,6 +485,14 @@ def build_parser():
     p.add_argument("--defer", help="comma-separated finding ids to park in tech-debt.md")
     p.add_argument("--task")
     p.set_defaults(func=cmd_settle)
+
+    p = sub.add_parser("figures", help="record or replace the harness figures of a settled ticket")
+    p.add_argument("ticket")
+    p.add_argument("--tokens", type=int)
+    p.add_argument("--tool-uses", type=int)
+    p.add_argument("--duration", type=int, help="seconds")
+    p.add_argument("--task")
+    p.set_defaults(func=cmd_figures)
 
     p = sub.add_parser("ruling", help="adjudicate one open finding")
     p.add_argument("ticket")
